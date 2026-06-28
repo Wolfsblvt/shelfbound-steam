@@ -1,0 +1,21 @@
+<Project>
+
+  <!-- Shared package/assembly metadata for the whole solution. -->
+  <PropertyGroup>
+    <Version>0.4.0</Version>
+    <Authors>Wolfsblvt</Authors>
+    <Company>Wolfsblvt</Company>
+    <Product>Shelfbound</Product>
+    <RepositoryType>git</RepositoryType>
+    <RepositoryUrl>https://github.com/Wolfsblvt/shelfbound-steam</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/Wolfsblvt/shelfbound-steam</PackageProjectUrl>
+    <PackageTags>steam;mcp;model-context-protocol;game-library;shelfbound</PackageTags>
+  </PropertyGroup>
+
+  <!-- Only the reusable libraries ship as NuGet packages (consumed by the private cloud). -->
+  <PropertyGroup>
+    <IsPackable Condition="'$(MSBuildProjectName)' == 'Shelfbound.Core' Or '$(MSBuildProjectName)' == 'Shelfbound.Query' Or '$(MSBuildProjectName)' == 'Shelfbound.Steam'">true</IsPackable>
+    <IsPackable Condition="'$(IsPackable)' == ''">false</IsPackable>
+  </PropertyGroup>
+
+</Project>
