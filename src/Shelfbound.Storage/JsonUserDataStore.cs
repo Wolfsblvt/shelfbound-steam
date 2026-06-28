@@ -1,5 +1,4 @@
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using Shelfbound.Core.UserData;
 
 namespace Shelfbound.Storage;
@@ -7,18 +6,14 @@ namespace Shelfbound.Storage;
 /// <summary>
 /// Local JSON-file user-data store: one file per owner under the Shelfbound config directory. Writes
 /// are atomic (temp file + move) and guarded by an in-process lock. This is the local implementation
-/// of <see cref="IUserDataStore"/>; the hosted layer provides a database-backed one over the same
-/// contract. (A SQLite backend is the planned upgrade if concurrency/query needs grow.)
+/// of <see cref="IUserDataStore"/>; the hosted layer provides a database-backed store over the same
+/// <see cref="UserProfile"/> model and <see cref="UserDataJson"/> format. (A SQLite backend is the
+/// planned local upgrade if concurrency/query needs grow.)
 /// </summary>
 public sealed class JsonUserDataStore : IUserDataStore
 {
-    private static readonly JsonSerializerOptions Options = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-        WriteIndented = true,
-        Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) },
-    };
+    // Indented for human-readable on-disk files; same canonical naming/enum/null policy as everywhere.
+    private static readonly JsonSerializerOptions Options = UserDataJson.Create(indented: true);
 
     private readonly Lock _sync = new();
     private readonly string _profilesDirectory;

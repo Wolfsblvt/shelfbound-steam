@@ -15,10 +15,7 @@ public static class LibraryReconciler
         var ids = appIds.ToList();
         store.Update(ownerId, profile =>
         {
-            var now = DateTimeOffset.UtcNow;
-            profile.FirstScanAt ??= now;
-            foreach (int appId in ids)
-                profile.FirstSeen.TryAdd(appId, now);
+            UserDataActions.RecordFirstSeen(profile, ids, DateTimeOffset.UtcNow);
             return 0;
         });
     }

@@ -45,4 +45,17 @@ public static class UserDataActions
         profile.CategoryDefinitions[name] = definition;
         return definition;
     }
+
+    /// <summary>
+    /// Records the first time each app id was observed owned, the proxy Shelfbound uses for "recently
+    /// added/bought" (Steam exposes no purchase date). The first call establishes the baseline scan
+    /// time; later calls only timestamp apps not seen before, so games first seen after the baseline
+    /// are the genuinely new ones. Pure — call inside a store transaction.
+    /// </summary>
+    public static void RecordFirstSeen(UserProfile profile, IEnumerable<int> appIds, DateTimeOffset now)
+    {
+        profile.FirstScanAt ??= now;
+        foreach (int appId in appIds)
+            profile.FirstSeen.TryAdd(appId, now);
+    }
 }

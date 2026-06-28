@@ -1,14 +1,25 @@
 name: Publish NuGet
 
-# Packs the reusable libraries (Shelfbound.Core / Query / Steam) and pushes them to NuGet.org.
-# Triggered by a version tag (e.g. v0.4.0) or manually. Requires the NUGET_API_KEY repo secret.
+# Packs the reusable libraries (Shelfbound.Core / Query / Steam) and pushes them to NuGet.org
+# using Trusted Publishing (OIDC) — no long-lived API key is stored. A short-lived key is minted
+# per run by exchanging a GitHub OIDC token against the policy configured on nuget.org.
+#
+# Setup on nuget.org (one-time): Username -> Trusted Publishing -> Add policy with
+#   repository owner = Wolfsblvt, repository = shelfbound-steam, workflow = nuget-publish.yml.
+# Then set NUGET_USER below to your nuget.org account name.
+#
+# Triggered by a version tag (e.g. v0.4.0) or manually.
 on:
   push:
     tags: ["v*"]
   workflow_dispatch:
 
+env:
+  NUGET_USER: REPLACE_WITH_NUGET_ORG_USERNAME
+
 permissions:
   contents: read
+  id-token: write # required for Trusted Publishing (OIDC token issuance)
 
 jobs:
   publish:
@@ -19,4 +30,9 @@ jobs:
         with:
           dotnet-version: "10.0.x"
       - run: dotnet pack -c Release -o ./artifacts
-      - run: dotnet nuget push "./artifacts/*.nupkg" --api-key "${{ secrets.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate
+      - name: Mint a short-lived NuGet API key via Trusted Publishing
+        id: nuget-login
+        uses: NuGet/login@v1
+        with:
+          user: ${{ env.NUGET_USER }}
+      - run: dotnet nuget push "./artifacts/*.nupkg" --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate
