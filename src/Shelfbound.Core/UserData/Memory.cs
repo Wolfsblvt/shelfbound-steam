@@ -1,4 +1,4 @@
-namespace Shelfbound.Storage.UserData;
+namespace Shelfbound.Core.UserData;
 
 /// <summary>
 /// A durable, user-owned fact saved by the user or the model: a note, an opinion, a preference, or a

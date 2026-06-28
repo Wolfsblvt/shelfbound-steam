@@ -1,7 +1,7 @@
 using System.ComponentModel;
 using ModelContextProtocol.Server;
+using Shelfbound.Core.UserData;
 using Shelfbound.Storage;
-using Shelfbound.Storage.UserData;
 
 namespace Shelfbound.Mcp.Tools;
 

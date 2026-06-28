@@ -40,7 +40,8 @@ metadata, not just local data.
 
 ## Search/filter model
 
-`search_library` should accept a rich, composable, **deterministic** filter set:
+`search_library` operates on the **merged view** (snapshot facts + user-data) and accepts a rich,
+composable, **deterministic** filter set:
 
 - text query; app id/name
 - categories/collections (include / exclude)

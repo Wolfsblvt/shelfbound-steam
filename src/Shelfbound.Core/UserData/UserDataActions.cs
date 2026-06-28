@@ -1,9 +1,9 @@
-namespace Shelfbound.Storage.UserData;
+namespace Shelfbound.Core.UserData;
 
 /// <summary>
 /// Centralized mutations on a <see cref="UserProfile"/> so the CLI, MCP tools, and (later) the hosted
-/// layer apply changes consistently (timestamps, upserts). Call these inside an
-/// <c>IUserDataStore.Update</c> transaction.
+/// layer apply changes consistently (timestamps, upserts). Pure helpers; call them inside a store
+/// transaction (e.g. <c>IUserDataStore.Update</c>).
 /// </summary>
 public static class UserDataActions
 {

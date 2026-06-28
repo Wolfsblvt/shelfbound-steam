@@ -1,4 +1,4 @@
-namespace Shelfbound.Storage.UserData;
+namespace Shelfbound.Core.UserData;
 
 /// <summary>Where a game stands for the user. Centralized so callers don't pass loose strings.</summary>
 public enum GameStatus

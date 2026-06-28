@@ -1,6 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Shelfbound.Storage.UserData;
+using Shelfbound.Core.UserData;
 
 namespace Shelfbound.Storage;
 

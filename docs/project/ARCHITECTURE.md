@@ -51,8 +51,8 @@ src/
   Shelfbound.Core      Domain models + snapshot contract + serializer. Pure, no I/O.
   Shelfbound.Steam     Local Steam scanner (VDF/ACF, categories) + Steam Web API client + enrichment.
                        The differentiator; auditable and open.
-  Shelfbound.Query     Deterministic filter/sort/summary engine over a snapshot. No I/O, no LLM;
-                       reused by the MCP server now and the dashboard/hosted layer later.
+  Shelfbound.Query     Merged library view (snapshot facts + user-data) + deterministic
+                       filter/sort/summary. No I/O, no LLM; reused by MCP now, dashboard/hosted later.
   Shelfbound.Storage   Local config (API key), the identity seam, and the user-data store
                        (statuses/ratings/completion/aspects, scoped memories, category meanings).
   Shelfbound.Cli       `shelfbound setup` + `shelfbound scan` — config, scan (+ enrichment), output.

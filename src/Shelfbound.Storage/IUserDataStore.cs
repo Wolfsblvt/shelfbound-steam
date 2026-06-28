@@ -1,4 +1,4 @@
-using Shelfbound.Storage.UserData;
+using Shelfbound.Core.UserData;
 
 namespace Shelfbound.Storage;
 

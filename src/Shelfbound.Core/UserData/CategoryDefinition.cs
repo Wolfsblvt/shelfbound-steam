@@ -1,4 +1,4 @@
-namespace Shelfbound.Storage.UserData;
+namespace Shelfbound.Core.UserData;
 
 /// <summary>The user's personal meaning for a local Steam collection/category name (e.g. what "Hold" means).</summary>
 public sealed record CategoryDefinition

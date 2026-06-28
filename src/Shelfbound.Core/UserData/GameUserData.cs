@@ -1,4 +1,4 @@
-namespace Shelfbound.Storage.UserData;
+namespace Shelfbound.Core.UserData;
 
 /// <summary>
 /// Per-game user/derived data layered on top of the snapshot's factual data. Flexible by design:

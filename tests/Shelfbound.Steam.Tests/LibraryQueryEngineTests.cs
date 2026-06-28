@@ -1,6 +1,7 @@
 using Shouldly;
 using Shelfbound.Core;
 using Shelfbound.Core.Model;
+using Shelfbound.Core.UserData;
 using Shelfbound.Query;
 
 namespace Shelfbound.Steam.Tests;
@@ -21,50 +22,59 @@ public class LibraryQueryEngineTests
     private static SnapshotGame Game(int id, string name, bool installed, long? playtime = null, params string[] categories) =>
         new() { AppId = id, Name = name, Installed = installed, PlaytimeMinutes = playtime, Categories = categories };
 
+    private static LibraryView View(params SnapshotGame[] games) => LibraryViewBuilder.Build(Snapshot(games));
+    private static LibraryView View(UserProfile userData, params SnapshotGame[] games) => LibraryViewBuilder.Build(Snapshot(games), userData);
+
     [Fact]
     public void Filters_by_text_installed_and_categories()
     {
-        var snap = Snapshot(
+        var view = View(
             Game(1, "Outer Wilds", installed: true, 120, "Deck", "Directly Choice"),
             Game(2, "Hades", installed: true, 0, "Deck"),
             Game(3, "Stardew Valley", installed: false, 3000, "Hold"));
 
-        LibraryQueryEngine.Search(snap, new LibraryFilter { Text = "out" })
+        LibraryQueryEngine.Search(view, new LibraryFilter { Text = "out" })
             .ShouldHaveSingleItem().Name.ShouldBe("Outer Wilds");
-
-        LibraryQueryEngine.Search(snap, new LibraryFilter { Installed = false })
+        LibraryQueryEngine.Search(view, new LibraryFilter { Installed = false })
             .ShouldHaveSingleItem().Name.ShouldBe("Stardew Valley");
-
-        LibraryQueryEngine.Search(snap, new LibraryFilter { CategoriesAny = ["deck"] }) // case-insensitive
+        LibraryQueryEngine.Search(view, new LibraryFilter { CategoriesAny = ["deck"] }) // case-insensitive
             .Select(g => g.AppId).ShouldBe([1, 2], ignoreOrder: true);
-
-        LibraryQueryEngine.Search(snap, new LibraryFilter { CategoriesNone = ["Deck"] })
+        LibraryQueryEngine.Search(view, new LibraryFilter { CategoriesNone = ["Deck"] })
             .ShouldHaveSingleItem().Name.ShouldBe("Stardew Valley");
     }
 
     [Fact]
     public void Filters_by_playtime_and_sorts_and_limits()
     {
-        var snap = Snapshot(
-            Game(1, "A", true, 50),
-            Game(2, "B", true, 500),
-            Game(3, "C", true, 0));
+        var view = View(Game(1, "A", true, 50), Game(2, "B", true, 500), Game(3, "C", true, 0));
 
-        LibraryQueryEngine.Search(snap, new LibraryFilter { MaxPlaytimeMinutes = 100 })
+        LibraryQueryEngine.Search(view, new LibraryFilter { MaxPlaytimeMinutes = 100 })
             .Select(g => g.Name).ShouldBe(["A", "C"], ignoreOrder: true);
-
-        LibraryQueryEngine.Search(snap, new LibraryFilter { Sort = LibrarySort.PlaytimeMinutes, Descending = true, Limit = 1 })
+        LibraryQueryEngine.Search(view, new LibraryFilter { Sort = LibrarySort.PlaytimeMinutes, Descending = true, Limit = 1 })
             .ShouldHaveSingleItem().Name.ShouldBe("B");
+    }
+
+    [Fact]
+    public void Filters_by_user_data_status_rating_and_completion()
+    {
+        var profile = new UserProfile { OwnerId = "x" };
+        UserDataActions.UpsertGame(profile, 1, g => g with { Status = GameStatus.Finished, Rating = GameRating.Loved, CompletionPercent = 100 });
+        UserDataActions.UpsertGame(profile, 2, g => g with { Status = GameStatus.Playing });
+
+        var view = View(profile, Game(1, "Done", true), Game(2, "Now", true), Game(3, "Untouched", true));
+
+        LibraryQueryEngine.Search(view, new LibraryFilter { Status = GameStatus.Finished })
+            .ShouldHaveSingleItem().Name.ShouldBe("Done");
+        LibraryQueryEngine.Search(view, new LibraryFilter { Rating = GameRating.Loved })
+            .ShouldHaveSingleItem().Name.ShouldBe("Done");
+        LibraryQueryEngine.Search(view, new LibraryFilter { MinCompletionPercent = 50 })
+            .ShouldHaveSingleItem().Name.ShouldBe("Done");
     }
 
     [Fact]
     public void Summarize_reports_totals_and_playtime()
     {
-        var snap = Snapshot(
-            Game(1, "A", true, 50, "Deck"),
-            Game(2, "B", false, 500));
-
-        var summary = LibraryQueryEngine.Summarize(snap);
+        var summary = LibraryQueryEngine.Summarize(View(Game(1, "A", true, 50, "Deck"), Game(2, "B", false, 500)));
         summary.TotalGames.ShouldBe(2);
         summary.InstalledGames.ShouldBe(1);
         summary.CategorizedGames.ShouldBe(1);
@@ -74,6 +84,6 @@ public class LibraryQueryEngineTests
     [Fact]
     public void Summarize_playtime_is_null_when_not_enriched()
     {
-        LibraryQueryEngine.Summarize(Snapshot(Game(1, "A", true))).TotalPlaytimeMinutes.ShouldBeNull();
+        LibraryQueryEngine.Summarize(View(Game(1, "A", true))).TotalPlaytimeMinutes.ShouldBeNull();
     }
 }

@@ -1,4 +1,4 @@
-namespace Shelfbound.Storage.UserData;
+namespace Shelfbound.Core.UserData;
 
 /// <summary>
 /// The root user-data document for one owner (profile). Locally there is a single profile (the machine
