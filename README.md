@@ -38,6 +38,7 @@ Requires the **.NET 10 SDK**.
 dotnet build
 dotnet run --project src/Shelfbound.Cli -- setup        # one-time: shows config + how to add an API key
 dotnet run --project src/Shelfbound.Cli -- scan --pretty
+dotnet run --project src/Shelfbound.Cli -- profile      # what Shelfbound remembers about your library
 ```
 
 **Steam Web API key (optional — for owned-but-not-installed games + playtime):** get one at

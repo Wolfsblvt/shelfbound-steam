@@ -32,6 +32,14 @@ logic lives in the reusable `Shelfbound.Query` engine.
 `record_user_preference`, plus deletes (`delete_game_note`, `delete_memory`). Tool descriptions should
 *encourage the model to save explicit durable facts* when the user clearly states them.
 
+## Onboarding & "save it as you go"
+
+`get_profile_status` reports whether the user's taste profile is set up and what to ask (games to rate,
+undefined category meanings). The server also ships **instructions** (in the MCP `initialize` result)
+telling the model to save context whenever the user states an opinion/status/meaning, and to onboard
+when the profile is sparse (ask, then save). The deterministic profile logic lives in the shared
+`ProfileQuery`; the model drives the conversation. `delete_memory` lets the user forget/correct.
+
 ## Later / advanced
 
 `find_games_by_mood`, `recommend_next_game`, `find_short_story_games`, `find_games_for_steam_deck`,

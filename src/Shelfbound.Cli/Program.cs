@@ -2,9 +2,12 @@ using System.Reflection;
 using Shelfbound.Cli;
 using Shelfbound.Core;
 using Shelfbound.Core.Model;
+using Shelfbound.Core.UserData;
+using Shelfbound.Query;
 using Shelfbound.Steam.Enrichment;
 using Shelfbound.Steam.Steam;
 using Shelfbound.Steam.Web;
+using Shelfbound.Storage;
 using Shelfbound.Storage.Config;
 
 string version = ResolveVersion();
@@ -24,6 +27,11 @@ if (args[0] is "-v" or "--version")
 if (args[0] == "setup")
 {
     return RunSetup(args);
+}
+
+if (args[0] == "profile")
+{
+    return RunProfile();
 }
 
 if (args[0] != "scan")
@@ -239,6 +247,81 @@ static int RunSetup(string[] args)
 
 static string Mask(string value) => value.Length <= 4 ? "****" : new string('*', value.Length - 4) + value[^4..];
 
+static int RunProfile()
+{
+    var config = ShelfboundConfig.Load();
+    string? steamRoot = SteamInstallLocator.Locate();
+    if (steamRoot is null)
+    {
+        Console.Error.WriteLine("Could not find a Steam installation. Run 'shelfbound scan' first, or set SHELFBOUND_STEAM_PATH.");
+        return 1;
+    }
+
+    ScanResult scan = new SteamScanner().Scan(new SteamScanRequest
+    {
+        SteamRootPath = steamRoot,
+        Device = DeviceIdentity.Resolve(null, null),
+        ToolVersion = ResolveVersion(),
+    });
+
+    SteamAccount? account = scan.Snapshot.SteamAccounts.FirstOrDefault(a => a.MostRecent)
+        ?? scan.Snapshot.SteamAccounts.FirstOrDefault();
+    string ownerId = ProfileIdentity.Resolve(config, account?.SteamId64);
+
+    UserProfile profile = new JsonUserDataStore(ShelfboundPaths.ProfilesDirectory).Load(ownerId);
+    LibraryView view = LibraryViewBuilder.Build(scan.Snapshot, profile);
+    ProfileSummary summary = ProfileQuery.Summarize(view);
+
+    Console.WriteLine("What Shelfbound remembers");
+    Console.WriteLine();
+    Console.WriteLine($"  profile          : {ownerId}");
+    Console.WriteLine($"  set up           : {(summary.IsSetUp ? "yes" : "no - rate a few games or tell Shelfbound your preferences")}");
+    Console.WriteLine($"  rated games      : {summary.RatedGames}");
+    Console.WriteLine($"  games w/ status  : {summary.GamesWithStatus}");
+    Console.WriteLine($"  preferences      : {summary.GlobalPreferences}");
+    Console.WriteLine($"  category meanings: {summary.CategoryMeanings} / {view.Categories.Count}");
+
+    if (profile.CategoryDefinitions.Count > 0)
+    {
+        Console.WriteLine();
+        Console.WriteLine("  category meanings:");
+        foreach (var def in profile.CategoryDefinitions.Values.OrderBy(d => d.Name))
+            Console.WriteLine($"      - {def.Name}: {def.Meaning}");
+    }
+
+    var preferences = profile.Memories.Where(m => m.Scope == MemoryScope.Global).ToList();
+    if (preferences.Count > 0)
+    {
+        Console.WriteLine();
+        Console.WriteLine("  preferences:");
+        foreach (var memory in preferences)
+            Console.WriteLine($"      - {memory.Text}");
+    }
+
+    var withData = view.Games.Where(g => g.UserData is not null).OrderBy(g => g.Name).ToList();
+    if (withData.Count > 0)
+    {
+        Console.WriteLine();
+        Console.WriteLine("  per-game:");
+        foreach (var game in withData)
+        {
+            var bits = new List<string>();
+            if (game.Status is { } s) bits.Add(s.ToString());
+            if (game.Rating is { } r) bits.Add(r.ToString());
+            if (game.CompletionPercent is { } c) bits.Add($"{c}%");
+            Console.WriteLine($"      - {game.Name}: {string.Join(", ", bits)}");
+        }
+    }
+
+    if (!summary.IsSetUp)
+    {
+        Console.WriteLine();
+        Console.WriteLine("Tip: connect Shelfbound to an MCP client (Claude/ChatGPT) and it can ask about your");
+        Console.WriteLine("favorites and save your taste — or record it yourself there.");
+    }
+    return 0;
+}
+
 static string FormatBytes(long bytes)
 {
     string[] units = ["B", "KB", "MB", "GB", "TB"];
@@ -260,6 +343,7 @@ static void PrintUsage()
 
         USAGE:
           shelfbound setup [--steam-api-key <key>] [--show]
+          shelfbound profile
           shelfbound scan [options]
 
         OPTIONS:

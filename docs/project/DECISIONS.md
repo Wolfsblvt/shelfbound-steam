@@ -91,6 +91,22 @@ both the CLI and the MCP server (key precedence: flag > env > config). The key i
 read-only, rate-limited credential, stored plaintext in the protected config dir for now (OS-keystore
 encryption — DPAPI / libsecret — is a planned hardening). Never in the repo, never logged.
 
+### Surfacing user data — shared logic, per-surface presentation
+"What Shelfbound remembers" appears in several places: the CLI (`shelfbound profile`), the local MCP
+server (`get_remembered` / `get_profile_status`, rendered conversationally), and the future hosted
+dashboard (web UI). Decision: **share the data model (`Shelfbound.Core.UserData`) and the derivation
+logic (`Shelfbound.Query` — the merged view + `ProfileQuery`); reimplement only the presentation per
+surface.** A cross-surface rendering layer (text vs web vs chat) isn't worth it — the shared layer is
+the model + query/derivation, which every surface (including the hosted one) reuses. The dashboard
+re-renders the same data over the hosted store rather than sharing rendering code.
+
+### Onboarding via MCP — model-driven, profile-aware
+`get_profile_status` reports whether the taste profile is set up and what to ask (suggested games to
+rate, undefined category meanings). Its description plus **server-level instructions** push the model
+to onboard the user (ask, then save via the write tools) when the profile is sparse, and to save
+context whenever the user states an opinion/status/meaning. The deterministic profile logic lives in
+the shared `ProfileQuery`; the model drives the conversation.
+
 ### Deferred (technical, recorded so it isn't re-litigated)
 - **Distribution** — package the CLI/MCP server as a dotnet tool + GitHub Releases.
 - **Modern dynamic collections** (leveldb) to complement the legacy categories already parsed.

@@ -61,15 +61,17 @@ The local Steam data is the moat. AI reasoning is commodity; good structured fac
 - **`Shelfbound.Query`**: deterministic filter/sort/summary over a **merged library view** (snapshot
   facts + user-data) — search by category, install state, playtime, **status, rating, and completion**.
 - **Local MCP server** (`Shelfbound.Mcp`, stdio): read tools (`search_library`, `get_library_summary`,
-  `get_categories`, `get_game_details`, `find_installed_unplayed`) **and write/remember tools**
+  `get_categories`, `get_game_details`, `find_installed_unplayed`), write/remember tools
   (`record_game_status`, `record_game_opinion`, `set_game_completion`, `set_category_definition`,
-  `remember`, `get_game_user_data`, `get_remembered`).
+  `remember`, `delete_memory`, `get_game_user_data`, `get_remembered`), an onboarding endpoint
+  (`get_profile_status`), and **server instructions** that push the model to save context and onboard.
 - **`Shelfbound.Storage`**: local config (API key), the **identity seam** (owner/profile), and a
   user-data store — per-game status/rating/completion/aspects, scoped memories, category meanings —
   shared by the CLI and MCP server.
-- CLI (`Shelfbound.Cli`): `shelfbound setup` (store API key) and `shelfbound scan` (+ enrichment).
-- xUnit + Shouldly tests (19). Verified on a real ~111-game / 2-library install (12 categories); MCP
-  server smoke-tested over stdio incl. a write→search round-trip (record status → search by status).
+- CLI (`Shelfbound.Cli`): `shelfbound setup` (API key), `shelfbound scan` (+ enrichment), and
+  `shelfbound profile` (a local "what Shelfbound remembers" view).
+- xUnit + Shouldly tests (21). Verified on a real ~111-game / 2-library install; MCP server
+  smoke-tested over stdio (write→search round-trip, server instructions, get_profile_status).
 - **Local only. Identity is the local machine owner; real auth slots in for the hosted layer.**
 
 **Data scope:** installed + (with an API key) owned-but-not-installed Steam games, playtime, Steam

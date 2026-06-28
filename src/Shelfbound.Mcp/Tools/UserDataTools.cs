@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using ModelContextProtocol.Server;
 using Shelfbound.Core.UserData;
+using Shelfbound.Query;
 using Shelfbound.Storage;
 
 namespace Shelfbound.Mcp.Tools;
@@ -15,6 +16,21 @@ namespace Shelfbound.Mcp.Tools;
 public static class UserDataTools
 {
     private const string Source = "mcp-conversation";
+
+    [McpServerTool(Name = "get_profile_status")]
+    [Description("Check how set-up the user's taste profile is and what to ask about. If the profile is sparse (isSetUp=false, or few rated games / preferences), STRONGLY consider onboarding the user before recommending: ask about a few of the suggestedGamesToRate and their general preferences, then save with record_game_opinion / remember. Ask what any undefinedCategories mean and save with set_category_definition. Call this before giving recommendations.")]
+    public static ProfileSummary GetProfileStatus(SnapshotContext context, IUserDataStore store) =>
+        ProfileQuery.Summarize(LibraryViewBuilder.Build(context.Snapshot, store.Load(context.OwnerId)));
+
+    [McpServerTool(Name = "delete_memory")]
+    [Description("Delete a stored memory by its id (ids come from get_remembered / get_game_user_data). Use when the user asks to forget something or corrects a saved fact.")]
+    public static object DeleteMemory(
+        SnapshotContext context, IUserDataStore store,
+        [Description("The memory id to delete.")] string id)
+    {
+        bool removed = store.Update(context.OwnerId, profile => profile.Memories.RemoveAll(m => m.Id == id) > 0);
+        return new { ok = removed, id };
+    }
 
     [McpServerTool(Name = "record_game_status")]
     [Description("Record where a game stands for the user. Only when the user explicitly says so (e.g. 'I finished it', 'mark this paused').")]
