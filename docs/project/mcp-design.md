@@ -32,6 +32,14 @@ logic lives in the reusable `Shelfbound.Query` engine.
 `record_user_preference`, plus deletes (`delete_game_note`, `delete_memory`). Tool descriptions should
 *encourage the model to save explicit durable facts* when the user clearly states them.
 
+## Recency
+
+Game results include recency as human phrases (`installedOrUpdatedAgo`, `lastPlayedAgo`, `addedAgo`)
+alongside raw dates — models weight "3 days ago" over "2026-06-24". Steam exposes no purchase date, so
+"added" is inferred from when Shelfbound first observed the game owned (relative to a baseline scan),
+becoming meaningful as the user keeps using Shelfbound. Last-played for owned-but-not-installed games
+comes from the Steam Web API (`rtime_last_played`).
+
 ## Onboarding & "save it as you go"
 
 `get_profile_status` reports whether the user's taste profile is set up and what to ask (games to rate,

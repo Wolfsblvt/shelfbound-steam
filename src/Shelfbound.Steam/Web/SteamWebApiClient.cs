@@ -28,6 +28,7 @@ public sealed class SteamWebApiClient(HttpClient httpClient) : ISteamWebApiClien
                 AppId = g.AppId,
                 Name = string.IsNullOrWhiteSpace(g.Name) ? $"App {g.AppId}" : g.Name,
                 PlaytimeForeverMinutes = g.PlaytimeForever,
+                LastPlayed = g.RtimeLastPlayed > 0 ? DateTimeOffset.FromUnixTimeSeconds(g.RtimeLastPlayed) : null,
             })
             .ToList();
     }
@@ -39,5 +40,6 @@ public sealed class SteamWebApiClient(HttpClient httpClient) : ISteamWebApiClien
     private sealed record ApiGame(
         [property: JsonPropertyName("appid")] int AppId,
         [property: JsonPropertyName("name")] string? Name,
-        [property: JsonPropertyName("playtime_forever")] long PlaytimeForever);
+        [property: JsonPropertyName("playtime_forever")] long PlaytimeForever,
+        [property: JsonPropertyName("rtime_last_played")] long RtimeLastPlayed = 0);
 }

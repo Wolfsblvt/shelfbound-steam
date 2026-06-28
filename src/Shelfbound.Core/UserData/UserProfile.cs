@@ -18,6 +18,12 @@ public sealed record UserProfile
     /// <summary>The user's meanings for their category names, keyed by category name.</summary>
     public Dictionary<string, CategoryDefinition> CategoryDefinitions { get; init; } = [];
 
+    /// <summary>When Shelfbound first scanned this owner's library (the baseline for "recently added").</summary>
+    public DateTimeOffset? FirstScanAt { get; set; }
+
+    /// <summary>First time each app id was observed owned — a proxy for when it was added/bought.</summary>
+    public Dictionary<int, DateTimeOffset> FirstSeen { get; init; } = [];
+
     public DateTimeOffset CreatedAt { get; init; }
     public DateTimeOffset UpdatedAt { get; init; }
 }

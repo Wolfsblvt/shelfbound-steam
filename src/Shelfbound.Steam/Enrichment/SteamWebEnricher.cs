@@ -19,21 +19,21 @@ public static class SteamWebEnricher
         IReadOnlyList<OwnedGame> ownedGames)
     {
         var installedAppIds = snapshot.Games.Select(g => g.AppId).ToHashSet();
-        var playtimeByApp = ownedGames
+        var ownedByApp = ownedGames
             .GroupBy(o => o.AppId)
-            .ToDictionary(g => g.Key, g => g.First().PlaytimeForeverMinutes);
+            .ToDictionary(g => g.Key, g => g.First());
 
         var games = new List<SnapshotGame>(snapshot.Games.Count + ownedGames.Count);
 
-        // Installed games: attach playtime where the API knows it.
+        // Installed games: attach playtime and last-played where the API knows them.
         foreach (var game in snapshot.Games)
         {
-            games.Add(playtimeByApp.TryGetValue(game.AppId, out long minutes)
-                ? game with { PlaytimeMinutes = minutes }
+            games.Add(ownedByApp.TryGetValue(game.AppId, out OwnedGame? owned)
+                ? game with { PlaytimeMinutes = owned.PlaytimeForeverMinutes, LastPlayed = owned.LastPlayed ?? game.LastPlayed }
                 : game);
         }
 
-        // Owned-but-not-installed games: add them with categories and playtime.
+        // Owned-but-not-installed games: add them with categories, playtime, and last-played.
         foreach (var owned in ownedGames)
         {
             if (installedAppIds.Contains(owned.AppId))
@@ -46,6 +46,7 @@ public static class SteamWebEnricher
                 Installed = false,
                 LibraryIndex = null,
                 PlaytimeMinutes = owned.PlaytimeForeverMinutes,
+                LastPlayed = owned.LastPlayed,
                 Categories = categoriesByApp.TryGetValue(owned.AppId, out var cats) ? cats : [],
             });
         }

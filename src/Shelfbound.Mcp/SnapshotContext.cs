@@ -5,6 +5,7 @@ using Shelfbound.Core.Model;
 using Shelfbound.Steam.Enrichment;
 using Shelfbound.Steam.Steam;
 using Shelfbound.Steam.Web;
+using Shelfbound.Storage;
 using Shelfbound.Storage.Config;
 
 namespace Shelfbound.Mcp;
@@ -19,7 +20,7 @@ namespace Shelfbound.Mcp;
 ///   <item><c>STEAM_WEB_API_KEY</c> — overrides the saved key; enriches with owned games + playtime.</item>
 /// </list>
 /// </summary>
-public sealed class SnapshotContext(ISteamWebApiClient steamWebApiClient, ILogger<SnapshotContext> logger)
+public sealed class SnapshotContext(ISteamWebApiClient steamWebApiClient, IUserDataStore userDataStore, ILogger<SnapshotContext> logger)
 {
     private SnapshotDocument? _snapshot;
 
@@ -39,6 +40,7 @@ public sealed class SnapshotContext(ISteamWebApiClient steamWebApiClient, ILogge
             SnapshotDocument loaded = SnapshotSerializer.Deserialize(await File.ReadAllTextAsync(snapshotFile, cancellationToken));
             _snapshot = loaded;
             OwnerId = ResolveOwner(config, loaded);
+            LibraryReconciler.RecordFirstSeen(userDataStore, OwnerId, loaded.Games.Select(g => g.AppId));
             logger.LogInformation("Loaded snapshot from {File} ({Games} games).", snapshotFile, loaded.Games.Count);
             return;
         }
@@ -85,6 +87,7 @@ public sealed class SnapshotContext(ISteamWebApiClient steamWebApiClient, ILogge
         }
 
         _snapshot = snapshot;
+        LibraryReconciler.RecordFirstSeen(userDataStore, OwnerId, snapshot.Games.Select(g => g.AppId));
         logger.LogInformation("Snapshot ready: {Games} games, {Installed} installed, {Categories} categories (owner {Owner}).",
             snapshot.Games.Count, snapshot.Stats.InstalledGameCount, snapshot.Categories.Count, OwnerId);
     }

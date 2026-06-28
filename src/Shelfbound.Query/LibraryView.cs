@@ -12,4 +12,7 @@ public sealed record LibraryView
     public IReadOnlyDictionary<string, CategoryDefinition> CategoryDefinitions { get; init; }
         = new Dictionary<string, CategoryDefinition>();
     public IReadOnlyList<Memory> GlobalMemories { get; init; } = [];
+
+    /// <summary>When Shelfbound first scanned this owner's library — the baseline for "recently added".</summary>
+    public DateTimeOffset? FirstScanAt { get; init; }
 }

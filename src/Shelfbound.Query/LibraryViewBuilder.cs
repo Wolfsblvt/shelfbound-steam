@@ -12,18 +12,36 @@ public static class LibraryViewBuilder
 {
     public static LibraryView Build(SnapshotDocument snapshot, UserProfile? userData = null)
     {
+        DateTimeOffset? firstScanAt = userData?.FirstScanAt;
+
         var games = snapshot.Games.Select(game =>
         {
             GameUserData? data = null;
             IReadOnlyList<Memory> memories = [];
+            DateTimeOffset? firstSeen = null;
             if (userData is not null)
             {
                 userData.Games.TryGetValue(game.AppId, out data);
                 memories = userData.Memories
                     .Where(m => m.Scope == MemoryScope.Game && m.Subject == game.AppId.ToString())
                     .ToList();
+                if (userData.FirstSeen.TryGetValue(game.AppId, out var seen))
+                    firstSeen = seen;
             }
-            return new LibraryGame { Snapshot = game, UserData = data, Memories = memories };
+
+            // "Added" is only meaningful for games first seen after the baseline scan.
+            string? addedAgo = firstSeen is { } s && firstScanAt is { } baseline && s > baseline
+                ? RelativeTime.Describe(s)
+                : null;
+
+            return new LibraryGame
+            {
+                Snapshot = game,
+                UserData = data,
+                Memories = memories,
+                FirstSeenAt = firstSeen,
+                AddedAgo = addedAgo,
+            };
         }).ToList();
 
         return new LibraryView
@@ -33,6 +51,7 @@ public static class LibraryViewBuilder
             Libraries = snapshot.Libraries,
             CategoryDefinitions = userData?.CategoryDefinitions ?? new Dictionary<string, CategoryDefinition>(),
             GlobalMemories = userData?.Memories.Where(m => m.Scope == MemoryScope.Global).ToList() ?? [],
+            FirstScanAt = firstScanAt,
         };
     }
 }
