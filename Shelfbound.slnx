@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Shelfbound.Cli/Shelfbound.Cli.csproj" />
+    <Project Path="src/Shelfbound.Core/Shelfbound.Core.csproj" />
+    <Project Path="src/Shelfbound.Steam/Shelfbound.Steam.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Shelfbound.Steam.Tests/Shelfbound.Steam.Tests.csproj" />
+  </Folder>
+</Solution>

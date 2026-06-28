@@ -1,0 +1,19 @@
+# Normalize line endings to LF in the repository for deterministic, cross-platform diffs.
+* text=auto eol=lf
+
+# Explicit text types
+*.cs    text eol=lf
+*.csproj text eol=lf
+*.slnx  text eol=lf
+*.json  text eol=lf
+*.md    text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf
+*.acf   text eol=lf
+*.vdf   text eol=lf
+
+# Known binaries
+*.png   binary
+*.jpg   binary
+*.ico   binary
+*.dll   binary

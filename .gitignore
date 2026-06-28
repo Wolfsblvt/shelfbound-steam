@@ -1,0 +1,28 @@
+## .NET build output
+[Bb]in/
+[Oo]bj/
+[Oo]ut/
+artifacts/
+
+## IDEs / editors
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+*.userprefs
+
+## Test / coverage
+[Tt]est[Rr]esults/
+coverage/
+*.trx
+*.coverage
+*.coveragexml
+
+## Shelfbound local artifacts — may contain personal library data; never commit
+shelfbound-snapshot*.json
+*.snapshot.json
+
+## OS noise
+Thumbs.db
+.DS_Store

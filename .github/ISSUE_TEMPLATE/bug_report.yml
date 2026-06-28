@@ -1,0 +1,61 @@
+name: Bug report
+description: Something in the open-source core (scanner / snapshot / CLI) doesn't work as expected.
+labels: ["type:bug", "status:needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report! Please don't include personal data (full library lists, account
+        names) unless needed. For security issues, see SECURITY.md instead — don't file here.
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened?
+      description: A clear description of the bug, plus what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: The exact command(s) and what followed.
+      placeholder: |
+        1. dotnet run --project src/Shelfbound.Cli -- scan ...
+        2. ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Shelfbound version
+      description: Output of `shelfbound --version` (or the commit you built).
+    validations:
+      required: false
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Windows
+        - Linux
+        - macOS
+        - Steam Deck (SteamOS)
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Output / warnings
+      description: Relevant CLI output or `warning:` lines. Redact anything personal.
+      render: shell
+    validations:
+      required: false
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I searched existing issues for a duplicate.
+          required: true
+        - label: This is not a security vulnerability (those go through SECURITY.md).
+          required: true

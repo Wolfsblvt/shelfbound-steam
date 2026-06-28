@@ -1,0 +1,17 @@
+name: Label PRs
+
+# Path-based auto-labelling. pull_request_target is used so labels can be applied to PRs from
+# forks; the labeler action only reads changed file paths and never checks out or runs PR code.
+on: [pull_request_target]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  label:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/labeler@v5
+        with:
+          sync-labels: true

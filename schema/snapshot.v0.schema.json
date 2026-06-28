@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://shelfbound.dev/schema/snapshot.v0.schema.json",
+  "title": "Shelfbound Snapshot",
+  "description": "Versioned, portable export of local game-library context. The contract between the Shelfbound scanner, the local MCP server, and hosted ingestion. See docs/project/snapshot-schema.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "snapshotId", "createdAt", "source", "device", "stats"],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "description": "Semantic version of this contract.",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "snapshotId": { "type": "string", "description": "Unique id for this snapshot instance." },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tool", "toolVersion", "platform"],
+      "properties": {
+        "tool": { "type": "string" },
+        "toolVersion": { "type": "string" },
+        "platform": { "$ref": "#/$defs/osPlatform" }
+      }
+    },
+    "device": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "type", "os"],
+      "properties": {
+        "id": { "type": "string", "description": "Random, locally persisted, non-identifying device id." },
+        "name": { "type": "string" },
+        "type": { "$ref": "#/$defs/deviceType" },
+        "os": { "$ref": "#/$defs/osPlatform" }
+      }
+    },
+    "steamAccounts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["steamId64", "mostRecent"],
+        "properties": {
+          "steamId64": { "type": "string" },
+          "accountName": { "type": "string" },
+          "personaName": { "type": "string" },
+          "mostRecent": { "type": "boolean" }
+        }
+      }
+    },
+    "libraries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["index", "label", "gameCount"],
+        "properties": {
+          "index": { "type": "integer" },
+          "label": { "type": "string", "description": "Library label; full filesystem path is deliberately omitted." },
+          "gameCount": { "type": "integer", "minimum": 0 }
+        }
+      }
+    },
+    "games": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["appId", "name", "installed", "libraryIndex"],
+        "properties": {
+          "appId": { "type": "integer" },
+          "name": { "type": "string" },
+          "installed": { "type": "boolean" },
+          "libraryIndex": { "type": "integer" },
+          "installDir": { "type": "string", "description": "Relative folder under steamapps/common (not a full path)." },
+          "sizeOnDiskBytes": { "type": "integer", "minimum": 0 },
+          "lastUpdated": { "type": "string", "format": "date-time" },
+          "lastPlayed": { "type": "string", "format": "date-time" },
+          "categories": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Reserved. The v0 scanner does not populate local collections yet, so this is currently always empty."
+          }
+        }
+      }
+    },
+    "stats": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["libraryCount", "installedGameCount", "totalSizeOnDiskBytes"],
+      "properties": {
+        "libraryCount": { "type": "integer", "minimum": 0 },
+        "installedGameCount": { "type": "integer", "minimum": 0 },
+        "totalSizeOnDiskBytes": { "type": "integer", "minimum": 0 }
+      }
+    }
+  },
+  "$defs": {
+    "osPlatform": { "type": "string", "enum": ["unknown", "windows", "linux", "macOs"] },
+    "deviceType": { "type": "string", "enum": ["unknown", "desktop", "laptop", "steamDeck", "server"] }
+  }
+}

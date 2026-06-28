@@ -1,0 +1,20 @@
+# Path-based PR labels (actions/labeler v5). See .github/workflows/labeler.yml.
+"area:scanner":
+  - changed-files:
+      - any-glob-to-any-file: "src/Shelfbound.Steam/**"
+"area:cli":
+  - changed-files:
+      - any-glob-to-any-file: "src/Shelfbound.Cli/**"
+"area:snapshot":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "src/Shelfbound.Core/**"
+          - "schema/**"
+"type:docs":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "docs/**"
+          - "**/*.md"
+"area:ci":
+  - changed-files:
+      - any-glob-to-any-file: ".github/**"
