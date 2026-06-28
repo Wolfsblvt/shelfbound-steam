@@ -1,6 +1,7 @@
 # Shelfbound
 
 [![CI](https://github.com/Wolfsblvt/shelfbound-steam/actions/workflows/ci.yml/badge.svg)](https://github.com/Wolfsblvt/shelfbound-steam/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/Wolfsblvt/shelfbound-steam/graph/badge.svg)](https://codecov.io/gh/Wolfsblvt/shelfbound-steam)
 [![NuGet](https://img.shields.io/nuget/v/Shelfbound.Core?logo=nuget&label=NuGet&color=004880)](https://www.nuget.org/packages/Shelfbound.Core)
 [![license](https://img.shields.io/github/license/Wolfsblvt/shelfbound-steam?color=blue)](LICENSE)
 [![.NET 10](https://img.shields.io/badge/.NET-10-512bd4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com)
@@ -56,6 +57,18 @@ Useful options: `--output <file>`, `--stdout`, `--steam-path <dir>`, `--device-n
 `--device-type …`, and `--steam-api-key <key>` (or `STEAM_WEB_API_KEY`) to add owned-but-not-installed
 games + playtime via the Steam Web API. Run `shelfbound --help`.
 
+### Upload to a Shelfbound server (optional)
+
+`shelfbound upload` scans and uploads your snapshot to a Shelfbound server so the hosted MCP/dashboard can
+read it without your machine online. Sign in there, create an API token, then:
+
+```bash
+shelfbound upload --server <url> --token <token>     # or SHELFBOUND_SERVER / SHELFBOUND_TOKEN
+```
+
+A one-shot upload is free. Continuous `--watch` sync is a paid (Pro/Lifetime) feature, enforced by the
+server. The uploader is cross-platform; OS-specific packaging (e.g. a Steam Deck Decky plugin) comes later.
+
 ### Local MCP server
 
 `shelfbound-mcp` scans your library on startup and serves it to MCP-compatible AI clients over stdio.
@@ -80,7 +93,7 @@ The whole repository is licensed **AGPL-3.0-or-later** (see [License](#license))
 | `src/Shelfbound.Steam` | Local Steam scanner + Steam Web API client + enrichment. |
 | `src/Shelfbound.Query` | Deterministic query/filter/summary engine over a snapshot. |
 | `src/Shelfbound.Storage` | Local config, identity seam, and the user-data store (statuses, ratings, memories). |
-| `src/Shelfbound.Cli` | The `shelfbound` command-line tool (setup/scan/export). |
+| `src/Shelfbound.Cli` | The `shelfbound` command-line tool (setup/scan/profile/upload). |
 | `src/Shelfbound.Mcp` | The `shelfbound-mcp` local MCP server. |
 | `tests/…` | Unit + integration tests. |
 

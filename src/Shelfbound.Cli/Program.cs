@@ -1,4 +1,8 @@
+using System.Net;
+using System.Net.Http.Headers;
 using System.Reflection;
+using System.Text;
+using System.Text.Json;
 using Shelfbound.Cli;
 using Shelfbound.Core;
 using Shelfbound.Core.Model;
@@ -18,142 +22,310 @@ if (args.Length == 0 || args[0] is "-h" or "--help" or "help")
     return 0;
 }
 
-if (args[0] is "-v" or "--version")
+switch (args[0])
 {
-    Console.WriteLine($"shelfbound {version}");
-    return 0;
+    case "-v" or "--version":
+        Console.WriteLine($"shelfbound {version}");
+        return 0;
+    case "setup":
+        return RunSetup(args);
+    case "profile":
+        return RunProfile();
+    case "scan":
+        return await RunScanAsync(args, version);
+    case "upload":
+        return await RunUploadAsync(args, version);
+    default:
+        Console.Error.WriteLine($"Unknown command '{args[0]}'.");
+        PrintUsage();
+        return 2;
 }
 
-if (args[0] == "setup")
-{
-    return RunSetup(args);
-}
+// --- commands ---
 
-if (args[0] == "profile")
+static async Task<int> RunScanAsync(string[] args, string version)
 {
-    return RunProfile();
-}
+    string? steamPath = null, output = null, deviceName = null, steamApiKey = null;
+    DeviceType? deviceType = null;
+    bool pretty = false, toStdout = false;
 
-if (args[0] != "scan")
-{
-    Console.Error.WriteLine($"Unknown command '{args[0]}'.");
-    PrintUsage();
-    return 2;
-}
-
-// --- parse `scan` options ---
-string? steamPath = null;
-string? output = null;
-string? deviceName = null;
-DeviceType? deviceType = null;
-bool pretty = false;
-bool toStdout = false;
-string? steamApiKey = null;
-
-for (int i = 1; i < args.Length; i++)
-{
-    string a = args[i];
-    switch (a)
+    for (int i = 1; i < args.Length; i++)
     {
-        case "--steam-path":
-            if (!TryTakeValue(args, ref i, a, out steamPath)) return 2;
-            break;
-        case "-o" or "--output":
-            if (!TryTakeValue(args, ref i, a, out output)) return 2;
-            break;
-        case "--device-name":
-            if (!TryTakeValue(args, ref i, a, out deviceName)) return 2;
-            break;
-        case "--device-type":
-            if (!TryTakeValue(args, ref i, a, out string? raw)) return 2;
-            if (!Enum.TryParse(raw, ignoreCase: true, out DeviceType parsed))
-            {
-                Console.Error.WriteLine($"Invalid --device-type '{raw}'. Valid: {string.Join(", ", Enum.GetNames<DeviceType>())}.");
+        string a = args[i];
+        switch (a)
+        {
+            case "--steam-path":
+                if (!TryTakeValue(args, ref i, a, out steamPath)) return 2;
+                break;
+            case "-o" or "--output":
+                if (!TryTakeValue(args, ref i, a, out output)) return 2;
+                break;
+            case "--device-name":
+                if (!TryTakeValue(args, ref i, a, out deviceName)) return 2;
+                break;
+            case "--device-type":
+                if (!TryParseDeviceType(args, ref i, out deviceType)) return 2;
+                break;
+            case "--steam-api-key":
+                if (!TryTakeValue(args, ref i, a, out steamApiKey)) return 2;
+                break;
+            case "--pretty":
+                pretty = true;
+                break;
+            case "--stdout":
+                toStdout = true;
+                break;
+            default:
+                Console.Error.WriteLine($"Unknown option '{a}'.");
+                PrintUsage();
                 return 2;
-            }
-            deviceType = parsed;
-            break;
-        case "--steam-api-key":
-            if (!TryTakeValue(args, ref i, a, out steamApiKey)) return 2;
-            break;
-        case "--pretty":
-            pretty = true;
-            break;
-        case "--stdout":
-            toStdout = true;
-            break;
-        default:
-            Console.Error.WriteLine($"Unknown option '{a}'.");
-            PrintUsage();
-            return 2;
+        }
     }
-}
 
-// --- locate Steam ---
-string? steamRoot = SteamInstallLocator.Locate(steamPath);
-if (steamRoot is null)
-{
-    Console.Error.WriteLine(steamPath is null
-        ? "Could not find a Steam installation. Pass --steam-path <dir> or set SHELFBOUND_STEAM_PATH."
-        : $"'{steamPath}' does not look like a Steam installation (no steamapps folder).");
-    return 1;
-}
+    SnapshotBuild? build = await BuildSnapshotAsync(steamPath, deviceName, deviceType, steamApiKey, version);
+    if (build is null)
+        return 1;
 
-// --- scan ---
-SnapshotDevice device = DeviceIdentity.Resolve(deviceName, deviceType);
-ScanResult result = new SteamScanner().Scan(new SteamScanRequest
-{
-    SteamRootPath = steamRoot,
-    Device = device,
-    ToolVersion = version,
-});
-
-// --- optional Steam Web API enrichment: owned-but-not-installed games + playtime ---
-string? apiKey = steamApiKey
-    ?? Environment.GetEnvironmentVariable("STEAM_WEB_API_KEY")
-    ?? ShelfboundConfig.Load().SteamApiKey;
-if (!string.IsNullOrWhiteSpace(apiKey))
-{
-    SteamAccount? account = result.Snapshot.SteamAccounts.FirstOrDefault(a => a.MostRecent)
-        ?? result.Snapshot.SteamAccounts.FirstOrDefault();
-    if (account is null)
+    string json = SnapshotSerializer.Serialize(build.Result.Snapshot, indented: pretty || toStdout);
+    if (toStdout)
     {
-        Console.Error.WriteLine("warning: --steam-api-key set but no Steam account was found to query.");
+        Console.Out.WriteLine(json);
     }
     else
     {
+        string path = output ?? "shelfbound-snapshot.json";
+        File.WriteAllText(path, json);
+        PrintSummary(build.Result, build.Device, path);
+    }
+
+    PrintWarnings(build.Result);
+    return 0;
+}
+
+static async Task<int> RunUploadAsync(string[] args, string version)
+{
+    string? server = Environment.GetEnvironmentVariable("SHELFBOUND_SERVER");
+    string? token = Environment.GetEnvironmentVariable("SHELFBOUND_TOKEN");
+    string? steamPath = null, deviceName = null, steamApiKey = null;
+    DeviceType? deviceType = null;
+    bool watch = false;
+    int intervalSeconds = 0;
+
+    for (int i = 1; i < args.Length; i++)
+    {
+        string a = args[i];
+        switch (a)
+        {
+            case "--server":
+                if (!TryTakeValue(args, ref i, a, out server)) return 2;
+                break;
+            case "--token":
+                if (!TryTakeValue(args, ref i, a, out token)) return 2;
+                break;
+            case "--watch":
+                watch = true;
+                break;
+            case "--interval":
+                if (!TryTakeValue(args, ref i, a, out string? iv)) return 2;
+                if (!int.TryParse(iv, out intervalSeconds) || intervalSeconds < 0)
+                {
+                    Console.Error.WriteLine("--interval must be a non-negative number of seconds.");
+                    return 2;
+                }
+                break;
+            case "--steam-path":
+                if (!TryTakeValue(args, ref i, a, out steamPath)) return 2;
+                break;
+            case "--device-name":
+                if (!TryTakeValue(args, ref i, a, out deviceName)) return 2;
+                break;
+            case "--device-type":
+                if (!TryParseDeviceType(args, ref i, out deviceType)) return 2;
+                break;
+            case "--steam-api-key":
+                if (!TryTakeValue(args, ref i, a, out steamApiKey)) return 2;
+                break;
+            default:
+                Console.Error.WriteLine($"Unknown option '{a}'.");
+                PrintUsage();
+                return 2;
+        }
+    }
+
+    if (string.IsNullOrWhiteSpace(server))
+    {
+        Console.Error.WriteLine("Set the Shelfbound server with --server <url> or the SHELFBOUND_SERVER environment variable.");
+        return 2;
+    }
+    if (string.IsNullOrWhiteSpace(token))
+    {
+        Console.Error.WriteLine("Set an API token with --token <token> or the SHELFBOUND_TOKEN environment variable.");
+        Console.Error.WriteLine("Create a token in the Shelfbound web app after signing in through Steam.");
+        return 2;
+    }
+
+    using var http = new HttpClient { BaseAddress = new Uri(server.TrimEnd('/') + "/") };
+    http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+    return watch
+        ? await RunWatchAsync(http, version, steamPath, deviceName, deviceType, steamApiKey, intervalSeconds)
+        : await UploadOnceAsync(http, version, steamPath, deviceName, deviceType, steamApiKey) ? 0 : 1;
+}
+
+// Continuous sync. Automatic sync is a paid feature: refuse politely for non-entitled accounts. This
+// client check is only a friendly fast-fail — the server also enforces a per-plan upload-frequency cap,
+// which is the part that actually gates it (scheduling a one-shot upload externally just gets 429'd).
+static async Task<int> RunWatchAsync(HttpClient http, string version, string? steamPath, string? deviceName,
+    DeviceType? deviceType, string? steamApiKey, int requestedIntervalSeconds)
+{
+    EntitlementsDto? entitlements = await GetEntitlementsAsync(http);
+    if (entitlements is null)
+    {
+        Console.Error.WriteLine("Could not reach the server to check your plan. Check --server and your token.");
+        return 1;
+    }
+    if (!entitlements.AutoSync)
+    {
+        Console.Error.WriteLine($"Automatic sync is a Pro/Lifetime feature (your plan: {entitlements.Plan}).");
+        Console.Error.WriteLine("A one-shot 'shelfbound upload' still works. Upgrade to enable --watch.");
+        return 1;
+    }
+
+    int interval = Math.Max(requestedIntervalSeconds, entitlements.MinUploadIntervalSeconds);
+    if (interval <= 0)
+        interval = 3600;
+
+    using var cts = new CancellationTokenSource();
+    Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
+    Console.WriteLine($"Watching: syncing every {interval}s. Press Ctrl+C to stop.");
+
+    while (!cts.IsCancellationRequested)
+    {
+        await UploadOnceAsync(http, version, steamPath, deviceName, deviceType, steamApiKey);
         try
         {
-            using var http = new HttpClient();
-            var owned = await new SteamWebApiClient(http).GetOwnedGamesAsync(account.SteamId64, apiKey);
-            result = result with { Snapshot = SteamWebEnricher.Enrich(result.Snapshot, result.CategoriesByApp, owned) };
+            await Task.Delay(TimeSpan.FromSeconds(interval), cts.Token);
         }
-        catch (Exception ex)
+        catch (TaskCanceledException)
         {
-            Console.Error.WriteLine($"warning: Steam Web API enrichment failed: {ex.Message}");
+            break;
         }
+    }
+
+    Console.WriteLine("Stopped.");
+    return 0;
+}
+
+static async Task<bool> UploadOnceAsync(HttpClient http, string version, string? steamPath, string? deviceName,
+    DeviceType? deviceType, string? steamApiKey)
+{
+    SnapshotBuild? build = await BuildSnapshotAsync(steamPath, deviceName, deviceType, steamApiKey, version);
+    if (build is null)
+        return false;
+
+    string json = SnapshotSerializer.Serialize(build.Result.Snapshot, indented: false);
+    using var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+    HttpResponseMessage response;
+    try
+    {
+        response = await http.PostAsync("ingest", content);
+    }
+    catch (Exception ex)
+    {
+        Console.Error.WriteLine($"Upload failed: {ex.Message}");
+        return false;
+    }
+
+    if (response.IsSuccessStatusCode)
+    {
+        Console.WriteLine($"Uploaded {build.Result.Snapshot.Games.Count} game(s) to {http.BaseAddress}.");
+        return true;
+    }
+
+    switch (response.StatusCode)
+    {
+        case HttpStatusCode.TooManyRequests:
+            string? retryAfter = response.Headers.RetryAfter?.Delta?.TotalSeconds is { } s ? $" (try again in ~{(int)s}s)" : null;
+            Console.Error.WriteLine($"Upload rejected: too soon for your plan{retryAfter}. Automatic/frequent sync is a Pro/Lifetime feature.");
+            return false;
+        case HttpStatusCode.Unauthorized:
+            Console.Error.WriteLine("Upload rejected: invalid or missing API token. Create one in the Shelfbound web app.");
+            return false;
+        default:
+            string body = await response.Content.ReadAsStringAsync();
+            Console.Error.WriteLine($"Upload failed ({(int)response.StatusCode}): {body}");
+            return false;
     }
 }
 
-string json = SnapshotSerializer.Serialize(result.Snapshot, indented: pretty || toStdout);
-
-if (toStdout)
+static async Task<EntitlementsDto?> GetEntitlementsAsync(HttpClient http)
 {
-    Console.Out.WriteLine(json);
+    try
+    {
+        HttpResponseMessage response = await http.GetAsync("auth/entitlements");
+        if (!response.IsSuccessStatusCode)
+            return null;
+        string body = await response.Content.ReadAsStringAsync();
+        return JsonSerializer.Deserialize<EntitlementsDto>(body, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+    }
+    catch
+    {
+        return null;
+    }
 }
-else
+
+// --- shared snapshot production (scan + optional Steam Web API enrichment) ---
+
+static async Task<SnapshotBuild?> BuildSnapshotAsync(string? steamPath, string? deviceName, DeviceType? deviceType,
+    string? steamApiKey, string version)
 {
-    string path = output ?? "shelfbound-snapshot.json";
-    File.WriteAllText(path, json);
-    PrintSummary(result, device, path);
+    string? steamRoot = SteamInstallLocator.Locate(steamPath);
+    if (steamRoot is null)
+    {
+        Console.Error.WriteLine(steamPath is null
+            ? "Could not find a Steam installation. Pass --steam-path <dir> or set SHELFBOUND_STEAM_PATH."
+            : $"'{steamPath}' does not look like a Steam installation (no steamapps folder).");
+        return null;
+    }
+
+    SnapshotDevice device = DeviceIdentity.Resolve(deviceName, deviceType);
+    ScanResult result = new SteamScanner().Scan(new SteamScanRequest
+    {
+        SteamRootPath = steamRoot,
+        Device = device,
+        ToolVersion = version,
+    });
+
+    // Optional Steam Web API enrichment: owned-but-not-installed games + playtime.
+    string? apiKey = steamApiKey
+        ?? Environment.GetEnvironmentVariable("STEAM_WEB_API_KEY")
+        ?? ShelfboundConfig.Load().SteamApiKey;
+    if (!string.IsNullOrWhiteSpace(apiKey))
+    {
+        SteamAccount? account = result.Snapshot.SteamAccounts.FirstOrDefault(a => a.MostRecent)
+            ?? result.Snapshot.SteamAccounts.FirstOrDefault();
+        if (account is null)
+        {
+            Console.Error.WriteLine("warning: Steam Web API key set but no Steam account was found to query.");
+        }
+        else
+        {
+            try
+            {
+                using var enrichmentHttp = new HttpClient();
+                var owned = await new SteamWebApiClient(enrichmentHttp).GetOwnedGamesAsync(account.SteamId64, apiKey);
+                result = result with { Snapshot = SteamWebEnricher.Enrich(result.Snapshot, result.CategoriesByApp, owned) };
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"warning: Steam Web API enrichment failed: {ex.Message}");
+            }
+        }
+    }
+
+    return new SnapshotBuild(result, device);
 }
-
-foreach (string w in result.Warnings.Take(10))
-    Console.Error.WriteLine($"warning: {w}");
-if (result.Warnings.Count > 10)
-    Console.Error.WriteLine($"warning: ... and {result.Warnings.Count - 10} more.");
-
-return 0;
 
 // --- helpers ---
 
@@ -167,6 +339,28 @@ static bool TryTakeValue(string[] args, ref int i, string option, out string? va
     }
     value = args[++i];
     return true;
+}
+
+static bool TryParseDeviceType(string[] args, ref int i, out DeviceType? deviceType)
+{
+    deviceType = null;
+    if (!TryTakeValue(args, ref i, "--device-type", out string? raw))
+        return false;
+    if (!Enum.TryParse(raw, ignoreCase: true, out DeviceType parsed))
+    {
+        Console.Error.WriteLine($"Invalid --device-type '{raw}'. Valid: {string.Join(", ", Enum.GetNames<DeviceType>())}.");
+        return false;
+    }
+    deviceType = parsed;
+    return true;
+}
+
+static void PrintWarnings(ScanResult result)
+{
+    foreach (string w in result.Warnings.Take(10))
+        Console.Error.WriteLine($"warning: {w}");
+    if (result.Warnings.Count > 10)
+        Console.Error.WriteLine($"warning: ... and {result.Warnings.Count - 10} more.");
 }
 
 static string ResolveVersion()
@@ -339,14 +533,15 @@ static void PrintUsage()
 {
     Console.WriteLine(
         """
-        shelfbound - local Steam library scanner (Shelfbound)
+        shelfbound - local Steam library scanner + uploader (Shelfbound)
 
         USAGE:
           shelfbound setup [--steam-api-key <key>] [--show]
           shelfbound profile
           shelfbound scan [options]
+          shelfbound upload [scan options] [--server <url>] [--token <tok>] [--watch] [--interval <sec>]
 
-        OPTIONS:
+        SCAN OPTIONS:
           --steam-path <dir>     Steam install root (else auto-detected / SHELFBOUND_STEAM_PATH)
           -o, --output <file>    Output file (default: shelfbound-snapshot.json)
           --stdout               Write snapshot JSON to stdout instead of a file
@@ -355,10 +550,24 @@ static void PrintUsage()
           --device-type <type>   desktop | laptop | steamDeck | server | unknown
           --steam-api-key <key>  Add owned (not installed) games + playtime via the Steam Web API
                                  (or set STEAM_WEB_API_KEY)
+
+        UPLOAD OPTIONS (also accepts the scan options above):
+          --server <url>         Shelfbound server (or set SHELFBOUND_SERVER)
+          --token <token>        API token from the web app (or set SHELFBOUND_TOKEN)
+          --watch                Keep syncing on an interval (requires a Pro/Lifetime plan)
+          --interval <seconds>   Watch interval (clamped to your plan's minimum)
+
+        GLOBAL:
           -v, --version          Print version
           -h, --help             Show this help
 
-        Produces a versioned Shelfbound snapshot of locally installed Steam games.
-        See docs/project/snapshot-schema.md.
+        Produces a versioned Shelfbound snapshot of locally installed Steam games, and optionally
+        uploads it to a Shelfbound server. See docs/project/snapshot-schema.md.
         """);
 }
+
+// --- types ---
+
+internal sealed record SnapshotBuild(ScanResult Result, SnapshotDevice Device);
+
+internal sealed record EntitlementsDto(string Plan, bool AutoSync, int MinUploadIntervalSeconds);
