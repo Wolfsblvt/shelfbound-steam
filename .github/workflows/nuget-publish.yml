@@ -4,9 +4,9 @@ name: Publish NuGet
 # using Trusted Publishing (OIDC) — no long-lived API key is stored. A short-lived key is minted
 # per run by exchanging a GitHub OIDC token against the policy configured on nuget.org.
 #
-# Setup on nuget.org (one-time): Username -> Trusted Publishing -> Add policy with
-#   repository owner = Wolfsblvt, repository = shelfbound-steam, workflow = nuget-publish.yml.
-# Then set NUGET_USER below to your nuget.org account name.
+# The nuget.org Trusted Publishing policy is bound to the GitHub `nuget` environment, so this job must
+# declare `environment: nuget` for the OIDC token's environment claim to match. (Create the environment
+# in repo Settings -> Environments if it doesn't exist yet.)
 #
 # Triggered by a version tag (e.g. v0.4.0) or manually.
 on:
@@ -24,6 +24,7 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    environment: nuget # must match the environment in the nuget.org Trusted Publishing policy
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
