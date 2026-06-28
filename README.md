@@ -1,5 +1,10 @@
 # Shelfbound
 
+[![CI](https://github.com/Wolfsblvt/shelfbound-steam/actions/workflows/ci.yml/badge.svg)](https://github.com/Wolfsblvt/shelfbound-steam/actions/workflows/ci.yml)
+[![NuGet](https://img.shields.io/nuget/v/Shelfbound.Core?logo=nuget&label=NuGet&color=004880)](https://www.nuget.org/packages/Shelfbound.Core)
+[![license](https://img.shields.io/github/license/Wolfsblvt/shelfbound-steam?color=blue)](LICENSE)
+[![.NET 10](https://img.shields.io/badge/.NET-10-512bd4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com)
+
 **AI-ready context for your real Steam library.**
 
 Shelfbound is a personal gaming context layer: it reads your *real* Steam library — including

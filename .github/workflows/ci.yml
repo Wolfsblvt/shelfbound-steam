@@ -15,4 +15,18 @@ jobs:
           dotnet-version: '10.0.x'
       - run: dotnet restore
       - run: dotnet build --no-restore -c Release
-      - run: dotnet test --no-build -c Release --verbosity normal
+      # coverlet.collector (already referenced by the test project) emits Cobertura coverage.
+      - run: dotnet test --no-build -c Release --verbosity normal --collect:"XPlat Code Coverage" --results-directory ./coverage
+      # Render a coverage table into the run's job summary — visibility without an external service.
+      - name: Coverage summary
+        if: always()
+        run: |
+          dotnet tool install --global dotnet-reportgenerator-globaltool
+          reportgenerator -reports:'./coverage/**/coverage.cobertura.xml' -targetdir:./coverage/report -reporttypes:MarkdownSummaryGithub
+          cat ./coverage/report/SummaryGithub.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: ./coverage/**/coverage.cobertura.xml
