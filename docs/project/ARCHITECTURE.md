@@ -53,8 +53,10 @@ src/
                        The differentiator; auditable and open.
   Shelfbound.Query     Deterministic filter/sort/summary engine over a snapshot. No I/O, no LLM;
                        reused by the MCP server now and the dashboard/hosted layer later.
-  Shelfbound.Cli       `shelfbound scan` — scans (+ optional Steam API enrichment), writes the snapshot.
-  Shelfbound.Mcp       `shelfbound-mcp` — local MCP server (stdio) exposing the library to AI tools.
+  Shelfbound.Storage   Local config (API key), the identity seam, and the user-data store
+                       (statuses/ratings/completion/aspects, scoped memories, category meanings).
+  Shelfbound.Cli       `shelfbound setup` + `shelfbound scan` — config, scan (+ enrichment), output.
+  Shelfbound.Mcp       `shelfbound-mcp` — local MCP server (stdio): read + write/remember tools.
 tests/
   Shelfbound.Steam.Tests           xUnit + Shouldly. Parsers, scanner, query engine, enricher.
 schema/
@@ -70,6 +72,26 @@ Boundaries / invariants:
   `Shelfbound.Steam` (Steam files) or `Shelfbound.Cli` (device identity, args, output).
 - The scanner takes a resolved `SnapshotDevice` and a Steam root path as input; it does not reach
   into global state. This keeps it testable against a temp fixture tree.
+
+## Identity, config & user-data storage
+
+Three concerns kept separate so the hosted layer can swap implementations without touching the data
+model (`Shelfbound.Storage`):
+
+- **Config** (`ShelfboundConfig`, `ShelfboundPaths`) — the Steam Web API key and active profile, in the
+  user's config dir (never the repo). The CLI `setup` command writes it; the CLI and MCP both read it.
+- **Identity seam** (`ProfileIdentity`) — resolves the current **owner/profile id**. Locally this is
+  the configured profile, else the primary Steam account, else `local`. There is no local login —
+  your machine is your identity. The hosted layer swaps in an auth-backed resolver and **the storage
+  contract and data model don't change.**
+- **User-data store** (`IUserDataStore`, local `JsonUserDataStore`) — per-owner durable data: per-game
+  status/rating/completion/aspects, scoped **memories** (global/game/category, with
+  source/evidence/confidence), and category meanings. One JSON file per owner, atomic writes, shared
+  consistently by the CLI and the MCP server. A database backend (SQLite, then the hosted DB)
+  implements the same interface when concurrency/scale demands.
+
+This is the **derived/user data** category — deliberately separate from the raw snapshot (see
+[privacy-and-data.md](./privacy-and-data.md)).
 
 ## Scanner internals (current)
 

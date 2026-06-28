@@ -5,6 +5,7 @@
     <Project Path="src/Shelfbound.Mcp/Shelfbound.Mcp.csproj" />
     <Project Path="src/Shelfbound.Query/Shelfbound.Query.csproj" />
     <Project Path="src/Shelfbound.Steam/Shelfbound.Steam.csproj" />
+    <Project Path="src/Shelfbound.Storage/Shelfbound.Storage.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Shelfbound.Steam.Tests/Shelfbound.Steam.Tests.csproj" />

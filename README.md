@@ -23,6 +23,9 @@ Early but already useful, all local:
   also adds **owned-but-not-installed games and playtime**. No install paths, credentials, or saves.
 - **`shelfbound-mcp`** — a local **MCP server** that exposes the library to AI tools (ChatGPT/Claude):
   search by category / install state / playtime, library summary, game details, "what haven't I played?".
+- **Per-game context** — the MCP server can also *remember* what you tell it: statuses
+  (finished/paused/dropped), ratings, completion, category meanings, and freeform memories — stored
+  locally and shared with the CLI.
 
 Not built yet: modern dynamic collections, accounts, upload, and the hosted service. See
 [docs/project/PROJECT.md](docs/project/PROJECT.md) for the roadmap.
@@ -33,8 +36,14 @@ Requires the **.NET 10 SDK**.
 
 ```bash
 dotnet build
+dotnet run --project src/Shelfbound.Cli -- setup        # one-time: shows config + how to add an API key
 dotnet run --project src/Shelfbound.Cli -- scan --pretty
 ```
+
+**Steam Web API key (optional — for owned-but-not-installed games + playtime):** get one at
+<https://steamcommunity.com/dev/apikey> (sign in, register any domain — `localhost` is fine), then
+`shelfbound setup --steam-api-key <key>`. Also set your Steam profile **Game details → Public**, or the
+API returns nothing. Both the CLI and the MCP server then use the saved key.
 
 This writes `shelfbound-snapshot.json` (git-ignored — it lists your games, so treat it as personal).
 Useful options: `--output <file>`, `--stdout`, `--steam-path <dir>`, `--device-name <name>`,
@@ -46,8 +55,10 @@ games + playtime via the Steam Web API. Run `shelfbound --help`.
 `shelfbound-mcp` scans your library on startup and serves it to MCP-compatible AI clients over stdio.
 Point your client (e.g. Claude Desktop) at the built `shelfbound-mcp` executable. It reads config from
 the environment: `SHELFBOUND_STEAM_PATH` (else auto-detected), `STEAM_WEB_API_KEY` (optional, for
-owned games + playtime), `SHELFBOUND_SNAPSHOT` (load a snapshot file instead of scanning). Tools:
+owned games + playtime), `SHELFBOUND_SNAPSHOT` (load a snapshot file instead of scanning). Read tools:
 `search_library`, `get_library_summary`, `get_categories`, `get_game_details`, `find_installed_unplayed`.
+Write/remember tools: `record_game_status`, `record_game_opinion`, `set_game_completion`,
+`set_category_definition`, `remember`, plus `get_game_user_data` / `get_remembered`.
 
 ```bash
 dotnet test
@@ -62,7 +73,8 @@ The whole repository is licensed **AGPL-3.0-or-later** (see [License](#license))
 | `src/Shelfbound.Core` | Domain models + the versioned snapshot contract + serializer. |
 | `src/Shelfbound.Steam` | Local Steam scanner + Steam Web API client + enrichment. |
 | `src/Shelfbound.Query` | Deterministic query/filter/summary engine over a snapshot. |
-| `src/Shelfbound.Cli` | The `shelfbound` command-line tool (scan/export). |
+| `src/Shelfbound.Storage` | Local config, identity seam, and the user-data store (statuses, ratings, memories). |
+| `src/Shelfbound.Cli` | The `shelfbound` command-line tool (setup/scan/export). |
 | `src/Shelfbound.Mcp` | The `shelfbound-mcp` local MCP server. |
 | `tests/…` | Unit + integration tests. |
 

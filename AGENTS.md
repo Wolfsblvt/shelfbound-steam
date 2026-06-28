@@ -8,6 +8,7 @@ snapshot for AI tools (MCP). .NET 10 / C#. Unofficial; not affiliated with Valve
 ```bash
 dotnet build
 dotnet test
+dotnet run --project src/Shelfbound.Cli -- setup           # store Steam Web API key in local config
 dotnet run --project src/Shelfbound.Cli -- scan --pretty   # writes shelfbound-snapshot.json
 dotnet run --project src/Shelfbound.Mcp                     # local MCP server (stdio)
 ```

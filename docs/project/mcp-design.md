@@ -1,8 +1,8 @@
 # Shelfbound — MCP Design (local server)
 
 How the open-source **local** MCP server exposes library context to AI clients. **Implemented**
-(`Shelfbound.Mcp`, stdio) — the read tools below exist; write tools (notes/statuses/category
-definitions) are the next addition.
+(`Shelfbound.Mcp`, stdio) — read tools and write/remember tools both exist, backed by the
+`Shelfbound.Storage` user-data store (statuses, ratings, completion, memories, category meanings).
 
 Built on the official C# MCP SDK (`ModelContextProtocol`). The server scans the library on startup
 (optionally enriched via the Steam Web API) and serves it; it can also load a snapshot file. Query

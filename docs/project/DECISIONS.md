@@ -76,8 +76,23 @@ Owned-but-not-installed games + playtime come from the Steam Web API behind `ISt
 the network call and the merge logic stay separable and testable. Requires a user-provided key
 (`--steam-api-key` / `STEAM_WEB_API_KEY`); the key is never stored.
 
+### User-data storage + identity/auth seam
+Durable user/derived data (per-game status/rating/completion/aspects, scoped memories, category
+meanings) lives in `Shelfbound.Storage`, **keyed by an owner/profile id** behind an identity seam
+(`ProfileIdentity`). There is no local login — the machine owner is the identity (profile = the primary
+Steam account, else `local`). The hosted layer swaps in auth-backed identity over the **same** store
+contract (`IUserDataStore`) and data model. Local backend is a JSON-file-per-owner store with atomic
+writes, shared consistently by the CLI and MCP server; SQLite/DB is the planned upgrade behind the same
+interface. Kept separate from the raw snapshot (the derived-data category).
+
+### Config + the Steam Web API key
+Config (API key, active profile) is stored in the user's config dir via `shelfbound setup`, read by
+both the CLI and the MCP server (key precedence: flag > env > config). The key is the user's own
+read-only, rate-limited credential, stored plaintext in the protected config dir for now (OS-keystore
+encryption — DPAPI / libsecret — is a planned hardening). Never in the repo, never logged.
+
 ### Deferred (technical, recorded so it isn't re-litigated)
-- **MCP write tools + local user-data store** (notes/statuses/category definitions) — next major piece.
+- **Distribution** — package the CLI/MCP server as a dotnet tool + GitHub Releases.
 - **Modern dynamic collections** (leveldb) to complement the legacy categories already parsed.
 - **Steam Deck** specifics (SD-card install location) and a future **Decky plugin** that emits the
   same snapshot contract.

@@ -59,12 +59,17 @@ The local Steam data is the moat. AI reasoning is commodity; good structured fac
   `appmanifest_*.acf`, `loginusers.vdf`, **local categories** (`sharedconfig.vdf`), a minimal VDF parser.
 - **Steam Web API** client + enrichment: owned-but-not-installed games and playtime (with an API key).
 - **`Shelfbound.Query`**: deterministic filter/sort/summary engine over a snapshot.
-- **Local MCP server** (`Shelfbound.Mcp`, stdio): read tools — `search_library`, `get_library_summary`,
-  `get_categories`, `get_game_details`, `find_installed_unplayed`.
-- CLI (`Shelfbound.Cli`): `shelfbound scan` (+ optional `--steam-api-key` enrichment).
-- xUnit + Shouldly tests (16). Verified on a real ~111-game / 2-library install (12 categories); MCP
-  server smoke-tested over stdio.
-- **Local only. No accounts, upload, or hosted service yet.**
+- **Local MCP server** (`Shelfbound.Mcp`, stdio): read tools (`search_library`, `get_library_summary`,
+  `get_categories`, `get_game_details`, `find_installed_unplayed`) **and write/remember tools**
+  (`record_game_status`, `record_game_opinion`, `set_game_completion`, `set_category_definition`,
+  `remember`, `get_game_user_data`, `get_remembered`).
+- **`Shelfbound.Storage`**: local config (API key), the **identity seam** (owner/profile), and a
+  user-data store — per-game status/rating/completion/aspects, scoped memories, category meanings —
+  shared by the CLI and MCP server.
+- CLI (`Shelfbound.Cli`): `shelfbound setup` (store API key) and `shelfbound scan` (+ enrichment).
+- xUnit + Shouldly tests (18). Verified on a real ~111-game / 2-library install (12 categories); MCP
+  server smoke-tested over stdio incl. a user-data write→read round-trip.
+- **Local only. Identity is the local machine owner; real auth slots in for the hosted layer.**
 
 **Data scope:** installed + (with an API key) owned-but-not-installed Steam games, playtime, Steam
 accounts, device info, and the user's **local categories** with per-game tags. Modern dynamic
@@ -74,16 +79,15 @@ collections (leveldb) are **not yet** read (see roadmap).
 
 Local-first — prove the data model locally before anything depends on it.
 
-1. **MCP write tools + local user-data store:** notes, statuses (finished/paused/dropped/played-
-   elsewhere), category *definitions*, opinions — stored locally, written via MCP with guardrails.
-   This is the taste/context moat. See [mcp-design.md](./mcp-design.md).
-2. **Distribution:** package the CLI/MCP server as a `dotnet tool` + GitHub Releases so others can install.
+1. **Distribution:** package the CLI/MCP server as a `dotnet tool` + GitHub Releases so others can install.
+2. **Taste/profile depth:** a "what Shelfbound remembers" view, merging user-data into query results
+   (filter by status/rating), and optional metered LLM extraction of taste signals.
 3. **Remaining local data:** modern dynamic collections (leveldb), Steam Deck SD-card awareness,
    Windows registry-based install discovery.
 4. **Snapshot/export polish:** validation, import/export ergonomics for other clients.
 
 Done: local scanner, local categories, owned-not-installed + playtime (Steam Web API), the query
-engine, and the local MCP server (read tools).
+engine, the local MCP server (read + write tools), and the user-data store + identity seam.
 
 > Hosted and paid features (if any) are developed separately and are intentionally out of scope here.
 

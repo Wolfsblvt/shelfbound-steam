@@ -5,6 +5,7 @@ using Shelfbound.Core.Model;
 using Shelfbound.Steam.Enrichment;
 using Shelfbound.Steam.Steam;
 using Shelfbound.Steam.Web;
+using Shelfbound.Storage.Config;
 
 string version = ResolveVersion();
 
@@ -18,6 +19,11 @@ if (args[0] is "-v" or "--version")
 {
     Console.WriteLine($"shelfbound {version}");
     return 0;
+}
+
+if (args[0] == "setup")
+{
+    return RunSetup(args);
 }
 
 if (args[0] != "scan")
@@ -95,7 +101,9 @@ ScanResult result = new SteamScanner().Scan(new SteamScanRequest
 });
 
 // --- optional Steam Web API enrichment: owned-but-not-installed games + playtime ---
-string? apiKey = steamApiKey ?? Environment.GetEnvironmentVariable("STEAM_WEB_API_KEY");
+string? apiKey = steamApiKey
+    ?? Environment.GetEnvironmentVariable("STEAM_WEB_API_KEY")
+    ?? ShelfboundConfig.Load().SteamApiKey;
 if (!string.IsNullOrWhiteSpace(apiKey))
 {
     SteamAccount? account = result.Snapshot.SteamAccounts.FirstOrDefault(a => a.MostRecent)
@@ -186,6 +194,51 @@ static void PrintSummary(ScanResult result, SnapshotDevice device, string path)
     Console.WriteLine("See docs/project/privacy-and-data.md.");
 }
 
+static int RunSetup(string[] args)
+{
+    var config = ShelfboundConfig.Load();
+    string? newKey = null;
+    bool show = false;
+
+    for (int i = 1; i < args.Length; i++)
+    {
+        switch (args[i])
+        {
+            case "--steam-api-key":
+                if (!TryTakeValue(args, ref i, "--steam-api-key", out newKey)) return 2;
+                break;
+            case "--show":
+                show = true;
+                break;
+            default:
+                Console.Error.WriteLine($"Unknown setup option '{args[i]}'.");
+                return 2;
+        }
+    }
+
+    if (newKey is not null)
+    {
+        config = config with { SteamApiKey = newKey };
+        config.Save();
+        Console.WriteLine($"Saved Steam Web API key to {ShelfboundPaths.ConfigFile}");
+    }
+
+    if (newKey is null || show)
+    {
+        Console.WriteLine("Shelfbound setup");
+        Console.WriteLine($"  config file   : {ShelfboundPaths.ConfigFile}");
+        Console.WriteLine($"  user data dir : {ShelfboundPaths.ProfilesDirectory}");
+        Console.WriteLine($"  steam api key : {(string.IsNullOrEmpty(config.SteamApiKey) ? "(not set)" : Mask(config.SteamApiKey))}");
+        Console.WriteLine();
+        Console.WriteLine("Get a Steam Web API key at https://steamcommunity.com/dev/apikey, then:");
+        Console.WriteLine("  shelfbound setup --steam-api-key <key>");
+        Console.WriteLine("For owned-but-not-installed games, set your Steam profile 'Game details' to Public.");
+    }
+    return 0;
+}
+
+static string Mask(string value) => value.Length <= 4 ? "****" : new string('*', value.Length - 4) + value[^4..];
+
 static string FormatBytes(long bytes)
 {
     string[] units = ["B", "KB", "MB", "GB", "TB"];
@@ -206,6 +259,7 @@ static void PrintUsage()
         shelfbound - local Steam library scanner (Shelfbound)
 
         USAGE:
+          shelfbound setup [--steam-api-key <key>] [--show]
           shelfbound scan [options]
 
         OPTIONS:

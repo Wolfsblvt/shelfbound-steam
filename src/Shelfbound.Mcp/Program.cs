@@ -3,6 +3,8 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Shelfbound.Mcp;
 using Shelfbound.Steam.Web;
+using Shelfbound.Storage;
+using Shelfbound.Storage.Config;
 
 var builder = Host.CreateApplicationBuilder(args);
 
@@ -11,6 +13,7 @@ builder.Logging.AddConsole(options => options.LogToStandardErrorThreshold = LogL
 
 builder.Services.AddHttpClient<ISteamWebApiClient, SteamWebApiClient>();
 builder.Services.AddSingleton<SnapshotContext>();
+builder.Services.AddSingleton<IUserDataStore>(_ => new JsonUserDataStore(ShelfboundPaths.ProfilesDirectory));
 
 builder.Services
     .AddMcpServer()
