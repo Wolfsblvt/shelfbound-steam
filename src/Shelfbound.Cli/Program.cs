@@ -2,7 +2,9 @@ using System.Reflection;
 using Shelfbound.Cli;
 using Shelfbound.Core;
 using Shelfbound.Core.Model;
+using Shelfbound.Steam.Enrichment;
 using Shelfbound.Steam.Steam;
+using Shelfbound.Steam.Web;
 
 string version = ResolveVersion();
 
@@ -32,6 +34,7 @@ string? deviceName = null;
 DeviceType? deviceType = null;
 bool pretty = false;
 bool toStdout = false;
+string? steamApiKey = null;
 
 for (int i = 1; i < args.Length; i++)
 {
@@ -55,6 +58,9 @@ for (int i = 1; i < args.Length; i++)
                 return 2;
             }
             deviceType = parsed;
+            break;
+        case "--steam-api-key":
+            if (!TryTakeValue(args, ref i, a, out steamApiKey)) return 2;
             break;
         case "--pretty":
             pretty = true;
@@ -87,6 +93,31 @@ ScanResult result = new SteamScanner().Scan(new SteamScanRequest
     Device = device,
     ToolVersion = version,
 });
+
+// --- optional Steam Web API enrichment: owned-but-not-installed games + playtime ---
+string? apiKey = steamApiKey ?? Environment.GetEnvironmentVariable("STEAM_WEB_API_KEY");
+if (!string.IsNullOrWhiteSpace(apiKey))
+{
+    SteamAccount? account = result.Snapshot.SteamAccounts.FirstOrDefault(a => a.MostRecent)
+        ?? result.Snapshot.SteamAccounts.FirstOrDefault();
+    if (account is null)
+    {
+        Console.Error.WriteLine("warning: --steam-api-key set but no Steam account was found to query.");
+    }
+    else
+    {
+        try
+        {
+            using var http = new HttpClient();
+            var owned = await new SteamWebApiClient(http).GetOwnedGamesAsync(account.SteamId64, apiKey);
+            result = result with { Snapshot = SteamWebEnricher.Enrich(result.Snapshot, result.CategoriesByApp, owned) };
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"warning: Steam Web API enrichment failed: {ex.Message}");
+        }
+    }
+}
 
 string json = SnapshotSerializer.Serialize(result.Snapshot, indented: pretty || toStdout);
 
@@ -184,6 +215,8 @@ static void PrintUsage()
           --pretty               Indent the JSON output file
           --device-name <name>   Override device name (default: machine name)
           --device-type <type>   desktop | laptop | steamDeck | server | unknown
+          --steam-api-key <key>  Add owned (not installed) games + playtime via the Steam Web API
+                                 (or set STEAM_WEB_API_KEY)
           -v, --version          Print version
           -h, --help             Show this help
 

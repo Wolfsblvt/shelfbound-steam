@@ -92,7 +92,7 @@ public sealed class SteamScanner
             },
         };
 
-        return new ScanResult { Snapshot = snapshot, Warnings = warnings };
+        return new ScanResult { Snapshot = snapshot, Warnings = warnings, CategoriesByApp = categoriesByApp };
     }
 
     private static IReadOnlyList<SteamLibraryFolder> ReadLibraries(string steamRoot, List<string> warnings)

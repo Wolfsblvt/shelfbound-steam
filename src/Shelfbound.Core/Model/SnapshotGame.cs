@@ -1,21 +1,27 @@
 namespace Shelfbound.Core.Model;
 
 /// <summary>
-/// A single game entry in a snapshot. The v0 scanner only emits Steam apps that are present in a
-/// local library (i.e. installed). Owned-but-not-installed games require the Steam Web API and are
-/// a planned addition. See docs/project/snapshot-schema.md.
+/// A single game in the library. The local scan emits installed games; Steam Web API enrichment adds
+/// owned-but-not-installed games (<see cref="Installed"/> = false, <see cref="LibraryIndex"/> = null)
+/// and playtime. Every entry is a game the user owns. See docs/project/snapshot-schema.md.
 /// </summary>
 public sealed record SnapshotGame
 {
     public required int AppId { get; init; }
     public required string Name { get; init; }
     public required bool Installed { get; init; }
-    public required int LibraryIndex { get; init; }
+
+    /// <summary>Index of the local library the game is installed in, or null if it is not installed locally.</summary>
+    public int? LibraryIndex { get; init; }
 
     /// <summary>Relative install folder name under steamapps/common (not a full path). Optional.</summary>
     public string? InstallDir { get; init; }
 
     public long? SizeOnDiskBytes { get; init; }
+
+    /// <summary>Total playtime in minutes (from the Steam Web API; null if the snapshot wasn't enriched).</summary>
+    public long? PlaytimeMinutes { get; init; }
+
     public DateTimeOffset? LastUpdated { get; init; }
     public DateTimeOffset? LastPlayed { get; init; }
 

@@ -49,12 +49,14 @@ No product/hosted code belongs in this repo.
 ```
 src/
   Shelfbound.Core      Domain models + snapshot contract + serializer. Pure, no I/O.
-  Shelfbound.Steam     Local Steam scanner: VDF parser, install locator, file parsers, snapshot
-                       assembly. The differentiator; auditable and open.
-  Shelfbound.Cli       `shelfbound scan` — resolves device identity, runs the scanner, writes the
-                       snapshot, prints a privacy-aware summary.
+  Shelfbound.Steam     Local Steam scanner (VDF/ACF, categories) + Steam Web API client + enrichment.
+                       The differentiator; auditable and open.
+  Shelfbound.Query     Deterministic filter/sort/summary engine over a snapshot. No I/O, no LLM;
+                       reused by the MCP server now and the dashboard/hosted layer later.
+  Shelfbound.Cli       `shelfbound scan` — scans (+ optional Steam API enrichment), writes the snapshot.
+  Shelfbound.Mcp       `shelfbound-mcp` — local MCP server (stdio) exposing the library to AI tools.
 tests/
-  Shelfbound.Steam.Tests           xUnit + Shouldly. Parser units + scanner integration.
+  Shelfbound.Steam.Tests           xUnit + Shouldly. Parsers, scanner, query engine, enricher.
 schema/
   snapshot.v0.schema.json          The language-neutral contract.
 ```

@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <PackageLicenseExpression>AGPL-3.0-or-later</PackageLicenseExpression>
+    <Description>Deterministic query/filter and summary engine over a Shelfbound snapshot. Reused by the MCP server and (later) the dashboard.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Shelfbound.Core\Shelfbound.Core.csproj" />
+  </ItemGroup>
+
+</Project>

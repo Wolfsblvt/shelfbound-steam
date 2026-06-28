@@ -65,9 +65,19 @@ FluentAssertions 8.x became commercially licensed; Shouldly is free and a clean 
 `SteamInstallLocator`: explicit `--steam-path` → `SHELFBOUND_STEAM_PATH` → per-OS default locations.
 Windows registry (`SteamPath`) lookup for non-default installs is a planned enhancement.
 
+### Query engine + local MCP server — the product seam
+A reusable, deterministic `Shelfbound.Query` engine (filter/sort/summary) sits between the snapshot and
+consumers; the **local MCP server** (`Shelfbound.Mcp`, official C# SDK, stdio) exposes read tools over
+it. Keeping query logic out of the MCP layer lets the dashboard/hosted layer reuse it later.
+
+### Steam Web API as composable enrichment
+Owned-but-not-installed games + playtime come from the Steam Web API behind `ISteamWebApiClient`
+(swappable/mockable). A **pure** `SteamWebEnricher` merges the fetched data into the local snapshot, so
+the network call and the merge logic stay separable and testable. Requires a user-provided key
+(`--steam-api-key` / `STEAM_WEB_API_KEY`); the key is never stored.
+
 ### Deferred (technical, recorded so it isn't re-litigated)
-- **Owned-but-not-installed** games (Steam Web API) and **modern dynamic collections** (leveldb), to
-  complement the legacy categories already parsed.
-- **Local MCP server** (next major piece) — design in [mcp-design.md](./mcp-design.md).
+- **MCP write tools + local user-data store** (notes/statuses/category definitions) — next major piece.
+- **Modern dynamic collections** (leveldb) to complement the legacy categories already parsed.
 - **Steam Deck** specifics (SD-card install location) and a future **Decky plugin** that emits the
   same snapshot contract.

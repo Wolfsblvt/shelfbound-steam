@@ -54,29 +54,36 @@ The local Steam data is the moat. AI reasoning is commodity; good structured fac
 ## Current status
 
 **Implemented (local core):**
-- Snapshot contract `v0.2.0` (`schema/snapshot.v0.schema.json`, models in `Shelfbound.Core`).
+- Snapshot contract `v0.3.0` (`schema/snapshot.v0.schema.json`, models in `Shelfbound.Core`).
 - Local Steam scanner (`Shelfbound.Steam`): install discovery, `libraryfolders.vdf`,
-  `appmanifest_*.acf`, `loginusers.vdf`, **local categories** (`sharedconfig.vdf`), a minimal VDF
-  parser, snapshot assembly.
-- CLI (`Shelfbound.Cli`): `shelfbound scan` → snapshot JSON + privacy-aware summary.
-- xUnit + Shouldly tests. Verified against a real ~111-game / 2-library install (12 categories).
-- **Local only. No network, upload, accounts, or MCP yet.**
+  `appmanifest_*.acf`, `loginusers.vdf`, **local categories** (`sharedconfig.vdf`), a minimal VDF parser.
+- **Steam Web API** client + enrichment: owned-but-not-installed games and playtime (with an API key).
+- **`Shelfbound.Query`**: deterministic filter/sort/summary engine over a snapshot.
+- **Local MCP server** (`Shelfbound.Mcp`, stdio): read tools — `search_library`, `get_library_summary`,
+  `get_categories`, `get_game_details`, `find_installed_unplayed`.
+- CLI (`Shelfbound.Cli`): `shelfbound scan` (+ optional `--steam-api-key` enrichment).
+- xUnit + Shouldly tests (16). Verified on a real ~111-game / 2-library install (12 categories); MCP
+  server smoke-tested over stdio.
+- **Local only. No accounts, upload, or hosted service yet.**
 
-**Data scope:** *installed* Steam games per library (names, install state, size, timestamps), Steam
-accounts, device info, and the user's **local categories** with per-game tags. Owned-but-not-installed
-games and modern dynamic collections (leveldb) are **not yet** populated (see roadmap).
+**Data scope:** installed + (with an API key) owned-but-not-installed Steam games, playtime, Steam
+accounts, device info, and the user's **local categories** with per-game tags. Modern dynamic
+collections (leveldb) are **not yet** read (see roadmap).
 
 ## Roadmap (open core)
 
 Local-first — prove the data model locally before anything depends on it.
 
-1. **Finish the local scanner:** local categories — done (legacy `sharedconfig.vdf`); remaining:
-   **owned-but-not-installed** via the **Steam Web API**, modern dynamic collections (leveldb), Steam
-   Deck SD-card awareness, Windows registry-based install discovery.
-2. **Local MCP server:** read tools (library summary, search, game details, categories, installed)
-   and write tools (notes, statuses, category definitions) over the snapshot + a local user-data
-   store. See [mcp-design.md](./mcp-design.md).
-3. **Snapshot/export polish:** stable schema, validation, import/export ergonomics for other clients.
+1. **MCP write tools + local user-data store:** notes, statuses (finished/paused/dropped/played-
+   elsewhere), category *definitions*, opinions — stored locally, written via MCP with guardrails.
+   This is the taste/context moat. See [mcp-design.md](./mcp-design.md).
+2. **Distribution:** package the CLI/MCP server as a `dotnet tool` + GitHub Releases so others can install.
+3. **Remaining local data:** modern dynamic collections (leveldb), Steam Deck SD-card awareness,
+   Windows registry-based install discovery.
+4. **Snapshot/export polish:** validation, import/export ergonomics for other clients.
+
+Done: local scanner, local categories, owned-not-installed + playtime (Steam Web API), the query
+engine, and the local MCP server (read tools).
 
 > Hosted and paid features (if any) are developed separately and are intentionally out of scope here.
 

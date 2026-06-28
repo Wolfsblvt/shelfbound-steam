@@ -67,14 +67,15 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["appId", "name", "installed", "libraryIndex"],
+        "required": ["appId", "name", "installed"],
         "properties": {
           "appId": { "type": "integer" },
           "name": { "type": "string" },
           "installed": { "type": "boolean" },
-          "libraryIndex": { "type": "integer" },
+          "libraryIndex": { "type": "integer", "description": "Local library index; absent when the game is owned but not installed." },
           "installDir": { "type": "string", "description": "Relative folder under steamapps/common (not a full path)." },
           "sizeOnDiskBytes": { "type": "integer", "minimum": 0 },
+          "playtimeMinutes": { "type": "integer", "minimum": 0, "description": "Total playtime in minutes (Steam Web API enrichment); absent if not enriched." },
           "lastUpdated": { "type": "string", "format": "date-time" },
           "lastPlayed": { "type": "string", "format": "date-time" },
           "categories": {
