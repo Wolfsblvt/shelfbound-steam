@@ -53,25 +53,26 @@ The local Steam data is the moat. AI reasoning is commodity; good structured fac
 
 ## Current status
 
-**Implemented (local core, v0):**
-- Snapshot contract `v0.1.0` (`schema/snapshot.v0.schema.json`, models in `Shelfbound.Core`).
+**Implemented (local core):**
+- Snapshot contract `v0.2.0` (`schema/snapshot.v0.schema.json`, models in `Shelfbound.Core`).
 - Local Steam scanner (`Shelfbound.Steam`): install discovery, `libraryfolders.vdf`,
-  `appmanifest_*.acf`, `loginusers.vdf`, a minimal VDF parser, snapshot assembly.
+  `appmanifest_*.acf`, `loginusers.vdf`, **local categories** (`sharedconfig.vdf`), a minimal VDF
+  parser, snapshot assembly.
 - CLI (`Shelfbound.Cli`): `shelfbound scan` → snapshot JSON + privacy-aware summary.
-- xUnit + Shouldly tests. Verified against a real ~111-game / 2-library install.
+- xUnit + Shouldly tests. Verified against a real ~111-game / 2-library install (12 categories).
 - **Local only. No network, upload, accounts, or MCP yet.**
 
-**v0 data scope:** *installed* Steam games per library (names, install state, size, timestamps),
-Steam accounts, and device info. Owned-but-not-installed games and local collections/categories are
-**not yet** populated (see roadmap).
+**Data scope:** *installed* Steam games per library (names, install state, size, timestamps), Steam
+accounts, device info, and the user's **local categories** with per-game tags. Owned-but-not-installed
+games and modern dynamic collections (leveldb) are **not yet** populated (see roadmap).
 
 ## Roadmap (open core)
 
 Local-first — prove the data model locally before anything depends on it.
 
-1. **Finish the local scanner:** local **collections/categories** parsing (the differentiator;
-   version-dependent and messy — needs iteration), owned-but-not-installed via the **Steam Web API**,
-   Steam Deck SD-card awareness, Windows registry-based install discovery.
+1. **Finish the local scanner:** local categories — done (legacy `sharedconfig.vdf`); remaining:
+   **owned-but-not-installed** via the **Steam Web API**, modern dynamic collections (leveldb), Steam
+   Deck SD-card awareness, Windows registry-based install discovery.
 2. **Local MCP server:** read tools (library summary, search, game details, categories, installed)
    and write tools (notes, statuses, category definitions) over the snapshot + a local user-data
    store. See [mcp-design.md](./mcp-design.md).

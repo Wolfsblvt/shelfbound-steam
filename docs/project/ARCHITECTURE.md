@@ -77,7 +77,10 @@ Boundaries / invariants:
 3. For each app id, **parse `appmanifest_<id>.acf`** → name, install state (StateFlags bit 4),
    install dir, size, last updated/played.
 4. **Parse `config/loginusers.vdf`** → Steam accounts.
-5. **Assemble** a `SnapshotDocument` with device, accounts, libraries, games, and stats.
+5. **Parse `userdata/<id>/7/remote/sharedconfig.vdf`** (most-recent account) → local categories
+   (app id → ordered tag names).
+6. **Assemble** a `SnapshotDocument` with device, accounts, libraries, games (with their categories),
+   a category summary, and stats.
 
 Non-fatal problems become `warnings` on the result rather than aborting the scan.
 

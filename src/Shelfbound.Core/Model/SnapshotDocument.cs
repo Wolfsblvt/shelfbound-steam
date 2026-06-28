@@ -22,5 +22,8 @@ public sealed record SnapshotDocument
     public IReadOnlyList<SnapshotLibrary> Libraries { get; init; } = [];
     public IReadOnlyList<SnapshotGame> Games { get; init; } = [];
 
+    /// <summary>The user's local Steam collections/categories with game counts (their library vocabulary).</summary>
+    public IReadOnlyList<SnapshotCategory> Categories { get; init; } = [];
+
     public required SnapshotStats Stats { get; init; }
 }

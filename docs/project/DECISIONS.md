@@ -48,11 +48,11 @@ name only). `device.id` is a **random GUID persisted locally**, not derived from
 credentials, saves, screenshots, or arbitrary files are ever read. So a snapshot is safe-by-default
 even if later exported/uploaded. See [privacy-and-data.md](./privacy-and-data.md).
 
-### v0 data scope — installed games only
-The local scan reliably yields *installed* games per library. **Owned-but-not-installed** needs the
-Steam Web API; **local collections/categories** use version-dependent formats. Both are deferred to
-focused follow-ups rather than shipped half-working. `SnapshotGame.categories` is reserved but
-currently always empty.
+### Data scope — installed games + local categories
+The local scan yields *installed* games per library plus the user's **local categories** (read from
+the legacy `sharedconfig.vdf` `tags` store, which covers the common case). **Owned-but-not-installed**
+still needs the Steam Web API; **modern dynamic collections** can live in the client's leveldb and are
+not read yet. Both are deferred to focused follow-ups rather than shipped half-working.
 
 ### VDF parsing — hand-rolled minimal parser (no dependency)
 The files we read use a simple quoted KeyValues subset; a small in-repo parser keeps v0
@@ -66,7 +66,8 @@ FluentAssertions 8.x became commercially licensed; Shouldly is free and a clean 
 Windows registry (`SteamPath`) lookup for non-default installs is a planned enhancement.
 
 ### Deferred (technical, recorded so it isn't re-litigated)
-- Local **collections/categories** parsing and **owned-not-installed** (Steam Web API).
+- **Owned-but-not-installed** games (Steam Web API) and **modern dynamic collections** (leveldb), to
+  complement the legacy categories already parsed.
 - **Local MCP server** (next major piece) — design in [mcp-design.md](./mcp-design.md).
 - **Steam Deck** specifics (SD-card install location) and a future **Decky plugin** that emits the
   same snapshot contract.

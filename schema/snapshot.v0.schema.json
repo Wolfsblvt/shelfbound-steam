@@ -80,8 +80,21 @@
           "categories": {
             "type": "array",
             "items": { "type": "string" },
-            "description": "Reserved. The v0 scanner does not populate local collections yet, so this is currently always empty."
+            "description": "Local Steam collection/category names the user assigned to this game, in Steam's tag order."
           }
+        }
+      }
+    },
+    "categories": {
+      "type": "array",
+      "description": "The user's local Steam collections/categories with game counts.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "gameCount"],
+        "properties": {
+          "name": { "type": "string" },
+          "gameCount": { "type": "integer", "minimum": 0, "description": "Number of categorized (owned) games with this category." }
         }
       }
     },

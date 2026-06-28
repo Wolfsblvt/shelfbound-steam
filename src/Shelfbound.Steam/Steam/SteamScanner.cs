@@ -5,8 +5,9 @@ namespace Shelfbound.Steam.Steam;
 
 /// <summary>
 /// Reads a local Steam installation and produces a versioned <see cref="SnapshotDocument"/>.
-/// The scanner only emits games that are present in a local library (i.e. installed); owned games
-/// that are not installed require the Steam Web API and are out of scope for the local v0 scan.
+/// Emits the installed games per library, the user's Steam accounts, and their local
+/// collections/categories. Owned-but-not-installed games require the Steam Web API and are out of
+/// scope for the local scan.
 /// </summary>
 public sealed class SteamScanner
 {
@@ -14,6 +15,9 @@ public sealed class SteamScanner
     {
         var warnings = new List<string>();
         IReadOnlyList<SteamLibraryFolder> folders = ReadLibraries(request.SteamRootPath, warnings);
+        IReadOnlyList<SteamAccount> accounts = ReadAccounts(request.SteamRootPath, warnings);
+        IReadOnlyDictionary<int, IReadOnlyList<string>> categoriesByApp =
+            ReadCategories(request.SteamRootPath, accounts, warnings);
 
         var games = new List<SnapshotGame>();
         var libraries = new List<SnapshotLibrary>();
@@ -51,6 +55,7 @@ public sealed class SteamScanner
                     SizeOnDiskBytes = manifest.SizeOnDisk,
                     LastUpdated = manifest.LastUpdated,
                     LastPlayed = manifest.LastPlayed,
+                    Categories = categoriesByApp.TryGetValue(manifest.AppId, out var cats) ? cats : [],
                 });
                 countInLibrary++;
             }
@@ -62,8 +67,6 @@ public sealed class SteamScanner
                 GameCount = countInLibrary,
             });
         }
-
-        IReadOnlyList<SteamAccount> accounts = ReadAccounts(request.SteamRootPath, warnings);
 
         var snapshot = new SnapshotDocument
         {
@@ -80,6 +83,7 @@ public sealed class SteamScanner
             SteamAccounts = accounts,
             Libraries = libraries,
             Games = games,
+            Categories = SummarizeCategories(categoriesByApp),
             Stats = new SnapshotStats
             {
                 LibraryCount = libraries.Count,
@@ -120,4 +124,42 @@ public sealed class SteamScanner
             return [];
         }
     }
+
+    /// <summary>Reads local categories from the most-recent account's sharedconfig.vdf (falling back to any account that has one).</summary>
+    private static IReadOnlyDictionary<int, IReadOnlyList<string>> ReadCategories(
+        string steamRoot, IReadOnlyList<SteamAccount> accounts, List<string> warnings)
+    {
+        foreach (var account in accounts.OrderByDescending(a => a.MostRecent))
+        {
+            if (account.AccountId is not long accountId)
+                continue;
+
+            string path = Path.Combine(steamRoot, "userdata", accountId.ToString(), "7", "remote", "sharedconfig.vdf");
+            if (!File.Exists(path))
+                continue;
+
+            try
+            {
+                return SharedConfigParser.ParseFile(path);
+            }
+            catch (Exception ex)
+            {
+                warnings.Add($"Failed to parse sharedconfig.vdf for account {accountId}: {ex.Message}");
+            }
+        }
+
+        if (accounts.Count > 0)
+            warnings.Add("No sharedconfig.vdf found; local categories not available.");
+        return new Dictionary<int, IReadOnlyList<string>>();
+    }
+
+    private static IReadOnlyList<SnapshotCategory> SummarizeCategories(
+        IReadOnlyDictionary<int, IReadOnlyList<string>> categoriesByApp) =>
+        categoriesByApp.Values
+            .SelectMany(categories => categories)
+            .GroupBy(name => name, StringComparer.Ordinal)
+            .Select(group => new SnapshotCategory { Name = group.Key, GameCount = group.Count() })
+            .OrderByDescending(category => category.GameCount)
+            .ThenBy(category => category.Name, StringComparer.Ordinal)
+            .ToList();
 }

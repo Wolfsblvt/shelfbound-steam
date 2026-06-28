@@ -145,6 +145,9 @@ static void PrintSummary(ScanResult result, SnapshotDevice device, string path)
         Console.WriteLine($"      - [{lib.Index}] {lib.Label}: {lib.GameCount} game(s)");
     Console.WriteLine($"  games       : {s.Games.Count} ({s.Stats.InstalledGameCount} fully installed)");
     Console.WriteLine($"  on disk     : {FormatBytes(s.Stats.TotalSizeOnDiskBytes)}");
+    Console.WriteLine($"  categories  : {s.Categories.Count}");
+    foreach (var cat in s.Categories)
+        Console.WriteLine($"      - {cat.Name}: {cat.GameCount}");
     Console.WriteLine($"  schema      : v{s.SchemaVersion}");
     Console.WriteLine($"  output      : {Path.GetFullPath(path)}");
     Console.WriteLine();

@@ -20,8 +20,8 @@ public sealed record SnapshotGame
     public DateTimeOffset? LastPlayed { get; init; }
 
     /// <summary>
-    /// Local Steam collection/category names. Reserved by the contract; the v0 scanner does not
-    /// populate this yet (collection parsing is on the roadmap), so it is currently always empty.
+    /// Local Steam collection/category names the user assigned to this game (their personal library
+    /// organization), in Steam's tag order. Empty if the game is uncategorized.
     /// </summary>
     public IReadOnlyList<string> Categories { get; init; } = [];
 }

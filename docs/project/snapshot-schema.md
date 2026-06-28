@@ -20,7 +20,7 @@ this seam matters.
 
 ## Versioning
 
-`schemaVersion` (semver) is present in every document. Current: **`0.1.0`**.
+`schemaVersion` (semver) is present in every document. Current: **`0.2.0`**.
 
 - **Patch/minor:** additive, backward-compatible (new optional fields). Consumers ignore unknowns.
 - **Major:** breaking changes; consumers must branch on the major version.
@@ -28,7 +28,7 @@ this seam matters.
 Pre-1.0 the contract may still move; once hosted ingestion exists, changes go through versioned
 migrations. `SnapshotSchema.Version` is the single source of truth in code.
 
-## Document shape (v0.1.0)
+## Document shape (v0.2.0)
 
 | Field | Type | Notes |
 |---|---|---|
@@ -40,10 +40,12 @@ migrations. `SnapshotSchema.Version` is the single source of truth in code.
 | `steamAccounts[]` | array | `steamId64`, `accountName?`, `personaName?`, `mostRecent` |
 | `libraries[]` | array | `index`, `label`, `gameCount` — **no filesystem path** |
 | `games[]` | array | see below |
+| `categories[]` | array | `name`, `gameCount` — the user's local collections vocabulary |
 | `stats` | object | `libraryCount`, `installedGameCount`, `totalSizeOnDiskBytes` |
 
 `games[]` entry: `appId`, `name`, `installed`, `libraryIndex`, `installDir?` (relative folder name
-only), `sizeOnDiskBytes?`, `lastUpdated?`, `lastPlayed?`, `categories[]` (reserved; see below).
+only), `sizeOnDiskBytes?`, `lastUpdated?`, `lastPlayed?`, `categories[]` (the user's category names
+for that game, in Steam's tag order; empty if uncategorized).
 
 Enums: `osPlatform` = `unknown|windows|linux|macOs`; `deviceType` =
 `unknown|desktop|laptop|steamDeck|server`.
@@ -60,15 +62,17 @@ These are contract-level guarantees, not just scanner behavior (see
 - `accountName` (the Steam login name) is included for local completeness but is a candidate for
   redaction before upload in cloud mode.
 
-## v0 scope and what's intentionally missing
+## Scope and what's intentionally missing
 
-The v0 scanner emits **installed Steam games per library**, plus accounts and device info. Not yet
-populated (each a focused follow-up, tracked in [PROJECT.md](./PROJECT.md)):
+The scanner emits **installed Steam games per library**, plus accounts, device info, and the user's
+**local categories** (read from `userdata/<id>/7/remote/sharedconfig.vdf`). Still to come (each a
+focused follow-up, tracked in [PROJECT.md](./PROJECT.md)):
 
-- **`games[].categories`** — local Steam collections live in version-dependent formats
-  (legacy `sharedconfig.vdf` tags vs modern `localconfig.vdf` `UserCollections`); reserved in the
-  contract, currently always `[]`.
-- **Owned-but-not-installed games** — require the Steam Web API; not in local files.
+- **Modern dynamic collections** — newer Steam "collections" can live in the client's leveldb
+  (cloud-storage namespace) rather than `sharedconfig.vdf`. The scanner reads the legacy `tags` store
+  (which covers the common case); the leveldb store is not read yet.
+- **Owned-but-not-installed games** — require the Steam Web API; not in local files. (Their
+  categories exist in `sharedconfig.vdf` but aren't surfaced until those games are listed.)
 - **Per-device install nuance** (Steam Deck internal SSD vs SD card), playtime, non-Steam shortcuts.
 
 When these land they extend the contract additively and bump the schema version.
@@ -77,18 +81,19 @@ When these land they extend the contract additively and bump the schema version.
 
 ```json
 {
-  "schemaVersion": "0.1.0",
+  "schemaVersion": "0.2.0",
   "snapshotId": "1b9d…",
   "createdAt": "2026-06-28T10:00:00+00:00",
-  "source": { "tool": "shelfbound-cli", "toolVersion": "0.1.0", "platform": "windows" },
+  "source": { "tool": "shelfbound-cli", "toolVersion": "0.2.0", "platform": "windows" },
   "device": { "id": "b54997ab-…", "name": "GERALT", "type": "unknown", "os": "windows" },
   "steamAccounts": [ { "steamId64": "765611…", "personaName": "…", "mostRecent": true } ],
   "libraries": [ { "index": 0, "label": "library-0", "gameCount": 11 } ],
   "games": [
-    { "appId": 292030, "name": "The Witcher 3: Wild Hunt", "installed": true,
-      "libraryIndex": 1, "installDir": "The Witcher 3", "sizeOnDiskBytes": 63077578235,
-      "lastUpdated": "2026-05-01T12:00:00+00:00", "categories": [] }
+    { "appId": 753640, "name": "Outer Wilds", "installed": true,
+      "libraryIndex": 1, "installDir": "Outer Wilds", "sizeOnDiskBytes": 11652599956,
+      "lastUpdated": "2026-05-01T12:00:00+00:00", "categories": ["Directly Choice"] }
   ],
+  "categories": [ { "name": "Directly Choice", "gameCount": 21 }, { "name": "Deck", "gameCount": 18 } ],
   "stats": { "libraryCount": 2, "installedGameCount": 111, "totalSizeOnDiskBytes": 1175000000000 }
 }
 ```

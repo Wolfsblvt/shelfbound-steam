@@ -22,7 +22,7 @@ public sealed class SteamScannerTests : IDisposable
     }
 
     [Fact]
-    public void Builds_snapshot_from_local_steam_files()
+    public void Builds_snapshot_with_games_accounts_and_categories()
     {
         string steamApps = Path.Combine(_root, "steamapps");
         string escapedRoot = _root.Replace("\\", "\\\\");
@@ -45,8 +45,20 @@ public sealed class SteamScannerTests : IDisposable
         File.WriteAllText(Path.Combine(steamApps, "appmanifest_20.acf"), """
             "AppState" { "appid" "20" "name" "Game Twenty" "StateFlags" "4" "SizeOnDisk" "2000" }
             """);
+
+        // SteamID64 76561197960265738 maps to account id 10 (userdata/10).
         File.WriteAllText(Path.Combine(_root, "config", "loginusers.vdf"), """
-            "users" { "76561190000000000" { "AccountName" "tester" "PersonaName" "Tester" "MostRecent" "1" } }
+            "users" { "76561197960265738" { "AccountName" "tester" "PersonaName" "Tester" "MostRecent" "1" } }
+            """);
+
+        string remote = Path.Combine(_root, "userdata", "10", "7", "remote");
+        Directory.CreateDirectory(remote);
+        File.WriteAllText(Path.Combine(remote, "sharedconfig.vdf"), """
+            "UserRoamingConfigStore" { "Software" { "Valve" { "Steam" { "apps"
+            {
+                "10" { "tags" { "0" "Next" "1" "Deck" } }
+                "20" { "tags" { "0" "Finished" } }
+            } } } } }
             """);
 
         var device = new SnapshotDevice { Id = "test-id", Name = "TEST", Type = DeviceType.Desktop, Os = OsPlatform.Windows };
@@ -58,14 +70,18 @@ public sealed class SteamScannerTests : IDisposable
         });
 
         var snapshot = result.Snapshot;
-        var names = snapshot.Games.Select(g => g.Name).ToList();
-        names.Count.ShouldBe(2);
-        names.ShouldContain("Game Ten");
-        names.ShouldContain("Game Twenty");
+        snapshot.Games.Count.ShouldBe(2);
         snapshot.Stats.InstalledGameCount.ShouldBe(2);
         snapshot.Stats.TotalSizeOnDiskBytes.ShouldBe(3000);
         snapshot.SteamAccounts.ShouldHaveSingleItem().PersonaName.ShouldBe("Tester");
         snapshot.Libraries.ShouldHaveSingleItem().GameCount.ShouldBe(2);
+
+        // Categories attached to games (tag order preserved) and summarized on the document.
+        snapshot.Games.Single(g => g.AppId == 10).Categories.ShouldBe(["Next", "Deck"]);
+        snapshot.Games.Single(g => g.AppId == 20).Categories.ShouldBe(["Finished"]);
+        snapshot.Categories.Select(c => c.Name).ShouldBe(["Deck", "Finished", "Next"]);
+        snapshot.Categories.Single(c => c.Name == "Deck").GameCount.ShouldBe(1);
+
         result.Warnings.ShouldBeEmpty();
     }
 }

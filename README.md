@@ -18,12 +18,13 @@ contract, the local Steam scanner, and the CLI. The hosted service lives in a se
 Early. What works **today** is local and offline:
 
 - `shelfbound scan` discovers your Steam install and writes a versioned **snapshot** of installed
-  games across all libraries (names, install state, size, timestamps), your Steam accounts, and the
-  device — with **no install paths, credentials, or save data**.
+  games across all libraries (names, install state, size, timestamps), your Steam accounts, the
+  device, and your **local categories** (the collections you organize your library with) — with
+  **no install paths, credentials, or save data**.
 
-Not built yet: local categories, owned-but-not-installed games, the local MCP server, accounts,
-upload, and the hosted service. See [docs/project/PROJECT.md](docs/project/PROJECT.md) for the
-roadmap.
+Not built yet: owned-but-not-installed games, modern dynamic collections, the local MCP server,
+accounts, upload, and the hosted service. See [docs/project/PROJECT.md](docs/project/PROJECT.md) for
+the roadmap.
 
 ## Quick start
 
