@@ -15,7 +15,7 @@ on:
   workflow_dispatch:
 
 env:
-  NUGET_USER: REPLACE_WITH_NUGET_ORG_USERNAME
+  NUGET_USER: Wolfsblvt
 
 permissions:
   contents: read
