@@ -1,5 +1,7 @@
 name: Sync labels
 
+# Upserts the labels defined in .github/labels.yml. Uses pre-installed gh + yq (no third-party
+# action). Existing labels not listed here are left untouched.
 on:
   push:
     branches: [main]
@@ -12,10 +14,17 @@ permissions:
 jobs:
   sync:
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
-      - uses: crazy-max/ghaction-github-labeler@v5
-        with:
-          yaml-file: .github/labels.yml
-          # Don't delete labels that aren't in the file (e.g. GitHub defaults).
-          skip-delete: true
+      - name: Upsert labels from .github/labels.yml
+        run: |
+          count=$(yq 'length' .github/labels.yml)
+          for i in $(seq 0 $((count - 1))); do
+            name=$(yq ".[$i].name" .github/labels.yml)
+            color=$(yq ".[$i].color" .github/labels.yml)
+            desc=$(yq ".[$i].description" .github/labels.yml)
+            echo "Syncing: $name"
+            gh label create "$name" --color "$color" --description "$desc" --force
+          done
