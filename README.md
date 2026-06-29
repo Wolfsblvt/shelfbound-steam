@@ -93,7 +93,9 @@ The whole repository is licensed **AGPL-3.0-or-later** (see [License](#license))
 | `src/Shelfbound.Steam` | Local Steam scanner + Steam Web API client + enrichment. |
 | `src/Shelfbound.Query` | Deterministic query/filter/summary engine over a snapshot. |
 | `src/Shelfbound.Storage` | Local config, identity seam, and the user-data store (statuses, ratings, memories). |
+| `src/Shelfbound.Client` | Shared scan-to-snapshot builder + Shelfbound server client, reused by the CLI and tray. |
 | `src/Shelfbound.Cli` | The `shelfbound` command-line tool (setup/scan/profile/upload). |
+| `src/Shelfbound.Tray` | The cross-platform tray app (Avalonia): background sync, status, and account connect. |
 | `src/Shelfbound.Mcp` | The `shelfbound-mcp` local MCP server. |
 | `tests/…` | Unit + integration tests. |
 

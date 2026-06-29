@@ -1,7 +1,7 @@
 using System.Runtime.InteropServices;
 using Shelfbound.Core.Model;
 
-namespace Shelfbound.Cli;
+namespace Shelfbound.Steam.Steam;
 
 /// <summary>
 /// Resolves the local device identity for a snapshot. The device id is a random GUID persisted

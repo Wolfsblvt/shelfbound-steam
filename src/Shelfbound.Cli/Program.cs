@@ -3,7 +3,6 @@ using System.Net.Http.Headers;
 using System.Reflection;
 using System.Text;
 using System.Text.Json;
-using Shelfbound.Cli;
 using Shelfbound.Core;
 using Shelfbound.Core.Model;
 using Shelfbound.Core.UserData;

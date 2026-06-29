@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Shelfbound.Client</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Shelfbound.Core\Shelfbound.Core.csproj" />
+    <ProjectReference Include="..\Shelfbound.Steam\Shelfbound.Steam.csproj" />
+    <ProjectReference Include="..\Shelfbound.Storage\Shelfbound.Storage.csproj" />
+  </ItemGroup>
+
+</Project>

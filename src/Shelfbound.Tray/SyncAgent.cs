@@ -1,0 +1,152 @@
+using System.Reflection;
+using Shelfbound.Client;
+
+namespace Shelfbound.Tray;
+
+/// <summary>
+/// The non-UI heart of the agent: holds settings, runs syncs (scan + upload via the shared client),
+/// schedules auto-sync, and keeps a short activity log. Raises <see cref="Changed"/> on any state change
+/// so the window can refresh. Deliberately light: a timer plus an HttpClient, no background hogging.
+/// </summary>
+public sealed class SyncAgent : IDisposable
+{
+    private static readonly string ToolVersion = ResolveVersion();
+
+    private readonly object _lock = new();
+    private readonly List<string> _history = [];
+    private Timer? _timer;
+
+    public AppSettings Settings { get; }
+    public DateTimeOffset? LastSync { get; private set; }
+    public string StatusLine { get; private set; } = "Starting…";
+    public IReadOnlyList<string> History
+    {
+        get { lock (_lock) { return _history.ToList(); } }
+    }
+
+    public event Action? Changed;
+
+    public SyncAgent() => Settings = AppSettings.Load();
+
+    public void Start() => Reschedule();
+
+    /// <summary>Applies a settings change, persists it, updates auto-start, and reschedules.</summary>
+    public void UpdateSettings(Action<AppSettings> mutate)
+    {
+        mutate(Settings);
+        Settings.Save();
+        AutoStart.Apply(Settings.StartOnLogin);
+        Reschedule();
+    }
+
+    public async Task SyncNowAsync()
+    {
+        if (!Settings.IsConnected)
+        {
+            Log("Not connected — connect your account first.");
+            return;
+        }
+
+        Log("Syncing…");
+        try
+        {
+            SnapshotBuildResult build = await SnapshotBuilder.BuildAsync(new SnapshotBuildOptions
+            {
+                ToolVersion = ToolVersion,
+                DeviceName = Settings.DeviceName,
+            });
+            using var client = new ShelfboundClient(Settings.ServerUrl, Settings.Token!);
+            UploadResult result = await client.UploadAsync(build.Snapshot);
+            Log(result.Status switch
+            {
+                UploadStatus.Success => $"Synced {result.GameCount} games.",
+                UploadStatus.Throttled => $"Skipped — {result.Message}",
+                UploadStatus.Unauthorized => "Token rejected — reconnect your account.",
+                _ => $"Failed — {result.Message}",
+            });
+            if (result.Ok)
+                LastSync = DateTimeOffset.Now;
+        }
+        catch (Exception ex)
+        {
+            Log($"Error — {ex.Message}");
+        }
+        UpdateStatus();
+    }
+
+    public async Task ConnectAsync()
+    {
+        Log("Opening browser to connect…");
+        try
+        {
+            string device = string.IsNullOrWhiteSpace(Settings.DeviceName) ? Environment.MachineName : Settings.DeviceName!;
+            string? token = await ConnectFlow.RunAsync(Settings.WebAppUrl, device);
+            if (token is null)
+            {
+                Log("Connect cancelled or timed out.");
+                return;
+            }
+            Settings.Token = token;
+            Settings.DeviceName ??= device;
+            Settings.Save();
+            Log("Account connected.");
+            Reschedule();
+            await SyncNowAsync();
+        }
+        catch (Exception ex)
+        {
+            Log($"Connect failed — {ex.Message}");
+        }
+    }
+
+    private void Reschedule()
+    {
+        _timer?.Dispose();
+        _timer = null;
+        if (Settings.AutoSync && Settings.IsConnected)
+        {
+            var interval = TimeSpan.FromMinutes(Math.Max(1, Settings.IntervalMinutes));
+            _timer = new Timer(_ => _ = SyncNowAsync(), null, TimeSpan.Zero, interval);
+        }
+        UpdateStatus();
+    }
+
+    private void UpdateStatus()
+    {
+        StatusLine = !Settings.IsConnected ? "Not connected"
+            : LastSync is null ? "Connected — not synced yet"
+            : $"Last synced {Friendly(LastSync.Value)}";
+        Changed?.Invoke();
+    }
+
+    private void Log(string message)
+    {
+        lock (_lock)
+        {
+            _history.Insert(0, $"{DateTime.Now:HH:mm:ss}  {message}");
+            if (_history.Count > 100)
+                _history.RemoveAt(_history.Count - 1);
+        }
+        Changed?.Invoke();
+    }
+
+    private static string Friendly(DateTimeOffset when)
+    {
+        TimeSpan span = DateTimeOffset.Now - when;
+        if (span.TotalMinutes < 1) return "just now";
+        if (span.TotalMinutes < 60) return $"{(int)span.TotalMinutes} min ago";
+        if (span.TotalHours < 24) return $"{(int)span.TotalHours} h ago";
+        return when.ToString("yyyy-MM-dd HH:mm");
+    }
+
+    private static string ResolveVersion()
+    {
+        string? raw = Assembly.GetExecutingAssembly()
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+        if (string.IsNullOrEmpty(raw)) return "0.5.0";
+        int plus = raw.IndexOf('+');
+        return plus >= 0 ? raw[..plus] : raw;
+    }
+
+    public void Dispose() => _timer?.Dispose();
+}

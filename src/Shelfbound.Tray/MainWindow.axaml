@@ -1,0 +1,72 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Shelfbound.Tray.MainWindow"
+        Title="Shelfbound"
+        Width="420" Height="580"
+        CanResize="False"
+        WindowStartupLocation="CenterScreen"
+        Background="#0f172a">
+
+  <Window.Styles>
+    <Style Selector="Button.primary">
+      <Setter Property="Background" Value="#6366f1"/>
+      <Setter Property="Foreground" Value="White"/>
+      <Setter Property="Padding" Value="14,8"/>
+      <Setter Property="CornerRadius" Value="8"/>
+    </Style>
+    <Style Selector="Button.primary:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="#818cf8"/>
+    </Style>
+    <Style Selector="Border.card">
+      <Setter Property="Background" Value="#1e293b"/>
+      <Setter Property="CornerRadius" Value="10"/>
+      <Setter Property="Padding" Value="14"/>
+    </Style>
+    <Style Selector="CheckBox">
+      <Setter Property="Foreground" Value="#cbd5e1"/>
+    </Style>
+  </Window.Styles>
+
+  <StackPanel Margin="20" Spacing="16">
+    <TextBlock Text="Shelfbound" FontSize="20" FontWeight="Bold" Foreground="White"/>
+
+    <Border Classes="card">
+      <StackPanel Spacing="4">
+        <TextBlock x:Name="StatusText" Foreground="#e2e8f0" FontSize="15"/>
+        <TextBlock x:Name="DeviceText" Foreground="#94a3b8" FontSize="12"/>
+      </StackPanel>
+    </Border>
+
+    <StackPanel Orientation="Horizontal" Spacing="10">
+      <Button x:Name="SyncButton" Classes="primary" Content="Sync now"/>
+      <Button x:Name="ConnectButton" Content="Connect account"/>
+    </StackPanel>
+
+    <Border Classes="card">
+      <StackPanel Spacing="12">
+        <CheckBox x:Name="AutoSyncCheck" Content="Sync automatically in the background"/>
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <TextBlock Text="Every" VerticalAlignment="Center" Foreground="#cbd5e1"/>
+          <NumericUpDown x:Name="IntervalInput" Minimum="1" Maximum="1440" Increment="5" Width="120"/>
+          <TextBlock Text="minutes" VerticalAlignment="Center" Foreground="#cbd5e1"/>
+        </StackPanel>
+        <CheckBox x:Name="StartLoginCheck" Content="Start on login"/>
+        <CheckBox x:Name="StartMinimizedCheck" Content="Start hidden in the tray"/>
+      </StackPanel>
+    </Border>
+
+    <TextBlock Text="Activity" Foreground="#94a3b8" FontSize="12"/>
+    <Border Classes="card" Height="170" Padding="10">
+      <ScrollViewer>
+        <ItemsControl x:Name="HistoryList">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <TextBlock Text="{Binding}" Foreground="#cbd5e1" FontSize="11"
+                         FontFamily="Cascadia Mono,Consolas,monospace"/>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+    </Border>
+  </StackPanel>
+</Window>
