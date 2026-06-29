@@ -36,7 +36,8 @@ migrations. `SnapshotSchema.Version` is the single source of truth in code.
 | `snapshotId` | string | unique per snapshot instance (GUID) |
 | `createdAt` | date-time | UTC |
 | `source` | object | `tool`, `toolVersion`, `platform` — no user data |
-| `device` | object | `id`, `name`, `type`, `os` |
+| `device` | object | `id`, `name`, `type`, `os`, optional `specs` |
+| `device.specs?` | object | best-effort hardware: `cpu?`, `logicalCores?`, `totalMemoryBytes?`, `gpu?`, `osDescription?`, `architecture?` — device facts only, no identifiers/serials |
 | `steamAccounts[]` | array | `steamId64`, `accountName?`, `personaName?`, `mostRecent` |
 | `libraries[]` | array | `index`, `label`, `gameCount` — **no filesystem path** |
 | `games[]` | array | see below |

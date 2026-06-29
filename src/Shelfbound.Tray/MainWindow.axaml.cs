@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Threading;
 
 namespace Shelfbound.Tray;
@@ -39,6 +40,23 @@ public partial class MainWindow : Window
         StartLoginCheck.IsCheckedChanged += (_, _) => Apply();
         StartMinimizedCheck.IsCheckedChanged += (_, _) => Apply();
         IntervalInput.ValueChanged += (_, _) => Apply();
+        // Drag the window by the custom title bar (we draw our own chrome).
+        TitleBar.PointerPressed += (_, e) =>
+        {
+            if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+                BeginMoveDrag(e);
+        };
+        ShowSpecs();
+    }
+
+    private void ShowSpecs()
+    {
+        var s = _agent.Specs;
+        SpecOs.Text = s.OsDescription ?? "—";
+        SpecCpu.Text = s.Cpu ?? "—";
+        SpecCores.Text = s.LogicalCores?.ToString() ?? "—";
+        SpecRam.Text = s.TotalMemoryBytes is { } bytes ? $"{bytes / 1024d / 1024d / 1024d:0.#} GB" : "—";
+        SpecGpu.Text = s.Gpu ?? "—";
     }
 
     private void Apply()

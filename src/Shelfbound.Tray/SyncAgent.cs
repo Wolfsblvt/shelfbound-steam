@@ -1,5 +1,7 @@
 using System.Reflection;
 using Shelfbound.Client;
+using Shelfbound.Core.Model;
+using Shelfbound.Steam.Steam;
 
 namespace Shelfbound.Tray;
 
@@ -18,6 +20,7 @@ public sealed class SyncAgent : IDisposable
     private string? _token;
 
     public AppSettings Settings { get; }
+    public DeviceSpecs Specs { get; }
     public bool IsConnected => !string.IsNullOrEmpty(_token);
     public DateTimeOffset? LastSync { get; private set; }
     public string StatusLine { get; private set; } = "Starting…";
@@ -32,6 +35,7 @@ public sealed class SyncAgent : IDisposable
     {
         Settings = AppSettings.Load();
         _token = TokenStore.Load();
+        Specs = HardwareInfo.Collect();
     }
 
     public void Start() => Reschedule();

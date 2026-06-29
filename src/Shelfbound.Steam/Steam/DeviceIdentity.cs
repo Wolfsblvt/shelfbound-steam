@@ -16,6 +16,7 @@ public static class DeviceIdentity
         Name = nameOverride ?? Environment.MachineName,
         Type = typeOverride ?? DetectType(),
         Os = DetectOs(),
+        Specs = HardwareInfo.Collect(),
     };
 
     private static OsPlatform DetectOs()

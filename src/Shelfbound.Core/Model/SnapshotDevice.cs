@@ -11,4 +11,7 @@ public sealed record SnapshotDevice
     public required string Name { get; init; }
     public required DeviceType Type { get; init; }
     public required OsPlatform Os { get; init; }
+
+    /// <summary>Optional best-effort hardware specs for device-aware recommendations. Additive; may be null.</summary>
+    public DeviceSpecs? Specs { get; init; }
 }

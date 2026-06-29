@@ -21,6 +21,8 @@ separate hosted version, that service has its own privacy policy.)
 - `steamapps/appmanifest_*.acf` — game name, install state, install-dir name, size, timestamps.
 - `config/loginusers.vdf` — Steam accounts (id, login name, persona name).
 - Device/environment basics (machine name, OS) and a locally persisted random device id.
+- Best-effort **hardware specs** (CPU, cores, RAM, GPU, OS, architecture) for device-aware
+  recommendations — device facts only, **no serial numbers or fingerprints**, surfaced in the tray.
 
 Nothing else. The scanner does not traverse user files, saves, or unrelated directories.
 

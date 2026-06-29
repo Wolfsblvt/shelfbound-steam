@@ -2,71 +2,128 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="Shelfbound.Tray.MainWindow"
         Title="Shelfbound"
-        Width="420" Height="580"
+        Width="440" Height="720"
         CanResize="False"
         WindowStartupLocation="CenterScreen"
-        Background="#0f172a">
+        Background="#0b1020"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaChromeHints="PreferSystemChrome"
+        ExtendClientAreaTitleBarHeightHint="-1">
 
   <Window.Styles>
     <Style Selector="Button.primary">
       <Setter Property="Background" Value="#6366f1"/>
       <Setter Property="Foreground" Value="White"/>
-      <Setter Property="Padding" Value="14,8"/>
-      <Setter Property="CornerRadius" Value="8"/>
+      <Setter Property="Padding" Value="16,9"/>
+      <Setter Property="CornerRadius" Value="9"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
     </Style>
     <Style Selector="Button.primary:pointerover /template/ ContentPresenter">
       <Setter Property="Background" Value="#818cf8"/>
     </Style>
+    <Style Selector="Button.ghost">
+      <Setter Property="Background" Value="#1c2438"/>
+      <Setter Property="Foreground" Value="#e2e8f0"/>
+      <Setter Property="Padding" Value="16,9"/>
+      <Setter Property="CornerRadius" Value="9"/>
+    </Style>
     <Style Selector="Border.card">
-      <Setter Property="Background" Value="#1e293b"/>
-      <Setter Property="CornerRadius" Value="10"/>
-      <Setter Property="Padding" Value="14"/>
+      <Setter Property="Background" Value="#141a2e"/>
+      <Setter Property="BorderBrush" Value="#222b45"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="CornerRadius" Value="12"/>
+      <Setter Property="Padding" Value="16"/>
     </Style>
-    <Style Selector="CheckBox">
-      <Setter Property="Foreground" Value="#cbd5e1"/>
+    <Style Selector="TextBlock.label">
+      <Setter Property="Foreground" Value="#7c89a8"/>
+      <Setter Property="FontSize" Value="11"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+      <Setter Property="LetterSpacing" Value="0.5"/>
     </Style>
+    <Style Selector="TextBlock.spec-k"><Setter Property="Foreground" Value="#8a96b4"/><Setter Property="FontSize" Value="12"/></Style>
+    <Style Selector="TextBlock.spec-v"><Setter Property="Foreground" Value="#e2e8f0"/><Setter Property="FontSize" Value="12"/></Style>
+    <Style Selector="CheckBox"><Setter Property="Foreground" Value="#cbd5e1"/></Style>
   </Window.Styles>
 
-  <StackPanel Margin="20" Spacing="16">
-    <TextBlock Text="Shelfbound" FontSize="20" FontWeight="Bold" Foreground="White"/>
+  <ScrollViewer>
+    <StackPanel Margin="20,12,20,20" Spacing="14">
 
-    <Border Classes="card">
-      <StackPanel Spacing="4">
-        <TextBlock x:Name="StatusText" Foreground="#e2e8f0" FontSize="15"/>
-        <TextBlock x:Name="DeviceText" Foreground="#94a3b8" FontSize="12"/>
-      </StackPanel>
-    </Border>
-
-    <StackPanel Orientation="Horizontal" Spacing="10">
-      <Button x:Name="SyncButton" Classes="primary" Content="Sync now"/>
-      <Button x:Name="ConnectButton" Content="Connect account"/>
-    </StackPanel>
-
-    <Border Classes="card">
-      <StackPanel Spacing="12">
-        <CheckBox x:Name="AutoSyncCheck" Content="Sync automatically in the background"/>
-        <StackPanel Orientation="Horizontal" Spacing="8">
-          <TextBlock Text="Every" VerticalAlignment="Center" Foreground="#cbd5e1"/>
-          <NumericUpDown x:Name="IntervalInput" Minimum="1" Maximum="1440" Increment="5" Width="120"/>
-          <TextBlock Text="minutes" VerticalAlignment="Center" Foreground="#cbd5e1"/>
+      <!-- Custom draggable title bar -->
+      <Border Name="TitleBar" Background="Transparent" Padding="0,8,90,4">
+        <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+          <Border Width="26" Height="26" CornerRadius="7" Background="#6366f1"/>
+          <TextBlock Text="Shelfbound" FontSize="17" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
         </StackPanel>
-        <CheckBox x:Name="StartLoginCheck" Content="Start on login"/>
-        <CheckBox x:Name="StartMinimizedCheck" Content="Start hidden in the tray"/>
-      </StackPanel>
-    </Border>
+      </Border>
 
-    <TextBlock Text="Activity" Foreground="#94a3b8" FontSize="12"/>
-    <Border Classes="card" Height="170" Padding="10">
-      <ScrollViewer>
-        <ItemsControl x:Name="HistoryList">
-          <ItemsControl.ItemTemplate>
-            <DataTemplate>
-              <TextBlock Text="{Binding}" Foreground="#cbd5e1" FontSize="11"
-                         FontFamily="Cascadia Mono,Consolas,monospace"/>
-            </DataTemplate>
-          </ItemsControl.ItemTemplate>
-        </ItemsControl>
-      </ScrollViewer>
-    </Border>
-  </StackPanel>
+      <!-- Status -->
+      <Border Classes="card">
+        <StackPanel Spacing="4">
+          <TextBlock x:Name="StatusText" Foreground="#f1f5f9" FontSize="15" FontWeight="SemiBold"/>
+          <TextBlock x:Name="DeviceText" Foreground="#8a96b4" FontSize="12"/>
+        </StackPanel>
+      </Border>
+
+      <StackPanel Orientation="Horizontal" Spacing="10">
+        <Button x:Name="SyncButton" Classes="primary" Content="Sync now"/>
+        <Button x:Name="ConnectButton" Classes="ghost" Content="Connect account"/>
+      </StackPanel>
+
+      <!-- What gets captured (trust) -->
+      <Border Classes="card">
+        <StackPanel Spacing="10">
+          <TextBlock Classes="label" Text="WHAT THIS DEVICE SHARES"/>
+          <Grid ColumnDefinitions="90,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="6">
+            <TextBlock Grid.Row="0" Grid.Column="0" Classes="spec-k" Text="OS"/>
+            <TextBlock Grid.Row="0" Grid.Column="1" Classes="spec-v" x:Name="SpecOs"/>
+            <TextBlock Grid.Row="1" Grid.Column="0" Classes="spec-k" Text="CPU"/>
+            <TextBlock Grid.Row="1" Grid.Column="1" Classes="spec-v" x:Name="SpecCpu" TextWrapping="Wrap"/>
+            <TextBlock Grid.Row="2" Grid.Column="0" Classes="spec-k" Text="Cores"/>
+            <TextBlock Grid.Row="2" Grid.Column="1" Classes="spec-v" x:Name="SpecCores"/>
+            <TextBlock Grid.Row="3" Grid.Column="0" Classes="spec-k" Text="Memory"/>
+            <TextBlock Grid.Row="3" Grid.Column="1" Classes="spec-v" x:Name="SpecRam"/>
+            <TextBlock Grid.Row="4" Grid.Column="0" Classes="spec-k" Text="GPU"/>
+            <TextBlock Grid.Row="4" Grid.Column="1" Classes="spec-v" x:Name="SpecGpu"/>
+          </Grid>
+          <Border Background="#10182e" CornerRadius="8" Padding="10">
+            <TextBlock FontSize="11" Foreground="#94a3b8" TextWrapping="Wrap"
+                       Text="Also synced: your game list, install state per device, playtime, and your Steam collections. Never synced: passwords, save files, or install paths."/>
+          </Border>
+        </StackPanel>
+      </Border>
+
+      <!-- Settings -->
+      <Border Classes="card">
+        <StackPanel Spacing="12">
+          <TextBlock Classes="label" Text="SYNC"/>
+          <CheckBox x:Name="AutoSyncCheck" Content="Sync automatically in the background"/>
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <TextBlock Text="Every" VerticalAlignment="Center" Foreground="#cbd5e1"/>
+            <NumericUpDown x:Name="IntervalInput" Minimum="1" Maximum="1440" Increment="5" Width="120"/>
+            <TextBlock Text="minutes" VerticalAlignment="Center" Foreground="#cbd5e1"/>
+          </StackPanel>
+          <CheckBox x:Name="StartLoginCheck" Content="Start on login"/>
+          <CheckBox x:Name="StartMinimizedCheck" Content="Start hidden in the tray"/>
+        </StackPanel>
+      </Border>
+
+      <!-- Activity -->
+      <Border Classes="card" Padding="12">
+        <StackPanel Spacing="8">
+          <TextBlock Classes="label" Text="ACTIVITY"/>
+          <ScrollViewer Height="120">
+            <ItemsControl x:Name="HistoryList">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <TextBlock Text="{Binding}" Foreground="#a9b4cf" FontSize="11"
+                             FontFamily="Cascadia Mono,Consolas,monospace"/>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </StackPanel>
+      </Border>
+
+    </StackPanel>
+  </ScrollViewer>
 </Window>
