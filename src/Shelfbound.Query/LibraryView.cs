@@ -9,6 +9,10 @@ public sealed record LibraryView
     public required IReadOnlyList<LibraryGame> Games { get; init; }
     public required IReadOnlyList<SnapshotCategory> Categories { get; init; }
     public required IReadOnlyList<SnapshotLibrary> Libraries { get; init; }
+
+    /// <summary>The device context for this view (drives device-aware recommendations). For a merged
+    /// multi-device view this is device-agnostic, so device-specific suggestions stay conservative.</summary>
+    public SnapshotDevice? Device { get; init; }
     public IReadOnlyDictionary<string, CategoryDefinition> CategoryDefinitions { get; init; }
         = new Dictionary<string, CategoryDefinition>();
     public IReadOnlyList<Memory> GlobalMemories { get; init; } = [];

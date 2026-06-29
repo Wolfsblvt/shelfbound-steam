@@ -49,6 +49,7 @@ public static class LibraryViewBuilder
             Games = games,
             Categories = snapshot.Categories,
             Libraries = snapshot.Libraries,
+            Device = snapshot.Device,
             CategoryDefinitions = userData?.CategoryDefinitions ?? new Dictionary<string, CategoryDefinition>(),
             GlobalMemories = userData?.Memories.Where(m => m.Scope == MemoryScope.Global).ToList() ?? [],
             FirstScanAt = firstScanAt,

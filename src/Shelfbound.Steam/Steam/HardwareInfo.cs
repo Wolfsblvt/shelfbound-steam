@@ -19,8 +19,29 @@ public static class HardwareInfo
         Architecture = RuntimeInformation.OSArchitecture.ToString(),
         Cpu = TryGetCpu(),
         TotalMemoryBytes = TryGetTotalMemory(),
-        Gpu = null, // TODO: best-effort GPU per platform (WMI/lspci/system_profiler).
+        Gpu = TryGetGpu(),
     };
+
+    private static string? TryGetGpu()
+    {
+        try
+        {
+            // Hardware.Info handles the per-OS GPU lookup (WMI on Windows, /sys or system_profiler else).
+            var hardware = new global::Hardware.Info.HardwareInfo();
+            hardware.RefreshVideoControllerList();
+            foreach (var controller in hardware.VideoControllerList)
+            {
+                string? name = Clean(controller.Name);
+                if (name is not null)
+                    return name;
+            }
+        }
+        catch
+        {
+            // GPU detection is best-effort; never let it fail a scan.
+        }
+        return null;
+    }
 
     private static string? TryGetCpu()
     {

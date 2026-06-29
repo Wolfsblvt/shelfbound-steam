@@ -106,6 +106,11 @@ public static class LibraryTools
             .ToList();
     }
 
+    [McpServerTool(Name = "get_recommendations")]
+    [Description("Themed 'what should I play (or uninstall) next?' cards over the user's library, each with reasons: installed-but-unplayed (framed as 'play next on your Steam Deck' when the device is a Deck), paused games worth returning to, recently added but untouched, and games to uninstall to free space. Device-aware: only suggests Deck-specific play when the device actually is a Deck.")]
+    public static IReadOnlyList<RecommendationCard> GetRecommendations(SnapshotContext context, IUserDataStore store) =>
+        RecommendationEngine.Build(View(context, store));
+
     private static TEnum? ParseEnum<TEnum>(string? value) where TEnum : struct, Enum =>
         value is not null && Enum.TryParse(value, ignoreCase: true, out TEnum parsed) ? parsed : null;
 

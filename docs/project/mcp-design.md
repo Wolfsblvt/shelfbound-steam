@@ -26,6 +26,11 @@ logic lives in the reusable `Shelfbound.Query` engine.
 `get_installed_games`, `find_installed_unplayed_games`, `find_backlog_candidates`, `compare_games`,
 `get_user_taste_profile`, `get_game_opinion`, `get_recommendation_context`.
 
+**Built:** `get_recommendations` — deterministic "what to play/uninstall next?" cards (installed-but-unplayed,
+framed for the Steam Deck only when the device is a Deck; paused; recently added; free-up-space) via the
+shared `RecommendationEngine`. Reused by the local + (soon) hosted MCP and the dashboard. Enrichment
+(completion times, ProtonDB) will add "short enough to finish" / "Gold on Deck" later.
+
 ## Write tools (candidates)
 
 `set_category_definition`, `record_game_opinion`, `record_game_status`, `set_game_note`,

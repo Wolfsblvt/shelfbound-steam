@@ -12,4 +12,8 @@
     <ProjectReference Include="..\Shelfbound.Core\Shelfbound.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="Hardware.Info" Version="110.0.0.1" />
+  </ItemGroup>
+
 </Project>
