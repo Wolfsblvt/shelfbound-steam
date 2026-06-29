@@ -18,7 +18,7 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Upsert labels from .github/labels.yml
         run: |
           count=$(yq 'length' .github/labels.yml)
