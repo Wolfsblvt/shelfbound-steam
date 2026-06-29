@@ -19,7 +19,7 @@ public static class LibraryTools
         LibraryViewBuilder.Build(context.Snapshot, store.Load(context.OwnerId));
 
     [McpServerTool(Name = "get_library_summary")]
-    [Description("High-level overview of the library: total/installed/categorized game counts, total size, total playtime (if available), libraries, and categories (collections) with counts.")]
+    [Description("High-level overview of the library: total/installed/categorized game counts, total size, total playtime (if available), libraries, and categories (collections) with counts. Includes 'scope': 'fullLibrary' means total reflects ALL owned games; 'installedOnly' means only installed games are present (owned-but-not-installed games are absent — a game's absence is NOT proof the user doesn't own it).")]
     public static LibrarySummary GetLibrarySummary(SnapshotContext context, IUserDataStore store) =>
         LibraryQueryEngine.Summarize(View(context, store));
 
@@ -29,7 +29,7 @@ public static class LibraryTools
         context.Snapshot.Categories;
 
     [McpServerTool(Name = "search_library")]
-    [Description("Search/filter the library by facts AND the user's saved data. All parameters are optional and combine with AND. Returns games with categories, install state, size, playtime, and any saved status/rating/completion/memories.")]
+    [Description("Search/filter the library by facts AND the user's saved data. All parameters are optional and combine with AND. Returns games with categories, install state, size, playtime, and any saved status/rating/completion/memories. NOTE: if the library scope is 'installedOnly' (see get_library_summary), owned-but-not-installed games are absent — no results does NOT mean the user doesn't own the game.")]
     public static IReadOnlyList<LibraryGame> SearchLibrary(
         SnapshotContext context, IUserDataStore store,
         [Description("Case-insensitive substring match on the game name.")] string? text = null,
@@ -72,7 +72,7 @@ public static class LibraryTools
     }
 
     [McpServerTool(Name = "get_game_details")]
-    [Description("Get a single game — facts plus the user's saved data and game-scoped memories — by Steam app id or by exact/closest name match.")]
+    [Description("Get a single game — facts plus the user's saved data and game-scoped memories — by Steam app id or by exact/closest name match. Returns null if not found; when the library scope is 'installedOnly' (see get_library_summary), that only means it isn't installed, not that the user doesn't own it.")]
     public static LibraryGame? GetGameDetails(
         SnapshotContext context, IUserDataStore store,
         [Description("Steam app id, if known.")] int? appId = null,

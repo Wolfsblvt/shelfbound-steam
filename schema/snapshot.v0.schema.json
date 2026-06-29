@@ -32,7 +32,20 @@
         "id": { "type": "string", "description": "Random, locally persisted, non-identifying device id." },
         "name": { "type": "string" },
         "type": { "$ref": "#/$defs/deviceType" },
-        "os": { "$ref": "#/$defs/osPlatform" }
+        "os": { "$ref": "#/$defs/osPlatform" },
+        "specs": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Optional best-effort hardware facts for device-aware recommendations. No identifiers/serials/fingerprints.",
+          "properties": {
+            "cpu": { "type": "string" },
+            "logicalCores": { "type": "integer", "minimum": 0 },
+            "totalMemoryBytes": { "type": "integer", "minimum": 0 },
+            "gpu": { "type": "string" },
+            "osDescription": { "type": "string" },
+            "architecture": { "type": "string" }
+          }
+        }
       }
     },
     "steamAccounts": {
@@ -106,12 +119,18 @@
       "properties": {
         "libraryCount": { "type": "integer", "minimum": 0 },
         "installedGameCount": { "type": "integer", "minimum": 0 },
-        "totalSizeOnDiskBytes": { "type": "integer", "minimum": 0 }
+        "totalSizeOnDiskBytes": { "type": "integer", "minimum": 0 },
+        "scope": { "$ref": "#/$defs/libraryScope" }
       }
     }
   },
   "$defs": {
     "osPlatform": { "type": "string", "enum": ["unknown", "windows", "linux", "macOs"] },
-    "deviceType": { "type": "string", "enum": ["unknown", "desktop", "laptop", "steamDeck", "server"] }
+    "deviceType": { "type": "string", "enum": ["unknown", "desktop", "laptop", "steamDeck", "server"] },
+    "libraryScope": {
+      "type": "string",
+      "enum": ["installedOnly", "fullLibrary"],
+      "description": "Whether the game list covers only installed games or the full owned library. Absent defaults to installedOnly."
+    }
   }
 }

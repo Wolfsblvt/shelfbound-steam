@@ -22,6 +22,7 @@ coverage/
 ## Shelfbound local artifacts — may contain personal library data; never commit
 shelfbound-snapshot*.json
 *.snapshot.json
+snap.json
 
 ## OS noise
 Thumbs.db

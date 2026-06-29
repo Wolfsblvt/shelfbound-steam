@@ -10,6 +10,13 @@ public sealed record LibrarySummary
     public required int CategorizedGames { get; init; }
     public required long TotalSizeOnDiskBytes { get; init; }
 
+    /// <summary>
+    /// Whether <see cref="TotalGames"/> is the full owned library or only what's installed. When
+    /// <see cref="LibraryScope.InstalledOnly"/>, owned-but-not-installed games are absent, so a missing
+    /// game does not mean the user doesn't own it.
+    /// </summary>
+    public LibraryScope Scope { get; init; } = LibraryScope.InstalledOnly;
+
     /// <summary>Total playtime in minutes, or null if the snapshot wasn't enriched with playtime.</summary>
     public long? TotalPlaytimeMinutes { get; init; }
 

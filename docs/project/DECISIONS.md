@@ -49,14 +49,33 @@ credentials, saves, screenshots, or arbitrary files are ever read. So a snapshot
 even if later exported/uploaded. See [privacy-and-data.md](./privacy-and-data.md).
 
 ### Data scope — installed games + local categories
-The local scan yields *installed* games per library plus the user's **local categories** (read from
-the legacy `sharedconfig.vdf` `tags` store, which covers the common case). **Owned-but-not-installed**
-still needs the Steam Web API; **modern dynamic collections** can live in the client's leveldb and are
-not read yet. Both are deferred to focused follow-ups rather than shipped half-working.
+The local scan yields *installed* games per library plus the user's **local categories**.
+**Owned-but-not-installed** needs the Steam Web API, so the snapshot carries an explicit **library
+scope** (`installedOnly` vs `fullLibrary`, on `stats.scope`): without a key the scan is installed-only,
+and the CLI/MCP say so loudly so a missing game is never read as "not owned" (schema bumped to `v0.4.0`).
+Categories currently come from the legacy `sharedconfig.vdf` `tags` store, which is **stale for users
+who manage collections in the modern Steam UI** — confirmed (it reported wrong categories that an AI
+then repeated). The fix (read the modern Chromium-leveldb collections) is **designed + validated but not
+yet built**; see [steam-collections.md](./steam-collections.md). Deferred as a focused follow-up rather
+than shipped half-working, with the legacy store kept as a fallback.
 
 ### VDF parsing — hand-rolled minimal parser (no dependency)
 The files we read use a simple quoted KeyValues subset; a small in-repo parser keeps v0
 dependency-free and offline-buildable. *Alternative if edge cases bite:* `Gameloop.Vdf` (MIT).
+
+### Modern collections — hand-rolled Chromium-leveldb reader (no dependency), legacy fallback
+The legacy `sharedconfig.vdf` categories are **stale for modern-UI users** (confirmed: it reported wrong
+categories an AI then repeated). The current collections live in the Steam client's Chromium **Local
+Storage leveldb** (`cloud-storage-namespace-1`). Decision: **read them with a small hand-rolled reader**
+(snappy decompression + LevelDB SSTable + WAL + Chromium LocalStorage decode + collections JSON),
+isolated under `Shelfbound.Steam.Collections`, **falling back to the legacy `sharedconfig.vdf`** so a
+failed/empty modern read is never worse than today. *Considered and rejected:* a native LevelDB/RocksDB
+dependency (too heavy/per-RID for a cross-platform open-core lib, and it still needs a copy-and-open
+dance to dodge Steam's lock) and doing nothing (categories are a headline feature and currently wrong).
+The approach was validated end-to-end against a real install (a Python port produced the correct
+result). Known cost: it parses Steam's internal, undocumented, in-flux cache, so it's **best-effort and
+maintained** — Windows-solid, can lag the live client by the last unflushed edit, dynamic `filterSpec`
+collections deferred. Full findings + algorithm: [steam-collections.md](./steam-collections.md).
 
 ### Test assertions — **Shouldly** (not FluentAssertions)
 FluentAssertions 8.x became commercially licensed; Shouldly is free and a clean fit with xUnit.

@@ -54,10 +54,12 @@ The local Steam data is the moat. AI reasoning is commodity; good structured fac
 ## Current status
 
 **Implemented (local core):**
-- Snapshot contract `v0.3.0` (`schema/snapshot.v0.schema.json`, models in `Shelfbound.Core`).
+- Snapshot contract `v0.4.0` (`schema/snapshot.v0.schema.json`, models in `Shelfbound.Core`).
 - Local Steam scanner (`Shelfbound.Steam`): install discovery, `libraryfolders.vdf`,
   `appmanifest_*.acf`, `loginusers.vdf`, **local categories** (`sharedconfig.vdf`), a minimal VDF parser.
 - **Steam Web API** client + enrichment: owned-but-not-installed games and playtime (with an API key).
+  The snapshot carries a **library scope** (`installedOnly` vs `fullLibrary`) so consumers never read
+  "not found" as "not owned" when no key was used; the CLI says so loudly.
 - **`Shelfbound.Query`**: deterministic filter/sort/summary over a **merged library view** (snapshot
   facts + user-data) — search by category, install state, playtime, **status, rating, and completion**;
   **recency** as human phrases (installed/last-played + "added N ago", inferred from first-seen).
@@ -72,13 +74,15 @@ The local Steam data is the moat. AI reasoning is commodity; good structured fac
   shared by the CLI and MCP server.
 - CLI (`Shelfbound.Cli`): `shelfbound setup` (API key), `shelfbound scan` (+ enrichment), and
   `shelfbound profile` (a local "what Shelfbound remembers" view).
-- xUnit + Shouldly tests (31). Verified on a real ~111-game / 2-library install; MCP server
+- xUnit + Shouldly tests (37). Verified on a real ~111-game / 2-library install; MCP server
   smoke-tested over stdio (write→search round-trip, server instructions, get_profile_status).
 - **Local only. Identity is the local machine owner; real auth slots in for the hosted layer.**
 
 **Data scope:** installed + (with an API key) owned-but-not-installed Steam games, playtime, Steam
-accounts, device info, and the user's **local categories** with per-game tags. Modern dynamic
-collections (leveldb) are **not yet** read (see roadmap).
+accounts, device info, and the user's **local categories** with per-game tags. Categories come from the
+**legacy** `sharedconfig.vdf`, which is **stale for modern-UI collection users** — the fix (read the
+modern Chromium-leveldb collections) is designed + validated but not yet built
+([steam-collections.md](./steam-collections.md)).
 
 ## Roadmap (open core)
 
@@ -87,7 +91,8 @@ Local-first — prove the data model locally before anything depends on it.
 1. **Distribution:** package the CLI/MCP server as a `dotnet tool` + GitHub Releases so others can install.
 2. **Taste/profile depth:** user-data now merges into query results (filter by status/rating/completion);
    remaining — a "what Shelfbound remembers" review/edit view and optional metered LLM extraction.
-3. **Remaining local data:** modern dynamic collections (leveldb), Steam Deck SD-card awareness,
+3. **Remaining local data:** modern collections reader (Chromium leveldb — designed + validated, fixes
+   stale categories; see [steam-collections.md](./steam-collections.md)), Steam Deck SD-card awareness,
    Windows registry-based install discovery.
 4. **Snapshot/export polish:** validation, import/export ergonomics for other clients.
 
@@ -110,6 +115,7 @@ engine (merging facts + user-data), the local MCP server (read + write tools), a
 - [ARCHITECTURE.md](./ARCHITECTURE.md) — components, the snapshot seam, local/cloud boundary, data model.
 - [DECISIONS.md](./DECISIONS.md) — technical/architecture decision log.
 - [snapshot-schema.md](./snapshot-schema.md) — the snapshot contract in detail.
+- [steam-collections.md](./steam-collections.md) — modern collections reader (stale-category fix): design + findings.
 - [privacy-and-data.md](./privacy-and-data.md) — privacy principles and what is read.
 - [mcp-design.md](./mcp-design.md) — local MCP tool design and memory-write guardrails.
 - [License summary](../../README.md#license) — the repo is AGPL-3.0-or-later.

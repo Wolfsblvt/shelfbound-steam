@@ -64,6 +64,7 @@ public static class LibraryQueryEngine
             TotalPlaytimeMinutes = anyPlaytime ? games.Sum(g => g.PlaytimeMinutes ?? 0) : null,
             Categories = view.Categories,
             Libraries = view.Libraries,
+            Scope = view.Scope,
         };
     }
 

@@ -20,7 +20,7 @@ this seam matters.
 
 ## Versioning
 
-`schemaVersion` (semver) is present in every document. Current: **`0.3.0`**.
+`schemaVersion` (semver) is present in every document. Current: **`0.4.0`**.
 
 - **Patch/minor:** additive, backward-compatible (new optional fields). Consumers ignore unknowns.
 - **Major:** breaking changes; consumers must branch on the major version.
@@ -28,7 +28,7 @@ this seam matters.
 Pre-1.0 the contract may still move; once hosted ingestion exists, changes go through versioned
 migrations. `SnapshotSchema.Version` is the single source of truth in code.
 
-## Document shape (v0.3.0)
+## Document shape (v0.4.0)
 
 | Field | Type | Notes |
 |---|---|---|
@@ -42,7 +42,8 @@ migrations. `SnapshotSchema.Version` is the single source of truth in code.
 | `libraries[]` | array | `index`, `label`, `gameCount` — **no filesystem path** |
 | `games[]` | array | see below |
 | `categories[]` | array | `name`, `gameCount` — the user's local collections vocabulary |
-| `stats` | object | `libraryCount`, `installedGameCount`, `totalSizeOnDiskBytes` |
+| `stats` | object | `libraryCount`, `installedGameCount`, `totalSizeOnDiskBytes`, `scope` |
+| `stats.scope` | enum | `installedOnly` (default) or `fullLibrary` — whether the game list is the full owned library or only installed games. Absence ≠ non-ownership when `installedOnly`. |
 
 `games[]` entry: `appId`, `name`, `installed`, `libraryIndex?` (null when owned but not installed),
 `installDir?` (relative folder name only), `sizeOnDiskBytes?`, `playtimeMinutes?` (from the Steam Web
@@ -50,7 +51,7 @@ API), `lastUpdated?`, `lastPlayed?`, `categories[]` (the user's category names f
 Steam's tag order; empty if uncategorized).
 
 Enums: `osPlatform` = `unknown|windows|linux|macOs`; `deviceType` =
-`unknown|desktop|laptop|steamDeck|server`.
+`unknown|desktop|laptop|steamDeck|server`; `libraryScope` = `installedOnly|fullLibrary`.
 
 ## Privacy rules baked into the contract
 
@@ -71,11 +72,14 @@ The scanner emits **installed Steam games per library**, plus accounts, device i
 **owned-but-not-installed games and playtime**. Still to come (each a focused follow-up, tracked in
 [PROJECT.md](./PROJECT.md)):
 
-- **Modern dynamic collections** — newer Steam "collections" can live in the client's leveldb
-  (cloud-storage namespace) rather than `sharedconfig.vdf`. The scanner reads the legacy `tags` store
-  (which covers the common case); the leveldb store is not read yet.
+- **Modern collections** — the scanner reads the legacy `tags` store (`sharedconfig.vdf`), but for
+  users who manage collections in the **modern Steam UI** that file is **stale**, so categories can be
+  wrong. The current collections live in the client's Chromium Local Storage leveldb
+  (`cloud-storage-namespace-1`). Reading them is designed + validated but **not yet implemented** —
+  see [steam-collections.md](./steam-collections.md).
 - **Owned-not-installed games + playtime** — populated only when a Steam Web API key is provided
-  (`--steam-api-key` / `STEAM_WEB_API_KEY`). Without a key, only installed games are listed.
+  (`--steam-api-key` / `STEAM_WEB_API_KEY`). Without a key, only installed games are listed and
+  `stats.scope` stays `installedOnly`; with a key it becomes `fullLibrary`.
 - **Per-device install nuance** (Steam Deck internal SSD vs SD card) and non-Steam shortcuts.
 
 When these land they extend the contract additively and bump the schema version.
@@ -84,10 +88,10 @@ When these land they extend the contract additively and bump the schema version.
 
 ```json
 {
-  "schemaVersion": "0.3.0",
+  "schemaVersion": "0.4.0",
   "snapshotId": "1b9d…",
   "createdAt": "2026-06-28T10:00:00+00:00",
-  "source": { "tool": "shelfbound-cli", "toolVersion": "0.3.0", "platform": "windows" },
+  "source": { "tool": "shelfbound-cli", "toolVersion": "0.6.0", "platform": "windows" },
   "device": { "id": "b54997ab-…", "name": "GERALT", "type": "unknown", "os": "windows" },
   "steamAccounts": [ { "steamId64": "765611…", "personaName": "…", "mostRecent": true } ],
   "libraries": [ { "index": 0, "label": "library-0", "gameCount": 11 } ],
@@ -97,6 +101,7 @@ When these land they extend the contract additively and bump the schema version.
       "lastUpdated": "2026-05-01T12:00:00+00:00", "categories": ["Directly Choice"] }
   ],
   "categories": [ { "name": "Directly Choice", "gameCount": 21 }, { "name": "Deck", "gameCount": 18 } ],
-  "stats": { "libraryCount": 2, "installedGameCount": 111, "totalSizeOnDiskBytes": 1175000000000 }
+  "stats": { "libraryCount": 2, "installedGameCount": 111, "totalSizeOnDiskBytes": 1175000000000,
+    "scope": "fullLibrary" }
 }
 ```

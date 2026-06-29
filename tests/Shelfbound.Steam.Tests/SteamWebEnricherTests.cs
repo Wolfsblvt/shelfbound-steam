@@ -29,9 +29,14 @@ public class SteamWebEnricherTests
             new() { AppId = 20, Name = "Owned Not Installed", PlaytimeForeverMinutes = 30 },
         };
 
+        // A scan is installed-only until enriched.
+        snapshot.Stats.Scope.ShouldBe(LibraryScope.InstalledOnly);
+
         var enriched = SteamWebEnricher.Enrich(snapshot, categoriesByApp, owned);
 
         enriched.Games.Count.ShouldBe(2);
+        // Enrichment adds owned-but-not-installed games, so the snapshot now covers the full library.
+        enriched.Stats.Scope.ShouldBe(LibraryScope.FullLibrary);
 
         var installed = enriched.Games.Single(g => g.AppId == 10);
         installed.Installed.ShouldBeTrue();

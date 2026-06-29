@@ -244,6 +244,7 @@ static async Task<bool> UploadOnceAsync(ShelfboundClient client, SnapshotBuildOp
     {
         case UploadStatus.Success:
             Console.WriteLine($"Uploaded {result.GameCount} game(s).");
+            PrintScopeNotice(build.Snapshot);
             return true;
         case UploadStatus.Throttled:
             string retry = result.RetryAfterSeconds is { } s ? $" (try again in ~{s}s)" : "";
@@ -314,7 +315,9 @@ static void PrintSummary(SnapshotDocument s, SnapshotDevice device, string path)
     Console.WriteLine($"  libraries   : {s.Stats.LibraryCount}");
     foreach (var lib in s.Libraries)
         Console.WriteLine($"      - [{lib.Index}] {lib.Label}: {lib.GameCount} game(s)");
+    bool fullLibrary = s.Stats.Scope == LibraryScope.FullLibrary;
     Console.WriteLine($"  games       : {s.Games.Count} ({s.Stats.InstalledGameCount} fully installed)");
+    Console.WriteLine($"  scope       : {(fullLibrary ? "full owned library" : "installed games only")}");
     Console.WriteLine($"  on disk     : {FormatBytes(s.Stats.TotalSizeOnDiskBytes)}");
     Console.WriteLine($"  categories  : {s.Categories.Count}");
     foreach (var cat in s.Categories)
@@ -322,8 +325,21 @@ static void PrintSummary(SnapshotDocument s, SnapshotDevice device, string path)
     Console.WriteLine($"  schema      : v{s.SchemaVersion}");
     Console.WriteLine($"  output      : {Path.GetFullPath(path)}");
     Console.WriteLine();
+    PrintScopeNotice(s);
     Console.WriteLine("Privacy: no install paths, credentials, or save data are included.");
     Console.WriteLine("See docs/project/privacy-and-data.md.");
+}
+
+// When a snapshot is installed-only, say so loudly: it's the difference between "I don't own Portal"
+// and "Portal just isn't installed". The fix is a Steam Web API key.
+static void PrintScopeNotice(SnapshotDocument s)
+{
+    if (s.Stats.Scope == LibraryScope.FullLibrary)
+        return;
+    Console.WriteLine("Note: this snapshot includes only installed games. Owned-but-not-installed games");
+    Console.WriteLine("are missing. Add them with a free Steam Web API key:");
+    Console.WriteLine("  shelfbound setup --steam-api-key <key>   (then re-run)   https://steamcommunity.com/dev/apikey");
+    Console.WriteLine();
 }
 
 static int RunSetup(string[] args)

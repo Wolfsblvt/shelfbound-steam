@@ -73,6 +73,8 @@ public sealed class SteamScannerTests : IDisposable
         snapshot.Games.Count.ShouldBe(2);
         snapshot.Stats.InstalledGameCount.ShouldBe(2);
         snapshot.Stats.TotalSizeOnDiskBytes.ShouldBe(3000);
+        // A local scan never reaches the Steam Web API, so it's installed-only.
+        snapshot.Stats.Scope.ShouldBe(LibraryScope.InstalledOnly);
         snapshot.SteamAccounts.ShouldHaveSingleItem().PersonaName.ShouldBe("Tester");
         snapshot.Libraries.ShouldHaveSingleItem().GameCount.ShouldBe(2);
 

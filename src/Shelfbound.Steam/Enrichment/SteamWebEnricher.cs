@@ -51,6 +51,11 @@ public static class SteamWebEnricher
             });
         }
 
-        return snapshot with { Games = games };
+        // The library now includes owned-but-not-installed games, so it's the full owned library.
+        return snapshot with
+        {
+            Games = games,
+            Stats = snapshot.Stats with { Scope = LibraryScope.FullLibrary },
+        };
     }
 }

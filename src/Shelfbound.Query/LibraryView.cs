@@ -13,6 +13,10 @@ public sealed record LibraryView
     /// <summary>The device context for this view (drives device-aware recommendations). For a merged
     /// multi-device view this is device-agnostic, so device-specific suggestions stay conservative.</summary>
     public SnapshotDevice? Device { get; init; }
+
+    /// <summary>Whether this view covers the full owned library or only installed games. Surfaced so
+    /// consumers don't read "not found" as "not owned" when the snapshot is installed-only.</summary>
+    public LibraryScope Scope { get; init; } = LibraryScope.InstalledOnly;
     public IReadOnlyDictionary<string, CategoryDefinition> CategoryDefinitions { get; init; }
         = new Dictionary<string, CategoryDefinition>();
     public IReadOnlyList<Memory> GlobalMemories { get; init; } = [];

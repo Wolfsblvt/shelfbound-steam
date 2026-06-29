@@ -7,7 +7,7 @@ public static class SnapshotSchema
     /// Current snapshot schema version (semver). Bump on contract changes;
     /// see docs/project/snapshot-schema.md and schema/snapshot.v0.schema.json.
     /// </summary>
-    public const string Version = "0.3.0";
+    public const string Version = "0.4.0";
 
     /// <summary>Canonical tool name recorded in <c>source.tool</c> for the bundled CLI scanner.</summary>
     public const string CliToolName = "shelfbound-cli";

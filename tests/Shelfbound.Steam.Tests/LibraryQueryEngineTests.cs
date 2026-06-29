@@ -86,4 +86,18 @@ public class LibraryQueryEngineTests
     {
         LibraryQueryEngine.Summarize(View(Game(1, "A", true))).TotalPlaytimeMinutes.ShouldBeNull();
     }
+
+    [Fact]
+    public void Summarize_carries_library_scope()
+    {
+        // Default snapshot is installed-only; the scope must reach the summary so the AI doesn't read
+        // "not found" as "not owned".
+        LibraryQueryEngine.Summarize(View(Game(1, "A", true))).Scope.ShouldBe(LibraryScope.InstalledOnly);
+
+        SnapshotDocument full = Snapshot(Game(1, "A", true)) with
+        {
+            Stats = new SnapshotStats { LibraryCount = 0, InstalledGameCount = 1, TotalSizeOnDiskBytes = 0, Scope = LibraryScope.FullLibrary },
+        };
+        LibraryQueryEngine.Summarize(LibraryViewBuilder.Build(full)).Scope.ShouldBe(LibraryScope.FullLibrary);
+    }
 }
