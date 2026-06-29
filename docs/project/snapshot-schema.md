@@ -72,11 +72,10 @@ The scanner emits **installed Steam games per library**, plus accounts, device i
 **owned-but-not-installed games and playtime**. Still to come (each a focused follow-up, tracked in
 [PROJECT.md](./PROJECT.md)):
 
-- **Modern collections** — the scanner reads the legacy `tags` store (`sharedconfig.vdf`), but for
-  users who manage collections in the **modern Steam UI** that file is **stale**, so categories can be
-  wrong. The current collections live in the client's Chromium Local Storage leveldb
-  (`cloud-storage-namespace-1`). Reading them is designed + validated but **not yet implemented** —
-  see [steam-collections.md](./steam-collections.md).
+- **Dynamic collections** — the scanner reads the **modern Steam collections** (Chromium Local Storage
+  leveldb), falling back to the legacy `sharedconfig.vdf` `tags` store. Static collections (explicit
+  membership) are covered; **dynamic, rule-based (`filterSpec`) collections** are not read yet — see
+  [steam-collections.md](./steam-collections.md).
 - **Owned-not-installed games + playtime** — populated only when a Steam Web API key is provided
   (`--steam-api-key` / `STEAM_WEB_API_KEY`). Without a key, only installed games are listed and
   `stats.scope` stays `installedOnly`; with a key it becomes `fullLibrary`.

@@ -56,7 +56,8 @@ The local Steam data is the moat. AI reasoning is commodity; good structured fac
 **Implemented (local core):**
 - Snapshot contract `v0.4.0` (`schema/snapshot.v0.schema.json`, models in `Shelfbound.Core`).
 - Local Steam scanner (`Shelfbound.Steam`): install discovery, `libraryfolders.vdf`,
-  `appmanifest_*.acf`, `loginusers.vdf`, **local categories** (`sharedconfig.vdf`), a minimal VDF parser.
+  `appmanifest_*.acf`, `loginusers.vdf`, **local categories** — modern Steam collections (a hand-rolled
+  Chromium-leveldb reader) with the legacy `sharedconfig.vdf` as fallback — and a minimal VDF parser.
 - **Steam Web API** client + enrichment: owned-but-not-installed games and playtime (with an API key).
   The snapshot carries a **library scope** (`installedOnly` vs `fullLibrary`) so consumers never read
   "not found" as "not owned" when no key was used; the CLI says so loudly.
@@ -74,15 +75,14 @@ The local Steam data is the moat. AI reasoning is commodity; good structured fac
   shared by the CLI and MCP server.
 - CLI (`Shelfbound.Cli`): `shelfbound setup` (API key), `shelfbound scan` (+ enrichment), and
   `shelfbound profile` (a local "what Shelfbound remembers" view).
-- xUnit + Shouldly tests (37). Verified on a real ~111-game / 2-library install; MCP server
+- xUnit + Shouldly tests (45). Verified on a real ~111-game / 2-library install; MCP server
   smoke-tested over stdio (write→search round-trip, server instructions, get_profile_status).
 - **Local only. Identity is the local machine owner; real auth slots in for the hosted layer.**
 
 **Data scope:** installed + (with an API key) owned-but-not-installed Steam games, playtime, Steam
-accounts, device info, and the user's **local categories** with per-game tags. Categories come from the
-**legacy** `sharedconfig.vdf`, which is **stale for modern-UI collection users** — the fix (read the
-modern Chromium-leveldb collections) is designed + validated but not yet built
-([steam-collections.md](./steam-collections.md)).
+accounts, device info, and the user's **local categories** with per-game tags. Categories are read from
+the **modern Steam collections** (Chromium leveldb), falling back to the legacy `sharedconfig.vdf` —
+the legacy file is stale for modern-UI users ([steam-collections.md](./steam-collections.md)).
 
 ## Roadmap (open core)
 
@@ -91,13 +91,13 @@ Local-first — prove the data model locally before anything depends on it.
 1. **Distribution:** package the CLI/MCP server as a `dotnet tool` + GitHub Releases so others can install.
 2. **Taste/profile depth:** user-data now merges into query results (filter by status/rating/completion);
    remaining — a "what Shelfbound remembers" review/edit view and optional metered LLM extraction.
-3. **Remaining local data:** modern collections reader (Chromium leveldb — designed + validated, fixes
-   stale categories; see [steam-collections.md](./steam-collections.md)), Steam Deck SD-card awareness,
-   Windows registry-based install discovery.
+3. **Remaining local data:** Steam Deck SD-card awareness, Windows registry-based install discovery,
+   and dynamic (`filterSpec`) collections (the modern-collections reader handles static ones today).
 4. **Snapshot/export polish:** validation, import/export ergonomics for other clients.
 
-Done: local scanner, local categories, owned-not-installed + playtime (Steam Web API), the query
-engine (merging facts + user-data), the local MCP server (read + write tools), and the user-data store + identity seam.
+Done: local scanner, local categories (modern collections + legacy fallback), owned-not-installed +
+playtime (Steam Web API), the query engine (merging facts + user-data), the local MCP server (read +
+write tools), and the user-data store + identity seam.
 
 > Hosted and paid features (if any) are developed separately and are intentionally out of scope here.
 

@@ -53,11 +53,10 @@ The local scan yields *installed* games per library plus the user's **local cate
 **Owned-but-not-installed** needs the Steam Web API, so the snapshot carries an explicit **library
 scope** (`installedOnly` vs `fullLibrary`, on `stats.scope`): without a key the scan is installed-only,
 and the CLI/MCP say so loudly so a missing game is never read as "not owned" (schema bumped to `v0.4.0`).
-Categories currently come from the legacy `sharedconfig.vdf` `tags` store, which is **stale for users
-who manage collections in the modern Steam UI** — confirmed (it reported wrong categories that an AI
-then repeated). The fix (read the modern Chromium-leveldb collections) is **designed + validated but not
-yet built**; see [steam-collections.md](./steam-collections.md). Deferred as a focused follow-up rather
-than shipped half-working, with the legacy store kept as a fallback.
+Categories are read from the **modern Steam collections** (Chromium-leveldb), falling back to the legacy
+`sharedconfig.vdf` `tags` store — the legacy file is **stale for users who manage collections in the
+modern Steam UI** (confirmed: it reported wrong categories that an AI then repeated). See the
+"Modern collections" decision below and [steam-collections.md](./steam-collections.md).
 
 ### VDF parsing — hand-rolled minimal parser (no dependency)
 The files we read use a simple quoted KeyValues subset; a small in-repo parser keeps v0
@@ -66,16 +65,16 @@ dependency-free and offline-buildable. *Alternative if edge cases bite:* `Gamelo
 ### Modern collections — hand-rolled Chromium-leveldb reader (no dependency), legacy fallback
 The legacy `sharedconfig.vdf` categories are **stale for modern-UI users** (confirmed: it reported wrong
 categories an AI then repeated). The current collections live in the Steam client's Chromium **Local
-Storage leveldb** (`cloud-storage-namespace-1`). Decision: **read them with a small hand-rolled reader**
-(snappy decompression + LevelDB SSTable + WAL + Chromium LocalStorage decode + collections JSON),
-isolated under `Shelfbound.Steam.Collections`, **falling back to the legacy `sharedconfig.vdf`** so a
-failed/empty modern read is never worse than today. *Considered and rejected:* a native LevelDB/RocksDB
-dependency (too heavy/per-RID for a cross-platform open-core lib, and it still needs a copy-and-open
-dance to dodge Steam's lock) and doing nothing (categories are a headline feature and currently wrong).
-The approach was validated end-to-end against a real install (a Python port produced the correct
-result). Known cost: it parses Steam's internal, undocumented, in-flux cache, so it's **best-effort and
-maintained** — Windows-solid, can lag the live client by the last unflushed edit, dynamic `filterSpec`
-collections deferred. Full findings + algorithm: [steam-collections.md](./steam-collections.md).
+Storage leveldb** (`cloud-storage-namespace-1`). Decision (**implemented** in `Shelfbound.Steam.Collections`):
+**read them with a small hand-rolled reader** (snappy decompression + LevelDB SSTable + WAL + Chromium
+LocalStorage decode + collections JSON), the scanner preferring it and **falling back to the legacy
+`sharedconfig.vdf`** so a failed/empty modern read is never worse than today. *Considered and rejected:*
+a native LevelDB/RocksDB dependency (too heavy/per-RID for a cross-platform open-core lib, and it still
+needs a copy-and-open dance to dodge Steam's lock) and doing nothing (categories are a headline feature
+and were wrong). Validated end-to-end against a real install (Slay the Princess → `Finished`). Known
+cost: it parses Steam's internal, undocumented, in-flux cache, so it's **best-effort and maintained** —
+Windows-solid, can lag the live client by the last unflushed edit, dynamic `filterSpec` collections
+deferred. Full findings + algorithm: [steam-collections.md](./steam-collections.md).
 
 ### Test assertions — **Shouldly** (not FluentAssertions)
 FluentAssertions 8.x became commercially licensed; Shouldly is free and a clean fit with xUnit.

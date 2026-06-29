@@ -1,7 +1,9 @@
 # Reading modern Steam collections (categories) — design
 
-> **Status: approved; implementation in progress.** Confirmed bug + validated approach. Decision logged
-> in [DECISIONS.md](./DECISIONS.md): hand-rolled, dependency-free reader with a legacy fallback.
+> **Status: implemented.** `Shelfbound.Steam.Collections` (`SteamCollectionsReader` + a hand-rolled
+> snappy/LevelDB reader) reads modern collections, with the legacy `sharedconfig.vdf` as a fallback. The
+> scanner prefers it. Validated end-to-end on a real install (Slay the Princess → `Finished`); decision
+> in [DECISIONS.md](./DECISIONS.md).
 
 ## The bug
 
@@ -65,21 +67,22 @@ real mechanics, all confirmed on disk:
    value, skipping a trailing tombstone"** — a heuristic, not guaranteed-correct, and inherently a bit
    behind the live client when Steam is mid-edit.
 
-### Validated algorithm (implementation-ready)
+### Algorithm (as implemented)
 
 ```
-for each *.ldb (SSTable) and *.log (WAL) in the leveldb dir:
+for each *.ldb (SSTable) and *.log (WAL) in the leveldb dir:   # ChromiumLevelDb
     collect (userkey, sequence, type, value) for every entry
 per userkey: keep the entry with the highest sequence whose type == value (skip tombstones)
-find userkey == _<origin>\x00\x01U<accountId>-cloud-storage-namespace-1
+find userkey == _<origin>\x00\x01U<accountId>-cloud-storage-namespace-1   # SteamCollectionsReader
 decode value (1-byte enc prefix) -> JSON -> collections
-build appid -> [category names]   (same shape SharedConfigParser already returns)
+build appid -> [category names]   (same shape SharedConfigParser returns)
 ```
 
-A Python port of exactly this produced the correct result (Slay the Princess → `Finished`), so the C#
-port is mechanical. MANIFEST parsing (to filter obsolete tables) was **not** needed — highest-sequence
--value-per-userkey across all files already resolves correctly, because obsolete duplicates carry lower
-sequences.
+`ChromiumLevelDb` parses the SSTables (footer → index → snappy data blocks) and the WAL directly, with
+no LevelDB handle, so it reads while Steam holds the lock. MANIFEST parsing (to filter obsolete tables)
+is **not** needed — highest-sequence-value-per-userkey across all files resolves correctly because
+obsolete duplicates carry lower sequences. Validated against a real install before and after the C# port
+(Slay the Princess → `Finished`).
 
 ## Chosen approach
 

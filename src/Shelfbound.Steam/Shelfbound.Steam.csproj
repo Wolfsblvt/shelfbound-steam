@@ -16,4 +16,9 @@
     <PackageReference Include="Hardware.Info" Version="110.0.0.1" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- The collections reader's binary plumbing (snappy/leveldb) is internal; expose it for tests. -->
+    <InternalsVisibleTo Include="Shelfbound.Steam.Tests" />
+  </ItemGroup>
+
 </Project>

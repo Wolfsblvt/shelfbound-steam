@@ -1,5 +1,6 @@
 using Shelfbound.Core;
 using Shelfbound.Core.Model;
+using Shelfbound.Steam.Collections;
 
 namespace Shelfbound.Steam.Steam;
 
@@ -125,7 +126,12 @@ public sealed class SteamScanner
         }
     }
 
-    /// <summary>Reads local categories from the most-recent account's sharedconfig.vdf (falling back to any account that has one).</summary>
+    /// <summary>
+    /// Reads local categories for the most-recent account (falling back to any account that has them).
+    /// Prefers the <b>modern</b> Steam collections (Chromium leveldb) and falls back to the legacy
+    /// <c>sharedconfig.vdf</c> — the legacy file is stale for users who manage collections in the modern
+    /// Steam UI. See docs/project/steam-collections.md.
+    /// </summary>
     private static IReadOnlyDictionary<int, IReadOnlyList<string>> ReadCategories(
         string steamRoot, IReadOnlyList<SteamAccount> accounts, List<string> warnings)
     {
@@ -133,6 +139,17 @@ public sealed class SteamScanner
         {
             if (account.AccountId is not long accountId)
                 continue;
+
+            try
+            {
+                var modern = SteamCollectionsReader.TryRead(accountId);
+                if (modern is { Count: > 0 })
+                    return modern;
+            }
+            catch (Exception ex)
+            {
+                warnings.Add($"Failed to read modern collections for account {accountId}: {ex.Message}");
+            }
 
             string path = Path.Combine(steamRoot, "userdata", accountId.ToString(), "7", "remote", "sharedconfig.vdf");
             if (!File.Exists(path))
@@ -149,7 +166,7 @@ public sealed class SteamScanner
         }
 
         if (accounts.Count > 0)
-            warnings.Add("No sharedconfig.vdf found; local categories not available.");
+            warnings.Add("No categories found (modern collections or sharedconfig.vdf).");
         return new Dictionary<int, IReadOnlyList<string>>();
     }
 
