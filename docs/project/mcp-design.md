@@ -42,11 +42,37 @@ comes from the Steam Web API (`rtime_last_played`).
 
 ## Onboarding & "save it as you go"
 
-`get_profile_status` reports whether the user's taste profile is set up and what to ask (games to rate,
-undefined category meanings). The server also ships **instructions** (in the MCP `initialize` result)
-telling the model to save context whenever the user states an opinion/status/meaning, and to onboard
-when the profile is sparse (ask, then save). The deterministic profile logic lives in the shared
-`ProfileQuery`; the model drives the conversation. `delete_memory` lets the user forget/correct.
+`get_profile_status` reports whether the taste profile is set up and what to ask; the server ships
+**instructions** (in the MCP `initialize` result) telling the model to save context when the user states
+an opinion/status/meaning and to onboard when the profile is sparse. The deterministic profile logic lives
+in the shared `ProfileQuery`; the model drives the conversation. `delete_memory` lets the user forget.
+
+### What we want onboarding to do (the target)
+
+A short, **optional, run-once** flow — never an interrogation, never blocking the actual task:
+
+1. The model calls `get_profile_status` at the start of any recommend/compare/choose-a-game task. If
+   `isSetUp` is true, it **skips** onboarding (no nagging); if false, it offers a quick setup.
+2. One sentence on what Shelfbound remembers and why.
+3. Ask about a few **high-signal games** (`suggestedGamesToRate` = most-played, recognizable, not yet
+   rated) — like it? what about it? → `record_game_opinion` (rating + aspects + the user's words as
+   evidence).
+4. Ask 1–2 **general taste** questions (genres/themes loved or avoided, typical time available) →
+   `remember(scope=global)`. (Onboarding must capture global taste, not only per-game ratings.)
+5. Ask what any `undefinedCategories` mean → `set_category_definition`.
+6. Confirm what was saved and stop. The user can skip any step.
+
+**Guardrails:** save only explicit statements; offer, don't force; keep it to a handful of questions.
+**Determinism:** `get_profile_status` hands the model the concrete games/categories to ask about so it
+doesn't invent them. `isSetUp` has a defined threshold (enough rated games or stated preferences).
+
+### Improvements to make (next)
+
+- Tighten the `initialize` instructions: onboard **once** when sparse, **skip** when set up, keep it short
+  and skippable, and explicitly capture global taste.
+- Consider a `get_onboarding_plan` tool returning the next concrete onboarding actions, so the flow is more
+  reliable than free-form prose.
+- Make `suggestedGamesToRate` favor high-playtime, recognizable, still-unrated games.
 
 ## Later / advanced
 
