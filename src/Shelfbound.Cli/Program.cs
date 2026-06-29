@@ -1,15 +1,10 @@
-using System.Net;
-using System.Net.Http.Headers;
 using System.Reflection;
-using System.Text;
-using System.Text.Json;
+using Shelfbound.Client;
 using Shelfbound.Core;
 using Shelfbound.Core.Model;
 using Shelfbound.Core.UserData;
 using Shelfbound.Query;
-using Shelfbound.Steam.Enrichment;
 using Shelfbound.Steam.Steam;
-using Shelfbound.Steam.Web;
 using Shelfbound.Storage;
 using Shelfbound.Storage.Config;
 
@@ -81,11 +76,18 @@ static async Task<int> RunScanAsync(string[] args, string version)
         }
     }
 
-    SnapshotBuild? build = await BuildSnapshotAsync(steamPath, deviceName, deviceType, steamApiKey, version);
-    if (build is null)
+    SnapshotBuildResult build;
+    try
+    {
+        build = await SnapshotBuilder.BuildAsync(BuildOptions(steamPath, deviceName, deviceType, steamApiKey, version));
+    }
+    catch (Exception ex)
+    {
+        Console.Error.WriteLine(ex.Message);
         return 1;
+    }
 
-    string json = SnapshotSerializer.Serialize(build.Result.Snapshot, indented: pretty || toStdout);
+    string json = SnapshotSerializer.Serialize(build.Snapshot, indented: pretty || toStdout);
     if (toStdout)
     {
         Console.Out.WriteLine(json);
@@ -94,12 +96,22 @@ static async Task<int> RunScanAsync(string[] args, string version)
     {
         string path = output ?? "shelfbound-snapshot.json";
         File.WriteAllText(path, json);
-        PrintSummary(build.Result, build.Device, path);
+        PrintSummary(build.Snapshot, build.Device, path);
     }
 
-    PrintWarnings(build.Result);
+    PrintWarnings(build.Warnings);
     return 0;
 }
+
+static SnapshotBuildOptions BuildOptions(string? steamPath, string? deviceName, DeviceType? deviceType,
+    string? steamApiKey, string version) => new()
+{
+    SteamPath = steamPath,
+    DeviceName = deviceName,
+    DeviceType = deviceType,
+    SteamApiKey = steamApiKey,
+    ToolVersion = version,
+};
 
 static async Task<int> RunUploadAsync(string[] args, string version)
 {
@@ -163,21 +175,20 @@ static async Task<int> RunUploadAsync(string[] args, string version)
         return 2;
     }
 
-    using var http = new HttpClient { BaseAddress = new Uri(server.TrimEnd('/') + "/") };
-    http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+    SnapshotBuildOptions options = BuildOptions(steamPath, deviceName, deviceType, steamApiKey, version);
+    using var client = new ShelfboundClient(server, token);
 
     return watch
-        ? await RunWatchAsync(http, version, steamPath, deviceName, deviceType, steamApiKey, intervalSeconds)
-        : await UploadOnceAsync(http, version, steamPath, deviceName, deviceType, steamApiKey) ? 0 : 1;
+        ? await RunWatchAsync(client, options, intervalSeconds)
+        : await UploadOnceAsync(client, options) ? 0 : 1;
 }
 
 // Continuous sync. Automatic sync is a paid feature: refuse politely for non-entitled accounts. This
 // client check is only a friendly fast-fail — the server also enforces a per-plan upload-frequency cap,
 // which is the part that actually gates it (scheduling a one-shot upload externally just gets 429'd).
-static async Task<int> RunWatchAsync(HttpClient http, string version, string? steamPath, string? deviceName,
-    DeviceType? deviceType, string? steamApiKey, int requestedIntervalSeconds)
+static async Task<int> RunWatchAsync(ShelfboundClient client, SnapshotBuildOptions options, int requestedIntervalSeconds)
 {
-    EntitlementsDto? entitlements = await GetEntitlementsAsync(http);
+    Entitlements? entitlements = await client.GetEntitlementsAsync();
     if (entitlements is null)
     {
         Console.Error.WriteLine("Could not reach the server to check your plan. Check --server and your token.");
@@ -200,7 +211,7 @@ static async Task<int> RunWatchAsync(HttpClient http, string version, string? st
 
     while (!cts.IsCancellationRequested)
     {
-        await UploadOnceAsync(http, version, steamPath, deviceName, deviceType, steamApiKey);
+        await UploadOnceAsync(client, options);
         try
         {
             await Task.Delay(TimeSpan.FromSeconds(interval), cts.Token);
@@ -215,115 +226,36 @@ static async Task<int> RunWatchAsync(HttpClient http, string version, string? st
     return 0;
 }
 
-static async Task<bool> UploadOnceAsync(HttpClient http, string version, string? steamPath, string? deviceName,
-    DeviceType? deviceType, string? steamApiKey)
+static async Task<bool> UploadOnceAsync(ShelfboundClient client, SnapshotBuildOptions options)
 {
-    SnapshotBuild? build = await BuildSnapshotAsync(steamPath, deviceName, deviceType, steamApiKey, version);
-    if (build is null)
-        return false;
-
-    string json = SnapshotSerializer.Serialize(build.Result.Snapshot, indented: false);
-    using var content = new StringContent(json, Encoding.UTF8, "application/json");
-
-    HttpResponseMessage response;
+    SnapshotBuildResult build;
     try
     {
-        response = await http.PostAsync("ingest", content);
+        build = await SnapshotBuilder.BuildAsync(options);
     }
     catch (Exception ex)
     {
-        Console.Error.WriteLine($"Upload failed: {ex.Message}");
+        Console.Error.WriteLine(ex.Message);
         return false;
     }
 
-    if (response.IsSuccessStatusCode)
+    UploadResult result = await client.UploadAsync(build.Snapshot);
+    switch (result.Status)
     {
-        Console.WriteLine($"Uploaded {build.Result.Snapshot.Games.Count} game(s) to {http.BaseAddress}.");
-        return true;
-    }
-
-    switch (response.StatusCode)
-    {
-        case HttpStatusCode.TooManyRequests:
-            string? retryAfter = response.Headers.RetryAfter?.Delta?.TotalSeconds is { } s ? $" (try again in ~{(int)s}s)" : null;
-            Console.Error.WriteLine($"Upload rejected: too soon for your plan{retryAfter}. Automatic/frequent sync is a Pro/Lifetime feature.");
+        case UploadStatus.Success:
+            Console.WriteLine($"Uploaded {result.GameCount} game(s).");
+            return true;
+        case UploadStatus.Throttled:
+            string retry = result.RetryAfterSeconds is { } s ? $" (try again in ~{s}s)" : "";
+            Console.Error.WriteLine($"Upload rejected: too soon for your plan{retry}. Automatic/frequent sync is a Pro/Lifetime feature.");
             return false;
-        case HttpStatusCode.Unauthorized:
+        case UploadStatus.Unauthorized:
             Console.Error.WriteLine("Upload rejected: invalid or missing API token. Create one in the Shelfbound web app.");
             return false;
         default:
-            string body = await response.Content.ReadAsStringAsync();
-            Console.Error.WriteLine($"Upload failed ({(int)response.StatusCode}): {body}");
+            Console.Error.WriteLine($"Upload failed: {result.Message}");
             return false;
     }
-}
-
-static async Task<EntitlementsDto?> GetEntitlementsAsync(HttpClient http)
-{
-    try
-    {
-        HttpResponseMessage response = await http.GetAsync("auth/entitlements");
-        if (!response.IsSuccessStatusCode)
-            return null;
-        string body = await response.Content.ReadAsStringAsync();
-        return JsonSerializer.Deserialize<EntitlementsDto>(body, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-    }
-    catch
-    {
-        return null;
-    }
-}
-
-// --- shared snapshot production (scan + optional Steam Web API enrichment) ---
-
-static async Task<SnapshotBuild?> BuildSnapshotAsync(string? steamPath, string? deviceName, DeviceType? deviceType,
-    string? steamApiKey, string version)
-{
-    string? steamRoot = SteamInstallLocator.Locate(steamPath);
-    if (steamRoot is null)
-    {
-        Console.Error.WriteLine(steamPath is null
-            ? "Could not find a Steam installation. Pass --steam-path <dir> or set SHELFBOUND_STEAM_PATH."
-            : $"'{steamPath}' does not look like a Steam installation (no steamapps folder).");
-        return null;
-    }
-
-    SnapshotDevice device = DeviceIdentity.Resolve(deviceName, deviceType);
-    ScanResult result = new SteamScanner().Scan(new SteamScanRequest
-    {
-        SteamRootPath = steamRoot,
-        Device = device,
-        ToolVersion = version,
-    });
-
-    // Optional Steam Web API enrichment: owned-but-not-installed games + playtime.
-    string? apiKey = steamApiKey
-        ?? Environment.GetEnvironmentVariable("STEAM_WEB_API_KEY")
-        ?? ShelfboundConfig.Load().SteamApiKey;
-    if (!string.IsNullOrWhiteSpace(apiKey))
-    {
-        SteamAccount? account = result.Snapshot.SteamAccounts.FirstOrDefault(a => a.MostRecent)
-            ?? result.Snapshot.SteamAccounts.FirstOrDefault();
-        if (account is null)
-        {
-            Console.Error.WriteLine("warning: Steam Web API key set but no Steam account was found to query.");
-        }
-        else
-        {
-            try
-            {
-                using var enrichmentHttp = new HttpClient();
-                var owned = await new SteamWebApiClient(enrichmentHttp).GetOwnedGamesAsync(account.SteamId64, apiKey);
-                result = result with { Snapshot = SteamWebEnricher.Enrich(result.Snapshot, result.CategoriesByApp, owned) };
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine($"warning: Steam Web API enrichment failed: {ex.Message}");
-            }
-        }
-    }
-
-    return new SnapshotBuild(result, device);
 }
 
 // --- helpers ---
@@ -354,12 +286,12 @@ static bool TryParseDeviceType(string[] args, ref int i, out DeviceType? deviceT
     return true;
 }
 
-static void PrintWarnings(ScanResult result)
+static void PrintWarnings(IReadOnlyList<string> warnings)
 {
-    foreach (string w in result.Warnings.Take(10))
+    foreach (string w in warnings.Take(10))
         Console.Error.WriteLine($"warning: {w}");
-    if (result.Warnings.Count > 10)
-        Console.Error.WriteLine($"warning: ... and {result.Warnings.Count - 10} more.");
+    if (warnings.Count > 10)
+        Console.Error.WriteLine($"warning: ... and {warnings.Count - 10} more.");
 }
 
 static string ResolveVersion()
@@ -372,9 +304,8 @@ static string ResolveVersion()
     return plus >= 0 ? raw[..plus] : raw;
 }
 
-static void PrintSummary(ScanResult result, SnapshotDevice device, string path)
+static void PrintSummary(SnapshotDocument s, SnapshotDevice device, string path)
 {
-    var s = result.Snapshot;
     Console.WriteLine("Shelfbound snapshot written.");
     Console.WriteLine();
     Console.WriteLine($"  device      : {device.Name} ({device.Type}, {device.Os})");
@@ -564,9 +495,3 @@ static void PrintUsage()
         uploads it to a Shelfbound server. See docs/project/snapshot-schema.md.
         """);
 }
-
-// --- types ---
-
-internal sealed record SnapshotBuild(ScanResult Result, SnapshotDevice Device);
-
-internal sealed record EntitlementsDto(string Plan, bool AutoSync, int MinUploadIntervalSeconds);

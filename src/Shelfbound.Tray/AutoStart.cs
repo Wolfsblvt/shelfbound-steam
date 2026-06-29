@@ -15,7 +15,56 @@ public static class AutoStart
     {
         if (OperatingSystem.IsWindows())
             ApplyWindows(enabled);
-        // TODO: Linux (~/.config/autostart/shelfbound.desktop) and macOS (LaunchAgent plist).
+        else if (OperatingSystem.IsLinux())
+            ApplyLinux(enabled);
+        else if (OperatingSystem.IsMacOS())
+            ApplyMacOs(enabled);
+    }
+
+    private static void ApplyLinux(bool enabled)
+    {
+        try
+        {
+            // SpecialFolder.ApplicationData is ~/.config on Linux.
+            string file = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "autostart", "shelfbound.desktop");
+            if (enabled && Environment.ProcessPath is { } exe)
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(file)!);
+                File.WriteAllText(file,
+                    $"[Desktop Entry]\nType=Application\nName=Shelfbound\nExec=\"{exe}\"\nX-GNOME-Autostart-enabled=true\n");
+            }
+            else if (!enabled && File.Exists(file))
+            {
+                File.Delete(file);
+            }
+        }
+        catch { /* non-fatal */ }
+    }
+
+    private static void ApplyMacOs(bool enabled)
+    {
+        try
+        {
+            string file = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                "Library", "LaunchAgents", "com.shelfbound.tray.plist");
+            if (enabled && Environment.ProcessPath is { } exe)
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(file)!);
+                File.WriteAllText(file,
+                    "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
+                    "<plist version=\"1.0\"><dict>" +
+                    "<key>Label</key><string>com.shelfbound.tray</string>" +
+                    $"<key>ProgramArguments</key><array><string>{exe}</string></array>" +
+                    "<key>RunAtLoad</key><true/></dict></plist>\n");
+            }
+            else if (!enabled && File.Exists(file))
+            {
+                File.Delete(file);
+            }
+        }
+        catch { /* non-fatal */ }
     }
 
     [SupportedOSPlatform("windows")]

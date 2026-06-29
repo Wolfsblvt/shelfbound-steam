@@ -59,7 +59,7 @@ public partial class MainWindow : Window
     private void Refresh()
     {
         StatusText.Text = _agent.StatusLine;
-        DeviceText.Text = _agent.Settings.IsConnected
+        DeviceText.Text = _agent.IsConnected
             ? $"Device: {_agent.Settings.DeviceName ?? Environment.MachineName}"
             : "Sign in to connect this device.";
         HistoryList.ItemsSource = _agent.History;

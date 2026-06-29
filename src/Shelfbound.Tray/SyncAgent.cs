@@ -15,8 +15,10 @@ public sealed class SyncAgent : IDisposable
     private readonly object _lock = new();
     private readonly List<string> _history = [];
     private Timer? _timer;
+    private string? _token;
 
     public AppSettings Settings { get; }
+    public bool IsConnected => !string.IsNullOrEmpty(_token);
     public DateTimeOffset? LastSync { get; private set; }
     public string StatusLine { get; private set; } = "Starting…";
     public IReadOnlyList<string> History
@@ -26,7 +28,11 @@ public sealed class SyncAgent : IDisposable
 
     public event Action? Changed;
 
-    public SyncAgent() => Settings = AppSettings.Load();
+    public SyncAgent()
+    {
+        Settings = AppSettings.Load();
+        _token = TokenStore.Load();
+    }
 
     public void Start() => Reschedule();
 
@@ -41,7 +47,7 @@ public sealed class SyncAgent : IDisposable
 
     public async Task SyncNowAsync()
     {
-        if (!Settings.IsConnected)
+        if (!IsConnected)
         {
             Log("Not connected — connect your account first.");
             return;
@@ -55,7 +61,7 @@ public sealed class SyncAgent : IDisposable
                 ToolVersion = ToolVersion,
                 DeviceName = Settings.DeviceName,
             });
-            using var client = new ShelfboundClient(Settings.ServerUrl, Settings.Token!);
+            using var client = new ShelfboundClient(Settings.ServerUrl, _token!);
             UploadResult result = await client.UploadAsync(build.Snapshot);
             Log(result.Status switch
             {
@@ -86,7 +92,8 @@ public sealed class SyncAgent : IDisposable
                 Log("Connect cancelled or timed out.");
                 return;
             }
-            Settings.Token = token;
+            _token = token;
+            TokenStore.Save(token);
             Settings.DeviceName ??= device;
             Settings.Save();
             Log("Account connected.");
@@ -103,7 +110,7 @@ public sealed class SyncAgent : IDisposable
     {
         _timer?.Dispose();
         _timer = null;
-        if (Settings.AutoSync && Settings.IsConnected)
+        if (Settings.AutoSync && IsConnected)
         {
             var interval = TimeSpan.FromMinutes(Math.Max(1, Settings.IntervalMinutes));
             _timer = new Timer(_ => _ = SyncNowAsync(), null, TimeSpan.Zero, interval);
@@ -113,7 +120,7 @@ public sealed class SyncAgent : IDisposable
 
     private void UpdateStatus()
     {
-        StatusLine = !Settings.IsConnected ? "Not connected"
+        StatusLine = !IsConnected ? "Not connected"
             : LastSync is null ? "Connected — not synced yet"
             : $"Last synced {Friendly(LastSync.Value)}";
         Changed?.Invoke();

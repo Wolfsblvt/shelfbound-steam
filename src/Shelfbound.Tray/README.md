@@ -13,7 +13,6 @@ dotnet run --project src/Shelfbound.Tray
 - **Sync now** uploads immediately; auto-sync runs on an interval when enabled.
 - Closing the window hides it to the tray. Auto-start on login and background auto-sync are optional and
   on by default.
-- Settings live in `…/AppData/shelfbound/tray.json` (server URLs default to localhost for now).
-
-Notes: the token is stored in plain JSON for now (OS secret-store integration is a TODO), and Linux/macOS
-login auto-start is not wired yet (Windows is).
+- Settings live in `…/AppData/shelfbound/tray.json` (server URLs default to localhost for now); the API
+  token is stored separately in `token.bin` — DPAPI-encrypted on Windows, a 0600 file elsewhere.
+- Login auto-start is wired for Windows (Run key), Linux (`~/.config/autostart`), and macOS (LaunchAgent).

@@ -18,6 +18,7 @@
     <ProjectReference Include="..\Shelfbound.Steam\Shelfbound.Steam.csproj" />
     <ProjectReference Include="..\Shelfbound.Storage\Shelfbound.Storage.csproj" />
     <ProjectReference Include="..\Shelfbound.Query\Shelfbound.Query.csproj" />
+    <ProjectReference Include="..\Shelfbound.Client\Shelfbound.Client.csproj" />
   </ItemGroup>
 
 </Project>
