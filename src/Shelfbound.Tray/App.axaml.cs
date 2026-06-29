@@ -26,7 +26,9 @@ public partial class App : Application
 
             SetupTray(desktop);
 
-            if (!_agent.Settings.StartMinimized)
+            // Start hidden in the tray when configured — but always show on first run (not connected yet)
+            // so the user sees the "Connect account" prompt instead of wondering where the app went.
+            if (!_agent.Settings.StartMinimized || !_agent.Settings.IsConnected)
                 ShowWindow();
         }
 
