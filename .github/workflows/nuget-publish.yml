@@ -27,7 +27,7 @@ jobs:
     environment: nuget # must match the environment in the nuget.org Trusted Publishing policy
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: "10.0.x"
       - run: dotnet pack -c Release -o ./artifacts
