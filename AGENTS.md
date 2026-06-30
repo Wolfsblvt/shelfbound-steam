@@ -29,6 +29,13 @@ dotnet run --project src/Shelfbound.Mcp                     # local MCP server (
   `docs/project/privacy-and-data.md` before touching the scanner or snapshot shape.
 - Tests use **Shouldly** (xUnit + Shouldly).
 
+## Git (dev phase)
+
+Pre-launch dev phase: **commit directly on `main`** — no feature branch needed. Committing is part of
+finishing a task (don't leave completed work uncommitted). **Never push** unless explicitly told (public
+history is forever). This overrides the global "branch first" default; the global no-push /
+no-history-rewrite rules still apply.
+
 ## Docs (read before non-trivial work)
 
 `docs/project/` — `PROJECT.md` (overview/roadmap), `ARCHITECTURE.md`, `DECISIONS.md`,
