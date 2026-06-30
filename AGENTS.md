@@ -32,5 +32,6 @@ dotnet run --project src/Shelfbound.Mcp                     # local MCP server (
 ## Docs (read before non-trivial work)
 
 `docs/project/` — `PROJECT.md` (overview/roadmap), `ARCHITECTURE.md`, `DECISIONS.md`,
-`snapshot-schema.md`, `privacy-and-data.md`, `mcp-design.md`. Keep them in sync when
-scope/architecture/decisions change. Product/business/monetization docs are maintained privately.
+`snapshot-schema.md`, `steam-collections.md` (modern-collections reader), `privacy-and-data.md`,
+`mcp-design.md`. Keep them in sync when scope/architecture/decisions change. Product/business/monetization
+docs are maintained privately.

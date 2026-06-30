@@ -8,10 +8,10 @@
 
 **AI-ready context for your real Steam library.**
 
-Shelfbound is a personal gaming context layer: it reads your *real* Steam library — including
-installed games per device and (soon) your local categories, notes, statuses, and taste — and makes
-it available to AI tools through [MCP](https://modelcontextprotocol.io), locally or via a hosted
-service. The point is to let ChatGPT/Claude reason about *your* library, not generic Steam API data.
+Shelfbound is a personal gaming context layer: it reads your *real* Steam library — installed games
+per device, your local categories (collections), notes, statuses, and taste — and makes it available
+to AI tools through [MCP](https://modelcontextprotocol.io), locally or via a hosted service. The point
+is to let ChatGPT/Claude reason about *your* library, not generic Steam API data.
 
 > **Unofficial.** Shelfbound is not affiliated with or endorsed by Valve. "Steam" is used
 > descriptively.
@@ -25,16 +25,19 @@ Early but already useful, all local:
 
 - **`shelfbound scan`** writes a versioned **snapshot** of your library — installed games across all
   libraries (names, install state, size, timestamps), your Steam accounts, the device, and your
-  **local categories** (the collections you organize your library with). With a Steam Web API key it
-  also adds **owned-but-not-installed games and playtime**. No install paths, credentials, or saves.
+  **local categories** (read from your **modern Steam collections**, falling back to the legacy store).
+  With a Steam Web API key it also adds **owned-but-not-installed games and playtime**. No install
+  paths, credentials, or saves.
 - **`shelfbound-mcp`** — a local **MCP server** that exposes the library to AI tools (ChatGPT/Claude):
   search by category / install state / playtime, library summary, game details, "what haven't I played?".
 - **Per-game context** — the MCP server can also *remember* what you tell it: statuses
   (finished/paused/dropped), ratings, completion, category meanings, and freeform memories — stored
   locally and shared with the CLI.
 
-Not built yet: modern dynamic collections, accounts, upload, and the hosted service. See
-[docs/project/PROJECT.md](docs/project/PROJECT.md) for the roadmap.
+Also built: a cross-platform **tray app** (background sync + account connect) and **`shelfbound upload`**
+(send a snapshot to a Shelfbound server). Still to come locally: dynamic (rule-based) collections,
+Windows-registry install discovery, and a Steam Deck Decky plugin. The hosted service lives in a
+separate private repo. See [docs/project/PROJECT.md](docs/project/PROJECT.md) for the roadmap.
 
 ## Quick start
 

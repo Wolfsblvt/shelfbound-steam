@@ -1,6 +1,6 @@
 # Shelfbound — Project Overview (open-source core)
 
-> Status as of 2026-06-28. This file is the living overview of the **open-source core**. Read it first.
+> Status as of 2026-06-30. This file is the living overview of the **open-source core**. Read it first.
 
 ## What Shelfbound is
 

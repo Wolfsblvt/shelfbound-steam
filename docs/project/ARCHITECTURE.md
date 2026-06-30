@@ -5,8 +5,8 @@ How the core is built and why the boundaries are where they are. Code is the sou
 
 ## Stack
 
-- **.NET (C#), targeting `net10.0`** for everything the maintainer controls — local core, CLI, and
-  the future local MCP server. Chosen for development speed in the maintainer's primary language and a
+- **.NET (C#), targeting `net10.0`** for everything the maintainer controls — local core, CLI, tray
+  app, and the local MCP server. Chosen for development speed in the maintainer's primary language and a
   **first-class official MCP SDK** (`ModelContextProtocol`, v1.0+, maintained with Microsoft).
 - Other languages only where a platform forces them: a future **Decky plugin** (Steam Deck) is
   Python + React/TS by Decky's design. Such clients interoperate through the **snapshot JSON
@@ -25,7 +25,7 @@ device/env ────────┘                                          
 ```
 
 Consequences:
-- The local MCP server, a future tray app or Decky plugin, and any external consumer **do not
+- The local MCP server, the tray app, a future Decky plugin, and any external consumer **do not
   duplicate** Steam-file parsing or the data model.
 - The contract is JSON Schema (`schema/snapshot.v0.schema.json`) plus C# types in `Shelfbound.Core`.
   A non-.NET client can emit a valid snapshot without referencing our assemblies.
@@ -37,8 +37,8 @@ Consequences:
 Two repositories, separated from day one — because *public is forever*, including git history.
 
 - **`shelfbound-steam` (this repo, public, open source)** — the free local/core capability users can
-  run and audit: domain models + snapshot contract, the local Steam scanner, the CLI, later the local
-  MCP server and query/search logic. Licensed **AGPL-3.0-or-later** (whole repo).
+  run and audit: domain models + snapshot contract, the local Steam scanner, the query/search engine,
+  the CLI, the tray app, and the local MCP server. Licensed **AGPL-3.0-or-later** (whole repo).
 - **A separate, private product** — a proprietary repository, out of scope here. It interoperates with
   the core **through the snapshot contract** (the published JSON format), never by embedding core code.
 
@@ -49,16 +49,21 @@ No product/hosted code belongs in this repo.
 ```
 src/
   Shelfbound.Core      Domain models + snapshot contract + serializer. Pure, no I/O.
-  Shelfbound.Steam     Local Steam scanner (VDF/ACF, categories) + Steam Web API client + enrichment.
-                       The differentiator; auditable and open.
+  Shelfbound.Steam     Local Steam scanner (VDF/ACF, modern + legacy categories, device specs) +
+                       Steam Web API client + enrichment. The differentiator; auditable and open.
   Shelfbound.Query     Merged library view (snapshot facts + user-data) + deterministic
-                       filter/sort/summary. No I/O, no LLM; reused by MCP now, dashboard/hosted later.
+                       filter/sort/summary + recommendations. No I/O, no LLM; reused by the MCP server,
+                       the tray, and the hosted layer.
   Shelfbound.Storage   Local config (API key), the identity seam, and the user-data store
                        (statuses/ratings/completion/aspects, scoped memories, category meanings).
-  Shelfbound.Cli       `shelfbound setup` + `shelfbound scan` — config, scan (+ enrichment), output.
+  Shelfbound.Client    Shared scan-to-snapshot builder + Shelfbound-server client, reused by the CLI
+                       and the tray.
+  Shelfbound.Cli       `shelfbound` CLI — setup, scan (+ enrichment), profile, upload.
+  Shelfbound.Tray      Cross-platform tray agent (Avalonia): background sync, status, account connect.
   Shelfbound.Mcp       `shelfbound-mcp` — local MCP server (stdio): read + write/remember tools.
 tests/
-  Shelfbound.Steam.Tests           xUnit + Shouldly. Parsers, scanner, query engine, enricher.
+  Shelfbound.Steam.Tests           xUnit + Shouldly. Parsers, scanner, query engine, enricher,
+                                   snappy/leveldb collections reader.
 schema/
   snapshot.v0.schema.json          The language-neutral contract.
 ```
@@ -101,10 +106,13 @@ This is the **derived/user data** category — deliberately separate from the ra
 3. For each app id, **parse `appmanifest_<id>.acf`** → name, install state (StateFlags bit 4),
    install dir, size, last updated/played.
 4. **Parse `config/loginusers.vdf`** → Steam accounts.
-5. **Parse `userdata/<id>/7/remote/sharedconfig.vdf`** (most-recent account) → local categories
-   (app id → ordered tag names).
-6. **Assemble** a `SnapshotDocument` with device, accounts, libraries, games (with their categories),
-   a category summary, and stats.
+5. **Read local categories** (most-recent account, app id → ordered category names): the **modern
+   Steam collections** from the desktop client's Chromium leveldb (`Shelfbound.Steam.Collections` — a
+   hand-rolled snappy + LevelDB reader), falling back to the legacy
+   `userdata/<id>/7/remote/sharedconfig.vdf` when unavailable. See [steam-collections.md](./steam-collections.md).
+6. **Collect device specs** (best-effort CPU/RAM/GPU/OS via `Shelfbound.Steam.HardwareInfo`).
+7. **Assemble** a `SnapshotDocument` with device (+ specs), accounts, libraries, games (with their
+   categories), a category summary, and stats (including the library scope: installed-only vs full).
 
 Non-fatal problems become `warnings` on the result rather than aborting the scan.
 
@@ -151,6 +159,7 @@ raw snapshot.
 
 ## Build order
 
-Open core: local scanner (done-ish) → finish local data (categories, owned-not-installed) → local MCP
-server. Hosted/product phases are tracked privately. Rationale and the local-first decision are in
-[DECISIONS.md](./DECISIONS.md) and [PROJECT.md](./PROJECT.md).
+The local-first core is built: scanner, local categories (modern + legacy), owned-not-installed +
+playtime, the query/recommendation engine, the user-data store, the tray app, and the local MCP server.
+Remaining local work and the forward roadmap live in [PROJECT.md](./PROJECT.md); the local-first
+rationale is in [DECISIONS.md](./DECISIONS.md). Hosted/product phases are tracked privately.
