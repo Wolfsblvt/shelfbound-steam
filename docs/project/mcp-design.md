@@ -31,11 +31,29 @@ framed for the Steam Deck only when the device is a Deck; paused; recently added
 shared `RecommendationEngine`. Reused by the local MCP server (and the hosted layer) through the shared
 engine. Enrichment (completion times, ProtonDB) will add "short enough to finish" / "Gold on Deck" later.
 
-## Write tools (candidates)
+## Write tools — MCP as a memory interface
 
-`set_category_definition`, `record_game_opinion`, `record_game_status`, `set_game_note`,
-`record_user_preference`, plus deletes (`delete_game_note`, `delete_memory`). Tool descriptions should
-*encourage the model to save explicit durable facts* when the user clearly states them.
+MCP isn't only library search: it's the primary way to **maintain the user's gaming memory**. The server
+instructions push the model to record useful facts whenever the user reveals them, then reason over them.
+
+**Built:** `record_game_status`, `record_game_opinion` (rating + aspects), `set_game_completion`,
+`set_category_definition`, `remember`, plus `delete_memory` / `get_game_user_data` / `get_remembered`.
+
+**Planned (the tracking/taste layer — see `shelfbound-cloud/docs/project/tracking-and-taste.md`):**
+- `record_game_rating` (loved/liked/mixed/disliked/never_again) and `record_game_reasons` (default + custom
+  **reason chips** — the "why", which matters more than the score).
+- `record_played_elsewhere` / `record_external_ownership` (platform = Switch/PS5/Epic/GOG/Game Pass…) — so
+  Shelfbound stops recommending the Steam version of a game already finished elsewhere.
+- `set_category_rule` (richer than `set_category_definition`: meaning + action + confidence mode) and the
+  **review-queue** tools `get_pending_review_items` / `confirm_inference` / `dismiss_inference` — confirm
+  soft, category-inferred states into explicit ones.
+- `record_recommendation_feedback` (dismiss with a reason → negative signal).
+
+Tool descriptions must *encourage saving explicit durable facts* the user clearly states — and **never**
+auto-promote an inference (e.g. a `Favorites` category) to an explicit rating without confirmation. Example
+behaviors: "I finished Outer Wilds" → status finished; "dropped Hades, roguelikes stress me out" → dropped
++ negative chips `roguelike_fatigue, stressful` + remembered preference; "played Persona 5 on Switch" →
+played_elsewhere + platform, drop from Steam backlog recs.
 
 ## Recency
 
