@@ -63,12 +63,25 @@ alongside raw dates — models weight "3 days ago" over "2026-06-24". Steam expo
 becoming meaningful as the user keeps using Shelfbound. Last-played for owned-but-not-installed games
 comes from the Steam Web API (`rtime_last_played`).
 
+## Steam deep links
+
+Game results include `steam://` **deep links** so the model can offer one-click access on a machine with
+Steam installed: `steam://run/<appid>` (**launch** — surface it clearly, it starts the game immediately),
+`steam://store/<appid>` (store page), `steam://nav/games/details/<appid>` (library detail). The server
+instructions tell the model to offer "launch / open in Steam" when it helps (e.g. after recommending what
+to play next).
+
 ## Onboarding & "save it as you go"
 
 `get_profile_status` reports whether the taste profile is set up and what to ask; the server ships
 **instructions** (in the MCP `initialize` result) telling the model to save context when the user states
 an opinion/status/meaning and to onboard when the profile is sparse. The deterministic profile logic lives
 in the shared `ProfileQuery`; the model drives the conversation. `delete_memory` lets the user forget.
+
+Onboarding is **never required, strongly recommended** — short, fast, skippable. The model can run it and
+mark the profile **soft-onboarded** (the website may add more later; the two surfaces share that state).
+Beyond onboarding, the profile keeps a persistent **"track these next" queue** (a few games to rate/track),
+so collection stays opportunistic rather than a one-time chore.
 
 ### What we want onboarding to do (the target)
 
