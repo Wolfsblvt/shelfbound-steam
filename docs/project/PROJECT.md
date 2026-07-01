@@ -78,8 +78,9 @@ The local Steam data is the moat. AI reasoning is commodity; good structured fac
 - **Tray agent** (`Shelfbound.Tray`, Avalonia): background auto-sync, the loopback **connect** flow
   (device token in `token.bin`), device hardware specs, and login auto-start — now with **account
   awareness** (signed-in account, plan, connected devices, sign-out; all display-only — the server
-  enforces limits) and a **Velopack installer + self-update** from GitHub Releases (Windows shipping;
-  Linux/macOS next). *Compiles and the logic is sound; a manual GUI/E2E pass is the owner's remaining step.*
+  enforces limits) and a **Velopack installer + self-update** from GitHub Releases (Windows + Linux
+  `AppImage` shipping; macOS unsigned/testing until notarized). *Compiles and the logic is sound; a manual
+  GUI/E2E pass is the owner's remaining step.*
 - xUnit + Shouldly tests (45). Verified on a real ~111-game / 2-library install; MCP server
   smoke-tested over stdio (write→search round-trip, server instructions, get_profile_status).
 - **Local only. Identity is the local machine owner; real auth slots in for the hosted layer.**
@@ -94,8 +95,9 @@ the legacy file is stale for modern-UI users ([steam-collections.md](./steam-col
 Local-first — prove the data model locally before anything depends on it.
 
 1. **Distribution:** the **tray agent** ships as a **Velopack installer with self-update** from GitHub
-   Releases (Windows done via the `Release Tray` workflow on a `tray-v*` tag; Linux/macOS next). Still to
-   do: package the CLI/MCP server as a `dotnet tool` + GitHub Releases so those can be installed too.
+   Releases via the `Release Tray` workflow on a `tray-v*` tag — Windows (`Setup.exe`) and Linux
+   (`AppImage`) publish; macOS is an unsigned test artifact until it's notarized. Still to do: package the
+   CLI/MCP server as a `dotnet tool` + GitHub Releases so those can be installed too.
 2. **Taste/profile depth:** user-data now merges into query results (filter by status/rating/completion);
    remaining — a "what Shelfbound remembers" review/edit view and optional metered LLM extraction.
 3. **Remaining local data:** Steam Deck SD-card awareness, Windows registry-based install discovery,

@@ -28,7 +28,10 @@ public static class AutoStart
             // SpecialFolder.ApplicationData is ~/.config on Linux.
             string file = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "autostart", "shelfbound.desktop");
-            if (enabled && Environment.ProcessPath is { } exe)
+            // When packaged as an AppImage, ProcessPath points at a transient mount (…/.mount_XXXX/…) that
+            // is gone after a reboot; $APPIMAGE holds the stable path to the AppImage itself. Prefer it.
+            string? launcher = Environment.GetEnvironmentVariable("APPIMAGE") ?? Environment.ProcessPath;
+            if (enabled && launcher is { } exe)
             {
                 Directory.CreateDirectory(Path.GetDirectoryName(file)!);
                 File.WriteAllText(file,

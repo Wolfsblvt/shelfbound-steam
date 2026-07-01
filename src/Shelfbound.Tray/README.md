@@ -7,9 +7,12 @@ token.
 ## Install
 
 - **Windows:** download `Shelfbound.Tray-win-Setup.exe` from
-  [GitHub Releases](https://github.com/Wolfsblvt/shelfbound-steam/releases) and run it. It installs per-user,
-  adds Start-menu/Desktop shortcuts, and **auto-updates** in the background from later releases. Linux
-  (AppImage/Flatpak) and macOS installers are planned follow-ups.
+  [GitHub Releases](https://github.com/Wolfsblvt/shelfbound-steam/releases) and run it. Installs per-user,
+  adds Start-menu/Desktop shortcuts, and **auto-updates** in the background from later releases.
+- **Linux:** download the `.AppImage`, make it executable (`chmod +x`), and run it. It self-updates in place.
+  Needs FUSE (`sudo apt install libfuse2` on Ubuntu 24.04+). `linux-x64` also covers the Steam Deck's
+  desktop mode.
+- **macOS:** unsigned test builds only for now — Gatekeeper will warn until a signed/notarized build ships.
 - **From source (any OS):**
 
   ```bash
@@ -17,6 +20,12 @@ token.
   ```
 
   Source/dev runs never self-update — only installed builds do.
+
+| Platform | Artifact | Status |
+| --- | --- | --- |
+| Windows x64 | `Setup.exe` | Shipping — auto-update |
+| Linux x64 | `AppImage` | Shipping — auto-update |
+| macOS arm64 | `.app` (unsigned) | Testing — needs signing + notarization |
 
 ## What it does
 
@@ -45,18 +54,36 @@ install/update/uninstall hooks.
 ## Releasing (maintainers)
 
 Releases are built by the **Release Tray** GitHub Actions workflow
-([.github/workflows/release-tray.yml](../../.github/workflows/release-tray.yml)):
+([.github/workflows/release-tray.yml](../../.github/workflows/release-tray.yml)) — a shared `version` job
+plus `windows`, `linux`, and `macos` build jobs.
 
-- Push a `tray-v<version>` tag (e.g. `tray-v0.6.0`, matching `Directory.Build.props`) to build the installer
-  and publish it plus the delta/full update packages to GitHub Releases. This tag stream is kept separate
-  from any CLI/`dotnet tool` release so their assets never collide.
-- `workflow_dispatch` builds the installer as a downloadable Actions artifact only (no Release published) —
-  for testing before you tag.
-- **Code signing is optional:** set the `WINDOWS_CERT_BASE64` (base64 of the `.pfx`) and
+**Cut a release:**
+
+1. Bump `<Version>` in [`Directory.Build.props`](../../Directory.Build.props) and commit.
+2. Tag it `tray-v<version>` (matching that version) and push the tag:
+
+   ```bash
+   git tag tray-v0.6.0
+   git push origin tray-v0.6.0
+   ```
+3. The workflow builds **Windows + Linux** and publishes them — plus the delta/full update packages — to a
+   GitHub Release for that tag. Installed clients pick up the update on their next check (auto-update works
+   from the *second* release onward, once a prior version exists to update from).
+
+`workflow_dispatch` runs the same build but uploads the installers as **Actions artifacts only** (no Release)
+— use it to smoke-test a build before tagging. The `tray-v*` tag stream is separate from any CLI/`dotnet
+tool` release so their assets never collide.
+
+**Signing:**
+
+- **Windows** — optional Authenticode: set the `WINDOWS_CERT_BASE64` (base64 of the `.pfx`) and
   `WINDOWS_CERT_PASSWORD` repo secrets to sign; without them the installer is unsigned. Publishing uses the
-  built-in `GITHUB_TOKEN`.
+  built-in `GITHUB_TOKEN` (no secret needed).
+- **macOS** — a signed **and notarized** build (Apple Developer ID + `notarytool`) is required before public
+  distribution; until then the `macos` job produces an unsigned artifact for testers only.
+- Branded installer icons (`.ico` for Windows, `.icns` for macOS) are a follow-up; Linux uses the tray PNG.
 
-Build and pack locally to test the pipeline (outputs to `./Releases`):
+Build and pack locally to test the pipeline (outputs to `./Releases`; swap `-r`/`--mainExe` per platform):
 
 ```bash
 dotnet tool install -g vpk --version 1.2.0

@@ -126,7 +126,33 @@ context whenever the user states an opinion/status/meaning. The deterministic pr
 the shared `ProfileQuery`; the model drives the conversation.
 
 ### Deferred (technical, recorded so it isn't re-litigated)
-- **Distribution** — package the CLI/MCP server as a dotnet tool + GitHub Releases.
+- **Distribution** — the **tray agent** now ships via Velopack installers + GitHub Releases (see
+  "Packaging & distribution" below); still deferred: packaging the CLI/MCP server as a `dotnet tool`.
 - **Modern dynamic collections** (leveldb) to complement the legacy categories already parsed.
 - **Steam Deck** specifics (SD-card install location) and a future **Decky plugin** that emits the
   same snapshot contract.
+
+---
+
+## Packaging & distribution (2026-07-02)
+
+### Tray installer + auto-update — **Velopack**, publishing to GitHub Releases
+The tray agent ships as a real installer that **self-updates**, using **Velopack** (`vpk`) — one .NET-native
+toolchain that produces both the installer *and* delta/full auto-update packages, cross-platform. The app
+calls `VelopackApp.Build().Run()` first in `Main` and checks a `GithubSource` for updates; the update path is
+guarded by `UpdateManager.IsInstalled`, so source / `dotnet run` builds never self-update. The distribution
+channel is **GitHub Releases** (free, fits open-core, no extra hosting), built by the `Release Tray` workflow
+on a **`tray-v*`** tag — a stream deliberately separate from any future CLI/`dotnet tool` release so their
+assets never collide. *Considered and rejected:* Squirrel.Windows and Clowd.Squirrel (Windows-only /
+superseded by Velopack), MSIX (Windows-only, awkward sideload signing + update story), and Inno/WiX + a
+hand-rolled updater (two tools, and we'd own the update logic — the kickoff explicitly said "pick one
+toolchain that does both"). The `dotnet tool` route stays for the headless CLI/MCP, not a GUI a non-dev
+installs.
+
+### Platform rollout — Windows + Linux shipping, macOS deferred
+Windows (`Setup.exe`) and Linux (`AppImage`, self-contained `linux-x64` — the Steam Deck desktop arch) both
+publish to the tagged Release; the Linux upload runs after Windows so the Release already exists (avoids a
+create-release race). **macOS** builds an **unsigned** artifact for testers only — Gatekeeper blocks
+un-notarized apps, so public macOS distribution waits on an Apple Developer ID cert + notarization. Windows
+Authenticode signing is optional and gated on the `WINDOWS_CERT_*` CI secrets (unsigned otherwise). Branded
+installer icons (`.ico` / `.icns`) are a follow-up; Linux uses the existing tray PNG.

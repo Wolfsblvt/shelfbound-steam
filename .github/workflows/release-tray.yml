@@ -1,9 +1,12 @@
 name: Release Tray
 
-# Builds the Shelfbound tray agent into a Velopack installer + auto-update package and publishes it to
+# Builds the Shelfbound tray agent into Velopack installer + auto-update packages and publishes them to
 # GitHub Releases. Triggered by a `tray-v*` tag (e.g. `tray-v0.6.0`) — a stream kept separate from any
-# future CLI/dotnet-tool release so their assets never collide. `workflow_dispatch` builds the installer
-# as a downloadable artifact only (no Release published), for testing before tagging.
+# future CLI/dotnet-tool release so their assets never collide. `workflow_dispatch` builds the installers
+# as downloadable artifacts only (no Release published), for testing before tagging.
+#
+# Platforms: Windows (Setup.exe) and Linux (AppImage) publish to the Release on a tag. macOS builds an
+# UNSIGNED artifact only — signing + notarization are required before public macOS distribution (deferred).
 
 on:
   push:
@@ -15,46 +18,45 @@ permissions:
   contents: write   # required to create/publish GitHub Releases
 
 jobs:
+  # Resolve the pack version once (from the tag on a tag push, else Directory.Build.props) and share it.
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: v
+        run: |
+          ref='${{ github.ref_name }}'
+          if [[ "$ref" == tray-v* ]]; then
+            version="${ref#tray-v}"                       # tag push: tray-v0.6.0 -> 0.6.0
+          else
+            version=$(sed -n 's/.*<Version>\(.*\)<\/Version>.*/\1/p' Directory.Build.props | head -1)
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Packing version $version"
+
   windows:
+    needs: version
     runs-on: windows-latest
     defaults:
       run:
         shell: pwsh
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
-
-      - name: Resolve version
-        id: meta
-        run: |
-          $ref = '${{ github.ref_name }}'
-          if ($ref -match '^tray-v(.+)$') {
-            $version = $Matches[1]                       # tag push: tray-v0.6.0 -> 0.6.0
-          } else {
-            $version = (Select-Xml -Path Directory.Build.props -XPath '//Version').Node.InnerText
-          }
-          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-          Write-Host "Packing version $version"
-
       - name: Install Velopack CLI
-        run: dotnet tool install -g vpk --version 1.2.0
-
+        run: |
+          dotnet tool install -g vpk --version 1.2.0
+          "$env:USERPROFILE\.dotnet\tools" | Out-File -FilePath $env:GITHUB_PATH -Append
       - name: Publish (self-contained win-x64)
-        run: >
-          dotnet publish src/Shelfbound.Tray/Shelfbound.Tray.csproj
-          -c Release -r win-x64 --self-contained
-          -o publish
-
+        run: dotnet publish src/Shelfbound.Tray/Shelfbound.Tray.csproj -c Release -r win-x64 --self-contained -o publish
       - name: Download previous release (for delta updates)
         if: startsWith(github.ref, 'refs/tags/tray-v')
         continue-on-error: true   # first release has nothing to delta against
         run: vpk download github --repoUrl "https://github.com/${{ github.repository }}" --token "${{ secrets.GITHUB_TOKEN }}"
-
       - name: Pack (Velopack)
         env:
           WINDOWS_CERT_BASE64: ${{ secrets.WINDOWS_CERT_BASE64 }}
@@ -63,7 +65,7 @@ jobs:
           $packArgs = @(
             'pack',
             '--packId', 'Shelfbound.Tray',
-            '--packVersion', '${{ steps.meta.outputs.version }}',
+            '--packVersion', '${{ needs.version.outputs.version }}',
             '--packDir', 'publish',
             '--mainExe', 'Shelfbound.Tray.exe',
             '--packTitle', 'Shelfbound'
@@ -77,14 +79,12 @@ jobs:
             Write-Host '::notice::No code-signing cert configured — producing an unsigned installer.'
           }
           vpk @packArgs
-
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
         with:
           name: shelfbound-tray-win-x64
           path: Releases/*Setup.exe
           if-no-files-found: error
-
       - name: Publish to GitHub Releases
         if: startsWith(github.ref, 'refs/tags/tray-v')
         run: >
@@ -92,7 +92,84 @@ jobs:
           --repoUrl "https://github.com/${{ github.repository }}"
           --token "${{ secrets.GITHUB_TOKEN }}"
           --publish
-          --releaseName "Shelfbound Tray ${{ steps.meta.outputs.version }}"
+          --releaseName "Shelfbound Tray ${{ needs.version.outputs.version }}"
           --tag "${{ github.ref_name }}"
 
-# Linux (AppImage/Flatpak) and macOS packaging are planned follow-ups (see src/Shelfbound.Tray/README.md).
+  linux:
+    # After windows so the tagged Release already exists — avoids a create-release race on first upload.
+    needs: [version, windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Install AppImage runtime dependency
+        run: sudo apt-get update && sudo apt-get install -y libfuse2
+      - name: Install Velopack CLI
+        run: |
+          dotnet tool install -g vpk --version 1.2.0
+          echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
+      - name: Publish (self-contained linux-x64)
+        run: dotnet publish src/Shelfbound.Tray/Shelfbound.Tray.csproj -c Release -r linux-x64 --self-contained -o publish
+      - name: Download previous release (for delta updates)
+        if: startsWith(github.ref, 'refs/tags/tray-v')
+        continue-on-error: true
+        run: vpk download github --repoUrl "https://github.com/${{ github.repository }}" --token "${{ secrets.GITHUB_TOKEN }}"
+      - name: Pack (Velopack → AppImage)
+        run: >
+          vpk pack
+          --packId Shelfbound.Tray
+          --packVersion "${{ needs.version.outputs.version }}"
+          --packDir publish
+          --mainExe Shelfbound.Tray
+          --packTitle Shelfbound
+          --icon src/Shelfbound.Tray/Assets/tray.png
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: shelfbound-tray-linux-x64
+          path: Releases/*.AppImage
+          if-no-files-found: error
+      - name: Publish to GitHub Releases
+        if: startsWith(github.ref, 'refs/tags/tray-v')
+        run: >
+          vpk upload github
+          --repoUrl "https://github.com/${{ github.repository }}"
+          --token "${{ secrets.GITHUB_TOKEN }}"
+          --publish
+          --releaseName "Shelfbound Tray ${{ needs.version.outputs.version }}"
+          --tag "${{ github.ref_name }}"
+
+  macos:
+    # Unsigned build for testers only — NOT published to the Release. Gatekeeper blocks unsigned/un-notarized
+    # apps, so public macOS distribution waits on an Apple Developer cert + notarization (see the README).
+    needs: version
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Install Velopack CLI
+        run: |
+          dotnet tool install -g vpk --version 1.2.0
+          echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
+      - name: Publish (self-contained osx-arm64)
+        run: dotnet publish src/Shelfbound.Tray/Shelfbound.Tray.csproj -c Release -r osx-arm64 --self-contained -o publish
+      - name: Pack (Velopack → .app, unsigned)
+        run: >
+          vpk pack
+          --packId Shelfbound.Tray
+          --packVersion "${{ needs.version.outputs.version }}"
+          --packDir publish
+          --mainExe Shelfbound.Tray
+          --packTitle Shelfbound
+      - name: Upload build artifact (unsigned — testing only)
+        uses: actions/upload-artifact@v4
+        with:
+          name: shelfbound-tray-osx-arm64-unsigned
+          path: |
+            Releases/*.zip
+            Releases/*.pkg
+          if-no-files-found: warn
