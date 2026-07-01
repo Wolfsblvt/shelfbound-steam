@@ -4,6 +4,10 @@
 [Oo]ut/
 artifacts/
 
+## Packaging / release output (Velopack: publish dir + installer/update assets)
+publish/
+[Rr]eleases/
+
 ## IDEs / editors
 .vs/
 .vscode/

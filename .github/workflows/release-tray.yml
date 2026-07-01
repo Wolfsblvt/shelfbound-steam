@@ -1,0 +1,98 @@
+name: Release Tray
+
+# Builds the Shelfbound tray agent into a Velopack installer + auto-update package and publishes it to
+# GitHub Releases. Triggered by a `tray-v*` tag (e.g. `tray-v0.6.0`) — a stream kept separate from any
+# future CLI/dotnet-tool release so their assets never collide. `workflow_dispatch` builds the installer
+# as a downloadable artifact only (no Release published), for testing before tagging.
+
+on:
+  push:
+    tags:
+      - 'tray-v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write   # required to create/publish GitHub Releases
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Resolve version
+        id: meta
+        run: |
+          $ref = '${{ github.ref_name }}'
+          if ($ref -match '^tray-v(.+)$') {
+            $version = $Matches[1]                       # tag push: tray-v0.6.0 -> 0.6.0
+          } else {
+            $version = (Select-Xml -Path Directory.Build.props -XPath '//Version').Node.InnerText
+          }
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          Write-Host "Packing version $version"
+
+      - name: Install Velopack CLI
+        run: dotnet tool install -g vpk --version 1.2.0
+
+      - name: Publish (self-contained win-x64)
+        run: >
+          dotnet publish src/Shelfbound.Tray/Shelfbound.Tray.csproj
+          -c Release -r win-x64 --self-contained
+          -o publish
+
+      - name: Download previous release (for delta updates)
+        if: startsWith(github.ref, 'refs/tags/tray-v')
+        continue-on-error: true   # first release has nothing to delta against
+        run: vpk download github --repoUrl "https://github.com/${{ github.repository }}" --token "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: Pack (Velopack)
+        env:
+          WINDOWS_CERT_BASE64: ${{ secrets.WINDOWS_CERT_BASE64 }}
+          WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+        run: |
+          $packArgs = @(
+            'pack',
+            '--packId', 'Shelfbound.Tray',
+            '--packVersion', '${{ steps.meta.outputs.version }}',
+            '--packDir', 'publish',
+            '--mainExe', 'Shelfbound.Tray.exe',
+            '--packTitle', 'Shelfbound'
+          )
+          # Code signing is optional — only signs when a certificate secret is configured.
+          if ($env:WINDOWS_CERT_BASE64 -and $env:WINDOWS_CERT_PASSWORD) {
+            $pfx = Join-Path $env:RUNNER_TEMP 'codesign.pfx'
+            [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:WINDOWS_CERT_BASE64))
+            $packArgs += @('--signParams', "/fd sha256 /f `"$pfx`" /p `"$env:WINDOWS_CERT_PASSWORD`" /tr http://timestamp.digicert.com /td sha256")
+          } else {
+            Write-Host '::notice::No code-signing cert configured — producing an unsigned installer.'
+          }
+          vpk @packArgs
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: shelfbound-tray-win-x64
+          path: Releases/*Setup.exe
+          if-no-files-found: error
+
+      - name: Publish to GitHub Releases
+        if: startsWith(github.ref, 'refs/tags/tray-v')
+        run: >
+          vpk upload github
+          --repoUrl "https://github.com/${{ github.repository }}"
+          --token "${{ secrets.GITHUB_TOKEN }}"
+          --publish
+          --releaseName "Shelfbound Tray ${{ steps.meta.outputs.version }}"
+          --tag "${{ github.ref_name }}"
+
+# Linux (AppImage/Flatpak) and macOS packaging are planned follow-ups (see src/Shelfbound.Tray/README.md).

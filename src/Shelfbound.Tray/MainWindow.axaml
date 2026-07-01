@@ -1,5 +1,6 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="using:Shelfbound.Tray"
         x:Class="Shelfbound.Tray.MainWindow"
         Title="Shelfbound"
         Width="440" Height="720"
@@ -56,6 +57,15 @@
         </StackPanel>
       </Border>
 
+      <!-- Update banner (only visible while an update is downloading / ready) -->
+      <Border x:Name="UpdateBanner" Classes="card" IsVisible="False" Background="#1e293b" BorderBrush="#3b82f6">
+        <Grid ColumnDefinitions="*,Auto">
+          <TextBlock x:Name="UpdateText" Grid.Column="0" Foreground="#e2e8f0" FontSize="12"
+                     VerticalAlignment="Center" TextWrapping="Wrap"/>
+          <Button x:Name="UpdateRestartButton" Grid.Column="1" Classes="primary" Content="Restart" Margin="12,0,0,0"/>
+        </Grid>
+      </Border>
+
       <!-- Status -->
       <Border Classes="card">
         <StackPanel Spacing="4">
@@ -68,6 +78,32 @@
         <Button x:Name="SyncButton" Classes="primary" Content="Sync now"/>
         <Button x:Name="ConnectButton" Classes="ghost" Content="Connect account"/>
       </StackPanel>
+
+      <!-- Account -->
+      <Border Classes="card">
+        <StackPanel Spacing="10">
+          <TextBlock Classes="label" Text="ACCOUNT"/>
+          <StackPanel Spacing="2">
+            <TextBlock x:Name="AccountName" Foreground="#f1f5f9" FontSize="14" FontWeight="SemiBold"/>
+            <TextBlock x:Name="AccountPlan" Foreground="#8a96b4" FontSize="12" TextWrapping="Wrap"/>
+          </StackPanel>
+          <StackPanel x:Name="DevicesSection" Spacing="6">
+            <TextBlock Classes="label" Text="DEVICES" FontSize="10"/>
+            <ItemsControl x:Name="DevicesList">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="local:DeviceRow">
+                  <Grid ColumnDefinitions="*,Auto" Margin="0,2">
+                    <TextBlock Grid.Column="0" Text="{Binding Title}" Foreground="#cbd5e1" FontSize="12" TextWrapping="Wrap"/>
+                    <TextBlock Grid.Column="1" Text="{Binding Detail}" Foreground="#7c89a8" FontSize="11"
+                               VerticalAlignment="Center" Margin="10,0,0,0"/>
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+          <Button x:Name="SignOutButton" Classes="ghost" Content="Sign out" HorizontalAlignment="Left"/>
+        </StackPanel>
+      </Border>
 
       <!-- What gets captured (trust) -->
       <Border Classes="card">

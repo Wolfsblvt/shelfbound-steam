@@ -29,6 +29,19 @@ public sealed class SyncAgent : IDisposable
         get { lock (_lock) { return _history.ToList(); } }
     }
 
+    // Signed-in account context, refreshed from the server via the connected token. All optional: the tray
+    // works offline / pre-deploy, so these stay null/empty until a successful RefreshAccountAsync.
+    public AccountInfo? Account { get; private set; }
+    public Entitlements? Entitlements { get; private set; }
+    public IReadOnlyList<DeviceToken> Devices { get; private set; } = [];
+
+    /// <summary>This device's entry in <see cref="Devices"/>, matched by the token's display prefix.</summary>
+    public DeviceToken? CurrentDevice => FindCurrentDevice();
+
+    // The non-secret display fragment the server stores per token (first 10 chars of the raw token).
+    private string? CurrentDevicePrefix =>
+        _token is null ? null : _token.Length <= 10 ? _token : _token[..10];
+
     public event Action? Changed;
 
     public SyncAgent()
@@ -38,7 +51,12 @@ public sealed class SyncAgent : IDisposable
         Specs = HardwareInfo.Collect();
     }
 
-    public void Start() => Reschedule();
+    public void Start()
+    {
+        Reschedule();
+        if (IsConnected)
+            _ = RefreshAccountAsync();
+    }
 
     /// <summary>Applies a settings change, persists it, updates auto-start, and reschedules.</summary>
     public void UpdateSettings(Action<AppSettings> mutate)
@@ -103,11 +121,78 @@ public sealed class SyncAgent : IDisposable
             Log("Account connected.");
             Reschedule();
             await SyncNowAsync();
+            await RefreshAccountAsync();
         }
         catch (Exception ex)
         {
             Log($"Connect failed — {ex.Message}");
         }
+    }
+
+    /// <summary>Pulls the signed-in account, plan entitlements, and connected devices for the account card.</summary>
+    public async Task RefreshAccountAsync(CancellationToken ct = default)
+    {
+        if (!IsConnected)
+        {
+            Account = null;
+            Entitlements = null;
+            Devices = [];
+            Changed?.Invoke();
+            return;
+        }
+
+        try
+        {
+            using var client = new ShelfboundClient(Settings.ServerUrl, _token!);
+            // Independent reads — run them together; each swallows its own failure and returns null/empty.
+            Task<AccountInfo?> account = client.GetAccountAsync(ct);
+            Task<Entitlements?> entitlements = client.GetEntitlementsAsync(ct);
+            Task<IReadOnlyList<DeviceToken>> devices = client.GetDevicesAsync(ct);
+            await Task.WhenAll(account, entitlements, devices);
+            Account = account.Result;
+            Entitlements = entitlements.Result;
+            Devices = devices.Result;
+        }
+        catch (Exception ex)
+        {
+            Log($"Couldn't load account — {ex.Message}");
+        }
+        Changed?.Invoke();
+    }
+
+    /// <summary>
+    /// Signs this device out: best-effort revokes its server-side token (so it can't be reused) and always
+    /// clears the local token, stopping auto-sync. Reconnecting mints a fresh token.
+    /// </summary>
+    public async Task SignOutAsync()
+    {
+        DeviceToken? current = FindCurrentDevice();
+        if (current is not null && _token is not null)
+        {
+            try
+            {
+                using var client = new ShelfboundClient(Settings.ServerUrl, _token);
+                await client.RevokeDeviceAsync(current.Id);
+            }
+            catch
+            {
+                // Revoke is best-effort — a network failure must not block the local sign-out below.
+            }
+        }
+
+        TokenStore.Clear();
+        _token = null;
+        Account = null;
+        Entitlements = null;
+        Devices = [];
+        Log("Signed out.");
+        Reschedule(); // IsConnected is now false → auto-sync timer is torn down.
+    }
+
+    private DeviceToken? FindCurrentDevice()
+    {
+        string? prefix = CurrentDevicePrefix;
+        return prefix is null ? null : Devices.FirstOrDefault(d => d.Prefix == prefix);
     }
 
     private void Reschedule()
