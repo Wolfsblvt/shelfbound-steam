@@ -163,3 +163,27 @@ The `shelfbound` CLI and `shelfbound-mcp` server are `PackAsTool` packages publi
 different rate than the tray). *Considered and rejected:* attaching nupkgs to GitHub Releases for manual
 `--add-source` installs (worse UX than `dotnet tool install -g`) and a dedicated tools workflow (redundant —
 `nuget-publish.yml` already packs every packable project).
+
+---
+
+## Open-source boundary (2026-07-02)
+
+### Which code is public vs private — reviewed and recorded
+Made the open-core boundary **deliberate rather than accidental** with an explicit pass over which currently-
+private pieces could move public and which must never. Full three-bucket review + leak check in
+[oss-boundary.md](./oss-boundary.md). The line: **public** = the local capability a user runs and audits plus
+the snapshot interop contract (this repo); **private** = the hosted product's intelligence and economics (the
+scoring engine, learned taste modelling, cross-source fusion, the enrichment fleet and its costs, accounts/
+billing/hosted infra, and product strategy). Rule of thumb for new code: pure, local/snapshot/device-shaped,
+no business or scoring value → public; the product's judgement, server economics, or strategy → private.
+- **Candidates flagged to move public** (recommendations, not moves — each a separate future task): a
+  conservative title-normalization utility and a pure install-history derivation (both snapshot-shaped, no
+  moat). Device-fit evaluation is a **borderline** case recommended to **stay private** for now (coupled to a
+  private type and a paid differentiator).
+- **Hard rule (non-negotiable):** the hosted recommendation/scoring engine, learned taste/affinity modelling,
+  cross-source enrichment fusion, server-side provider credentials/costs, server-side LLM usage, the hosted
+  taste store, accounts/billing/hosted infra, buy/discovery/affiliate logic, and business/strategy docs stay
+  private. This repo may acknowledge a private product exists (it does, openly) but never carry its internals.
+- **Leak check: clean.** One low-severity follow-up — `mcp-design.md` links to a doc path inside the private
+  repo; reword to drop the private-repo pointer. No secrets, pricing, or engine/fusion detail are present; the
+  "local data is the moat" framing and the tray's `localhost` dev defaults are intended and safe.

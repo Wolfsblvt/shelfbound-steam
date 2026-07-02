@@ -129,4 +129,5 @@ CLI/MCP packaged as .NET global tools.
 - [steam-collections.md](./steam-collections.md) — modern collections reader (stale-category fix): design + findings.
 - [privacy-and-data.md](./privacy-and-data.md) — privacy principles and what is read.
 - [mcp-design.md](./mcp-design.md) — local MCP tool design and memory-write guardrails.
+- [oss-boundary.md](./oss-boundary.md) — what stays public vs private (open-core boundary) + leak check.
 - [License summary](../../README.md#license) — the repo is AGPL-3.0-or-later.

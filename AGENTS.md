@@ -20,7 +20,8 @@ dotnet run --project src/Shelfbound.Mcp                     # local MCP server (
 
 - **This repo is public and open source.** Never put hosted/product, accounts/auth, billing, secrets,
   or monetization/strategy docs here — those belong in the separate private product repo. Public
-  history is forever.
+  history is forever. The public/private line (three buckets + leak check) is in
+  `docs/project/oss-boundary.md`.
 - **License: whole repo is AGPL-3.0-or-later** (single license; see `/LICENSE` and the README). Keep
   `<PackageLicenseExpression>AGPL-3.0-or-later</PackageLicenseExpression>` on new projects.
 - **`Shelfbound.Core` stays pure** — no file/network/environment access. Local-machine I/O lives in
