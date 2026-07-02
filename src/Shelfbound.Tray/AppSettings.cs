@@ -17,6 +17,8 @@ public sealed class AppSettings
     public int IntervalMinutes { get; set; } = 60;
     public bool StartMinimized { get; set; } = true;
     public bool StartOnLogin { get; set; } = true;
+    // Background update checks (installed builds only). Manual "Check now" works regardless.
+    public bool AutoUpdate { get; set; } = true;
 
     private static readonly JsonSerializerOptions Options = new()
     {

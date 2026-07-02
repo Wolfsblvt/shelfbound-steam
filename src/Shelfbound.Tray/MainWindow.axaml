@@ -3,7 +3,7 @@
         xmlns:local="using:Shelfbound.Tray"
         x:Class="Shelfbound.Tray.MainWindow"
         Title="Shelfbound"
-        Width="440" Height="720"
+        Width="720" Height="732"
         CanResize="False"
         WindowStartupLocation="CenterScreen"
         Background="#0b1020"
@@ -52,10 +52,10 @@
   </Window.Styles>
 
   <ScrollViewer>
-    <StackPanel Margin="20,12,20,20" Spacing="14">
+    <StackPanel Margin="20,12,20,16" Spacing="14">
 
       <!-- Custom draggable title bar -->
-      <Border Name="TitleBar" Background="Transparent" Padding="0,8,90,4">
+      <Border Name="TitleBar" Background="Transparent" Padding="0,6,90,0">
         <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
           <Border Width="26" Height="26" CornerRadius="7" Background="#6366f1"/>
           <TextBlock Text="Shelfbound" FontSize="17" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
@@ -73,105 +73,129 @@
         </Grid>
       </Border>
 
-      <!-- Status -->
-      <Border Classes="card">
-        <StackPanel Spacing="4">
-          <TextBlock x:Name="StatusText" Foreground="#f1f5f9" FontSize="15" FontWeight="SemiBold"/>
-          <TextBlock x:Name="DeviceText" Foreground="#8a96b4" FontSize="12"/>
-        </StackPanel>
-      </Border>
+      <!-- Two-column dashboard so everything fits without scrolling -->
+      <Grid ColumnDefinitions="*,*" ColumnSpacing="14">
 
-      <StackPanel Orientation="Horizontal" Spacing="10">
-        <Button x:Name="SyncButton" Classes="primary" Content="Sync now"/>
-        <Button x:Name="ConnectButton" Classes="ghost" Content="Connect account"/>
-      </StackPanel>
+        <!-- Left column: status + account + activity (Activity fills the remaining height) -->
+        <DockPanel Grid.Column="0" LastChildFill="True">
 
-      <!-- Account -->
-      <Border Classes="card">
-        <StackPanel Spacing="10">
-          <TextBlock Classes="label" Text="ACCOUNT"/>
-          <StackPanel Spacing="2">
-            <TextBlock x:Name="AccountName" Foreground="#f1f5f9" FontSize="14" FontWeight="SemiBold"/>
-            <TextBlock x:Name="AccountPlan" Foreground="#8a96b4" FontSize="12" TextWrapping="Wrap"/>
-          </StackPanel>
-          <StackPanel x:Name="DevicesSection" Spacing="6">
-            <TextBlock Classes="label" Text="DEVICES" FontSize="10"/>
-            <ItemsControl x:Name="DevicesList">
-              <ItemsControl.ItemTemplate>
-                <DataTemplate x:DataType="local:DeviceRow">
-                  <Grid ColumnDefinitions="*,Auto" Margin="0,2">
-                    <TextBlock Grid.Column="0" Text="{Binding Title}" Foreground="#cbd5e1" FontSize="12" TextWrapping="Wrap"/>
-                    <TextBlock Grid.Column="1" Text="{Binding Detail}" Foreground="#7c89a8" FontSize="11"
-                               VerticalAlignment="Center" Margin="10,0,0,0"/>
-                  </Grid>
-                </DataTemplate>
-              </ItemsControl.ItemTemplate>
-            </ItemsControl>
-          </StackPanel>
-          <Button x:Name="SignOutButton" Classes="ghost" Content="Sign out" HorizontalAlignment="Left"/>
-        </StackPanel>
-      </Border>
-
-      <!-- What gets captured (trust) -->
-      <Border Classes="card">
-        <StackPanel Spacing="10">
-          <TextBlock Classes="label" Text="WHAT THIS DEVICE SHARES"/>
-          <Grid ColumnDefinitions="90,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="6">
-            <TextBlock Grid.Row="0" Grid.Column="0" Classes="spec-k" Text="OS"/>
-            <TextBlock Grid.Row="0" Grid.Column="1" Classes="spec-v" x:Name="SpecOs"/>
-            <TextBlock Grid.Row="1" Grid.Column="0" Classes="spec-k" Text="CPU"/>
-            <TextBlock Grid.Row="1" Grid.Column="1" Classes="spec-v" x:Name="SpecCpu" TextWrapping="Wrap"/>
-            <TextBlock Grid.Row="2" Grid.Column="0" Classes="spec-k" Text="Cores"/>
-            <TextBlock Grid.Row="2" Grid.Column="1" Classes="spec-v" x:Name="SpecCores"/>
-            <TextBlock Grid.Row="3" Grid.Column="0" Classes="spec-k" Text="Memory"/>
-            <TextBlock Grid.Row="3" Grid.Column="1" Classes="spec-v" x:Name="SpecRam"/>
-            <TextBlock Grid.Row="4" Grid.Column="0" Classes="spec-k" Text="GPU"/>
-            <TextBlock Grid.Row="4" Grid.Column="1" Classes="spec-v" x:Name="SpecGpu"/>
-          </Grid>
-          <Border Background="#10182e" CornerRadius="8" Padding="10">
-            <TextBlock FontSize="11" Foreground="#94a3b8" TextWrapping="Wrap"
-                       Text="Also synced: your game list, install state per device, playtime, and your Steam collections. Never synced: passwords, save files, or install paths."/>
+          <Border Classes="card" DockPanel.Dock="Top">
+            <StackPanel Spacing="12">
+              <StackPanel Spacing="4">
+                <TextBlock x:Name="StatusText" Foreground="#f1f5f9" FontSize="15" FontWeight="SemiBold"/>
+                <TextBlock x:Name="DeviceText" Foreground="#8a96b4" FontSize="12"/>
+              </StackPanel>
+              <StackPanel Orientation="Horizontal" Spacing="10">
+                <Button x:Name="SyncButton" Classes="primary" Content="Sync now"/>
+                <Button x:Name="ConnectButton" Classes="ghost" Content="Connect account"/>
+              </StackPanel>
+            </StackPanel>
           </Border>
-        </StackPanel>
-      </Border>
 
-      <!-- Settings -->
-      <Border Classes="card">
-        <StackPanel Spacing="12">
-          <TextBlock Classes="label" Text="SYNC"/>
-          <CheckBox x:Name="AutoSyncCheck" Content="Sync automatically in the background"/>
-          <StackPanel Orientation="Horizontal" Spacing="8">
-            <TextBlock Text="Every" VerticalAlignment="Center" Foreground="#cbd5e1"/>
-            <NumericUpDown x:Name="IntervalInput" Minimum="1" Maximum="1440" Increment="5" Width="120"/>
-            <TextBlock Text="minutes" VerticalAlignment="Center" Foreground="#cbd5e1"/>
-          </StackPanel>
-          <CheckBox x:Name="StartLoginCheck" Content="Start on login"/>
-          <CheckBox x:Name="StartMinimizedCheck" Content="Start hidden in the tray"/>
-        </StackPanel>
-      </Border>
+          <Border Classes="card" DockPanel.Dock="Top" Margin="0,14,0,0">
+            <StackPanel Spacing="10">
+              <TextBlock Classes="label" Text="ACCOUNT"/>
+              <StackPanel Spacing="2">
+                <TextBlock x:Name="AccountName" Foreground="#f1f5f9" FontSize="14" FontWeight="SemiBold"/>
+                <TextBlock x:Name="AccountPlan" Foreground="#8a96b4" FontSize="12" TextWrapping="Wrap"/>
+              </StackPanel>
+              <StackPanel x:Name="DevicesSection" Spacing="6">
+                <TextBlock Classes="label" Text="DEVICES" FontSize="10"/>
+                <ItemsControl x:Name="DevicesList">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="local:DeviceRow">
+                      <Grid ColumnDefinitions="*,Auto" Margin="0,2">
+                        <TextBlock Grid.Column="0" Text="{Binding Title}" Foreground="#cbd5e1" FontSize="12" TextWrapping="Wrap"/>
+                        <TextBlock Grid.Column="1" Text="{Binding Detail}" Foreground="#7c89a8" FontSize="11"
+                                   VerticalAlignment="Center" Margin="10,0,0,0"/>
+                      </Grid>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+              <Button x:Name="SignOutButton" Classes="ghost" Content="Sign out" HorizontalAlignment="Left"/>
+            </StackPanel>
+          </Border>
 
-      <!-- Activity -->
-      <Border Classes="card" Padding="12">
-        <StackPanel Spacing="8">
-          <TextBlock Classes="label" Text="ACTIVITY"/>
-          <ScrollViewer Height="120">
-            <ItemsControl x:Name="HistoryList">
-              <ItemsControl.ItemTemplate>
-                <DataTemplate>
-                  <TextBlock Text="{Binding}" Foreground="#a9b4cf" FontSize="11"
-                             FontFamily="Cascadia Mono,Consolas,monospace"/>
-                </DataTemplate>
-              </ItemsControl.ItemTemplate>
-            </ItemsControl>
-          </ScrollViewer>
-        </StackPanel>
-      </Border>
+          <Border Classes="card" Margin="0,14,0,0" Padding="12">
+            <DockPanel LastChildFill="True">
+              <TextBlock DockPanel.Dock="Top" Classes="label" Text="ACTIVITY" Margin="0,0,0,8"/>
+              <ScrollViewer MinHeight="80">
+                <ItemsControl x:Name="HistoryList">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                      <TextBlock Text="{Binding}" Foreground="#a9b4cf" FontSize="11"
+                                 FontFamily="Cascadia Mono,Consolas,monospace"/>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </ScrollViewer>
+            </DockPanel>
+          </Border>
 
-      <!-- Footer: version + release notes (transparency for a locally-installed tool) -->
-      <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center" Margin="0,2,0,0">
+        </DockPanel>
+
+        <!-- Right column: what's shared + sync + updates -->
+        <StackPanel Grid.Column="1" Spacing="14">
+
+          <Border Classes="card">
+            <StackPanel Spacing="10">
+              <TextBlock Classes="label" Text="WHAT THIS DEVICE SHARES"/>
+              <Grid ColumnDefinitions="72,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="6">
+                <TextBlock Grid.Row="0" Grid.Column="0" Classes="spec-k" Text="OS"/>
+                <TextBlock Grid.Row="0" Grid.Column="1" Classes="spec-v" x:Name="SpecOs" TextWrapping="Wrap"/>
+                <TextBlock Grid.Row="1" Grid.Column="0" Classes="spec-k" Text="CPU"/>
+                <TextBlock Grid.Row="1" Grid.Column="1" Classes="spec-v" x:Name="SpecCpu" TextWrapping="Wrap"/>
+                <TextBlock Grid.Row="2" Grid.Column="0" Classes="spec-k" Text="Cores"/>
+                <TextBlock Grid.Row="2" Grid.Column="1" Classes="spec-v" x:Name="SpecCores"/>
+                <TextBlock Grid.Row="3" Grid.Column="0" Classes="spec-k" Text="Memory"/>
+                <TextBlock Grid.Row="3" Grid.Column="1" Classes="spec-v" x:Name="SpecRam"/>
+                <TextBlock Grid.Row="4" Grid.Column="0" Classes="spec-k" Text="GPU"/>
+                <TextBlock Grid.Row="4" Grid.Column="1" Classes="spec-v" x:Name="SpecGpu" TextWrapping="Wrap"/>
+              </Grid>
+              <Border Background="#10182e" CornerRadius="8" Padding="10">
+                <TextBlock FontSize="11" Foreground="#94a3b8" TextWrapping="Wrap"
+                           Text="Also synced: your game list, install state per device, playtime, and your Steam collections. Never synced: passwords, save files, or install paths."/>
+              </Border>
+            </StackPanel>
+          </Border>
+
+          <Border Classes="card">
+            <StackPanel Spacing="12">
+              <TextBlock Classes="label" Text="SYNC"/>
+              <CheckBox x:Name="AutoSyncCheck" Content="Sync automatically in the background"/>
+              <StackPanel x:Name="IntervalRow" Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="Every" VerticalAlignment="Center" Foreground="#cbd5e1"/>
+                <NumericUpDown x:Name="IntervalInput" Minimum="1" Maximum="1440" Increment="5" Width="120"/>
+                <TextBlock Text="minutes" VerticalAlignment="Center" Foreground="#cbd5e1"/>
+              </StackPanel>
+              <CheckBox x:Name="StartLoginCheck" Content="Start on login"/>
+              <CheckBox x:Name="StartMinimizedCheck" Content="Start hidden in the tray"/>
+            </StackPanel>
+          </Border>
+
+          <Border Classes="card">
+            <StackPanel Spacing="10">
+              <TextBlock Classes="label" Text="UPDATES"/>
+              <TextBlock x:Name="UpdateStatusText" Foreground="#cbd5e1" FontSize="12" TextWrapping="Wrap"/>
+              <StackPanel x:Name="UpdateActions" Orientation="Horizontal" Spacing="10">
+                <Button x:Name="CheckUpdateButton" Classes="ghost" Content="Check now"/>
+                <TextBlock x:Name="LastCheckedText" Foreground="#7c89a8" FontSize="11" VerticalAlignment="Center"/>
+              </StackPanel>
+              <CheckBox x:Name="AutoUpdateCheck" Content="Check for updates automatically"/>
+            </StackPanel>
+          </Border>
+
+        </StackPanel>
+      </Grid>
+
+      <!-- Footer: version + links (transparency for a locally-installed tool) -->
+      <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
         <TextBlock x:Name="VersionText" Foreground="#5b6580" FontSize="11" VerticalAlignment="Center"/>
         <TextBlock Text="•" Foreground="#3b4463" FontSize="11" VerticalAlignment="Center"/>
         <TextBlock x:Name="ReleaseNotesLink" Classes="link" Text="Release notes" FontSize="11" VerticalAlignment="Center"/>
+        <TextBlock Text="•" Foreground="#3b4463" FontSize="11" VerticalAlignment="Center"/>
+        <TextBlock x:Name="BugReportLink" Classes="link" Text="Report a bug" FontSize="11" VerticalAlignment="Center"/>
       </StackPanel>
 
     </StackPanel>

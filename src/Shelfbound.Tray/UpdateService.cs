@@ -30,6 +30,9 @@ public sealed class UpdateService
     /// <summary>The GitHub Release page for the offered update's notes, or null when none is pending.</summary>
     public string? TargetReleaseUrl => TargetVersion is null ? null : AppInfo.ReleaseUrl(TargetVersion);
 
+    /// <summary>When the last update check completed (success or failure), or null if never checked.</summary>
+    public DateTimeOffset? LastChecked { get; private set; }
+
     public bool IsSupported => _manager.IsInstalled;
 
     public event Action? Changed;
@@ -44,6 +47,7 @@ public sealed class UpdateService
         {
             Set(UpdateState.Checking, null);
             UpdateInfo? info = await _manager.CheckForUpdatesAsync();
+            LastChecked = DateTimeOffset.Now;
             if (info is null)
             {
                 Set(UpdateState.UpToDate, null);
@@ -58,6 +62,7 @@ public sealed class UpdateService
         catch
         {
             // Update failures are non-fatal — the app keeps running on the current version.
+            LastChecked = DateTimeOffset.Now;
             Set(UpdateState.Failed, null);
         }
     }

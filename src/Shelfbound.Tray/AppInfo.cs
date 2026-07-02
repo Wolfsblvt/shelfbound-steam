@@ -17,6 +17,9 @@ public static class AppInfo
     /// <summary>The GitHub Releases listing.</summary>
     public static string ReleasesUrl => $"{RepoUrl}/releases";
 
+    /// <summary>The GitHub issue tracker (for the "Report a bug" link).</summary>
+    public static string IssuesUrl => $"{RepoUrl}/issues";
+
     /// <summary>The GitHub Release page for a specific tray version (its notes come from the changelog).</summary>
     public static string ReleaseUrl(string version) => $"{RepoUrl}/releases/tag/tray-v{version}";
 

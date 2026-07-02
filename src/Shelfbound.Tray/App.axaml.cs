@@ -35,9 +35,11 @@ public partial class App : Application
             if (!_agent.Settings.StartMinimized || !_agent.IsConnected)
                 ShowWindow();
 
-            // Check for updates in the background — a no-op unless installed via the Velopack installer.
+            // Check for updates in the background — a no-op unless installed via the Velopack installer,
+            // and only when the user hasn't turned automatic checks off. Manual "Check now" always works.
             _update.Changed += OnUpdateChanged;
-            _ = _update.CheckAsync();
+            if (_agent.Settings.AutoUpdate)
+                _ = _update.CheckAsync();
         }
 
         base.OnFrameworkInitializationCompleted();

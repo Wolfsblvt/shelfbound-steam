@@ -10,6 +10,16 @@ section up to date as you work — the release step promotes it to a new version
 [docs/project/releasing.md](docs/project/releasing.md) for the full flow.
 
 ## [Unreleased]
+### Added
+- **Updates** section in the window: check for updates on demand, see when it last checked, and a toggle
+  for automatic checks.
+- "Report a bug" link in the footer.
+
+### Changed
+- Redesigned the window as a two-column dashboard so everything fits without a scrollbar.
+
+### Fixed
+- The sync interval is greyed out when automatic background sync is off.
 
 ## [0.6.0] - 2026-07-02
 ### Added
