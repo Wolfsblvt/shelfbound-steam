@@ -187,3 +187,30 @@ no business or scoring value → public; the product's judgement, server economi
 - **Leak check: clean.** One low-severity follow-up — `mcp-design.md` links to a doc path inside the private
   repo; reword to drop the private-repo pointer. No secrets, pricing, or engine/fusion detail are present; the
   "local data is the moat" framing and the tray's `localhost` dev defaults are intended and safe.
+
+---
+
+## Tray — M-4 consequence: device management degrades to dashboard link (2026-07-02)
+
+### Token-management endpoints require cookie session after M-4 — tray degrades gracefully
+
+Cloud security fix **M-4** made `/auth/tokens*` (list devices, revoke, mint) reject **Bearer (API token)**
+principals and require an interactive cookie session instead. The tray authenticates with a stored Bearer token,
+so its `GET /auth/tokens` (device list) and `DELETE /auth/tokens/{id}` (revoke) calls would 403. These endpoints
+are **only** the device-management ones — `GET /auth/me`, `GET /auth/entitlements`, and `POST /ingest` still
+accept Bearer and are unaffected.
+
+**Decision (implemented):**
+- **Drop the server device list from the tray** — `GetDevicesAsync` and `RevokeDeviceAsync` removed from
+  `ShelfboundClient`; `RefreshAccountAsync` only fetches account + entitlements. No 403s in the normal flow.
+- **DEVICES panel → static + dashboard link** — shows this device's local name and a "Manage devices in dashboard"
+  button (`WebAppUrl` from settings). Account/plan/sync display and the browser connect/mint onboarding flow are
+  unchanged and still work over Bearer.
+- **Sign-out is local-only** — clears the stored token immediately and stops auto-sync. Server-side revoke is not
+  attempted (it would 403). Tokens expire naturally at 90 days or can be revoked from the web dashboard.
+- **Dashboard device-management page is a follow-up** — the "Manage devices in dashboard" button currently links
+  to the dashboard root (`WebAppUrl`). A direct `/devices` page waits on the deferred dashboard build
+  (`TODO(dashboard)` in `MainWindow.axaml.cs`).
+
+*Considered:* keeping a best-effort revoke call on sign-out (would swallow the 403 silently). Rejected — cleaner
+to be explicit about local-only rather than pretend the revoke might succeed.

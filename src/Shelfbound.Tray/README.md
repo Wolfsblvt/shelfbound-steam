@@ -31,9 +31,11 @@ token.
 
 - **Connect account** (tray menu or window button) opens the dashboard in your browser to sign in; the
   device token is handed back to the app over a localhost callback and saved locally.
-- The **Account** card shows who's signed in, your plan and device allowance, and your connected devices.
-  **Sign out** revokes this device's token on the server and clears it locally. Plan limits are enforced by
-  the server — the tray only displays them, it never gates features client-side.
+- The **Account** card shows who's signed in, your plan and device allowance, and this device's name. A
+  **"Manage devices in dashboard"** button opens the web dashboard for the full device list and revocation.
+  **Sign out** clears the local token and stops auto-sync immediately; the server-side token expires at 90 days
+  or can be revoked from the dashboard. Plan limits are enforced by the server — the tray only displays them,
+  it never gates features client-side.
 - **Sync now** uploads immediately; auto-sync runs on an interval when enabled.
 - Closing the window hides it to the tray. Auto-start on login and background auto-sync are optional and on
   by default.
