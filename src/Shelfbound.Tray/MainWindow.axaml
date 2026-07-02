@@ -44,6 +44,11 @@
     <Style Selector="TextBlock.spec-k"><Setter Property="Foreground" Value="#8a96b4"/><Setter Property="FontSize" Value="12"/></Style>
     <Style Selector="TextBlock.spec-v"><Setter Property="Foreground" Value="#e2e8f0"/><Setter Property="FontSize" Value="12"/></Style>
     <Style Selector="CheckBox"><Setter Property="Foreground" Value="#cbd5e1"/></Style>
+    <Style Selector="TextBlock.link">
+      <Setter Property="Foreground" Value="#93c5fd"/>
+      <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+    <Style Selector="TextBlock.link:pointerover"><Setter Property="TextDecorations" Value="Underline"/></Style>
   </Window.Styles>
 
   <ScrollViewer>
@@ -60,8 +65,10 @@
       <!-- Update banner (only visible while an update is downloading / ready) -->
       <Border x:Name="UpdateBanner" Classes="card" IsVisible="False" Background="#1e293b" BorderBrush="#3b82f6">
         <Grid ColumnDefinitions="*,Auto">
-          <TextBlock x:Name="UpdateText" Grid.Column="0" Foreground="#e2e8f0" FontSize="12"
-                     VerticalAlignment="Center" TextWrapping="Wrap"/>
+          <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2">
+            <TextBlock x:Name="UpdateText" Foreground="#e2e8f0" FontSize="12" TextWrapping="Wrap"/>
+            <TextBlock x:Name="UpdateNotesLink" Classes="link" Text="What's new" FontSize="11" IsVisible="False"/>
+          </StackPanel>
           <Button x:Name="UpdateRestartButton" Grid.Column="1" Classes="primary" Content="Restart" Margin="12,0,0,0"/>
         </Grid>
       </Border>
@@ -159,6 +166,13 @@
           </ScrollViewer>
         </StackPanel>
       </Border>
+
+      <!-- Footer: version + release notes (transparency for a locally-installed tool) -->
+      <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center" Margin="0,2,0,0">
+        <TextBlock x:Name="VersionText" Foreground="#5b6580" FontSize="11" VerticalAlignment="Center"/>
+        <TextBlock Text="•" Foreground="#3b4463" FontSize="11" VerticalAlignment="Center"/>
+        <TextBlock x:Name="ReleaseNotesLink" Classes="link" Text="Release notes" FontSize="11" VerticalAlignment="Center"/>
+      </StackPanel>
 
     </StackPanel>
   </ScrollViewer>

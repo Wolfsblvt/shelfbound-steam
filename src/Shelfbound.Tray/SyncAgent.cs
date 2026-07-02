@@ -1,4 +1,3 @@
-using System.Reflection;
 using Shelfbound.Client;
 using Shelfbound.Core.Model;
 using Shelfbound.Steam.Steam;
@@ -12,8 +11,6 @@ namespace Shelfbound.Tray;
 /// </summary>
 public sealed class SyncAgent : IDisposable
 {
-    private static readonly string ToolVersion = ResolveVersion();
-
     private readonly object _lock = new();
     private readonly List<string> _history = [];
     private Timer? _timer;
@@ -80,7 +77,7 @@ public sealed class SyncAgent : IDisposable
         {
             SnapshotBuildResult build = await SnapshotBuilder.BuildAsync(new SnapshotBuildOptions
             {
-                ToolVersion = ToolVersion,
+                ToolVersion = AppInfo.Version,
                 DeviceName = Settings.DeviceName,
             });
             using var client = new ShelfboundClient(Settings.ServerUrl, _token!);
@@ -233,15 +230,6 @@ public sealed class SyncAgent : IDisposable
         if (span.TotalMinutes < 60) return $"{(int)span.TotalMinutes} min ago";
         if (span.TotalHours < 24) return $"{(int)span.TotalHours} h ago";
         return when.ToString("yyyy-MM-dd HH:mm");
-    }
-
-    private static string ResolveVersion()
-    {
-        string? raw = Assembly.GetExecutingAssembly()
-            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
-        if (string.IsNullOrEmpty(raw)) return "0.5.0";
-        int plus = raw.IndexOf('+');
-        return plus >= 0 ? raw[..plus] : raw;
     }
 
     public void Dispose() => _timer?.Dispose();

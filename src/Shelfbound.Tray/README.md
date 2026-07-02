@@ -53,40 +53,11 @@ install/update/uninstall hooks.
 
 ## Releasing (maintainers)
 
-Releases are built by the **Release Tray** GitHub Actions workflow
-([.github/workflows/release-tray.yml](../../.github/workflows/release-tray.yml)) — a shared `version` job
-plus `windows`, `linux`, and `macos` build jobs.
+The tray ships via the **Release Tray** GitHub Actions workflow: bump the version, promote `CHANGELOG.md`,
+push a **`tray-v<version>`** tag, and CI publishes the Windows + Linux installers, the update packages, and
+the changelog notes to a GitHub Release that clients self-update from.
 
-**Cut a release:**
-
-1. Bump `<Version>` in [`Directory.Build.props`](../../Directory.Build.props) and commit.
-2. Tag it `tray-v<version>` (matching that version) and push the tag:
-
-   ```bash
-   git tag tray-v0.6.0
-   git push origin tray-v0.6.0
-   ```
-3. The workflow builds **Windows + Linux** and publishes them — plus the delta/full update packages — to a
-   GitHub Release for that tag. Installed clients pick up the update on their next check (auto-update works
-   from the *second* release onward, once a prior version exists to update from).
-
-`workflow_dispatch` runs the same build but uploads the installers as **Actions artifacts only** (no Release)
-— use it to smoke-test a build before tagging. The `tray-v*` tag stream is separate from any CLI/`dotnet
-tool` release so their assets never collide.
-
-**Signing:**
-
-- **Windows** — optional Authenticode: set the `WINDOWS_CERT_BASE64` (base64 of the `.pfx`) and
-  `WINDOWS_CERT_PASSWORD` repo secrets to sign; without them the installer is unsigned. Publishing uses the
-  built-in `GITHUB_TOKEN` (no secret needed).
-- **macOS** — a signed **and notarized** build (Apple Developer ID + `notarytool`) is required before public
-  distribution; until then the `macos` job produces an unsigned artifact for testers only.
-- Branded installer icons (`.ico` for Windows, `.icns` for macOS) are a follow-up; Linux uses the tray PNG.
-
-Build and pack locally to test the pipeline (outputs to `./Releases`; swap `-r`/`--mainExe` per platform):
-
-```bash
-dotnet tool install -g vpk --version 1.2.0
-dotnet publish src/Shelfbound.Tray -c Release -r win-x64 --self-contained -o publish
-vpk pack --packId Shelfbound.Tray --packVersion 0.6.0 --packDir publish --mainExe Shelfbound.Tray.exe --packTitle Shelfbound
-```
+Full process, CI shape, signing, and the release rules:
+**[docs/project/releasing.md](../../docs/project/releasing.md)**. The `./scripts/release.ps1 -Version <x.y.z>`
+helper does the local prep (version bump, changelog, commit, tag); `workflow_dispatch` builds installers as
+artifacts for testing without publishing.

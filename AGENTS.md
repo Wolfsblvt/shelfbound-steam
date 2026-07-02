@@ -42,5 +42,6 @@ no-history-rewrite rules still apply.
 
 `docs/project/` — `PROJECT.md` (overview/roadmap), `ARCHITECTURE.md`, `DECISIONS.md`,
 `snapshot-schema.md`, `steam-collections.md` (modern-collections reader), `privacy-and-data.md`,
-`mcp-design.md`. Keep them in sync when scope/architecture/decisions change. Product/business/monetization
-docs are maintained privately.
+`mcp-design.md`, `releasing.md` (how to cut a tray release — follow it for any release/publish work). Keep
+them in sync when scope/architecture/decisions change. Product/business/monetization docs are maintained
+privately.

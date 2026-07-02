@@ -16,6 +16,9 @@ publish/
 *.suo
 *.userprefs
 
+## Local agent scratch (deep-research briefs, session kickoff prompts) — never public
+.prompts/
+
 ## Test / coverage
 [Tt]est[Rr]esults/
 coverage/

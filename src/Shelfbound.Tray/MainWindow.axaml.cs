@@ -42,10 +42,13 @@ public partial class MainWindow : Window
 
     private void WireEvents()
     {
+        VersionText.Text = $"Shelfbound Tray v{AppInfo.Version}";
         SyncButton.Click += async (_, _) => await _agent.SyncNowAsync();
         ConnectButton.Click += async (_, _) => await _agent.ConnectAsync();
         SignOutButton.Click += async (_, _) => await _agent.SignOutAsync();
         UpdateRestartButton.Click += (_, _) => _update?.ApplyAndRestart();
+        ReleaseNotesLink.PointerPressed += (_, _) => Browser.Open(AppInfo.ReleasesUrl);
+        UpdateNotesLink.PointerPressed += (_, _) => Browser.Open(_update?.TargetReleaseUrl ?? AppInfo.ReleasesUrl);
         AutoSyncCheck.IsCheckedChanged += (_, _) => Apply();
         StartLoginCheck.IsCheckedChanged += (_, _) => Apply();
         StartMinimizedCheck.IsCheckedChanged += (_, _) => Apply();
@@ -139,11 +142,13 @@ public partial class MainWindow : Window
                 UpdateBanner.IsVisible = true;
                 UpdateText.Text = $"Downloading update {_update.TargetVersion}…";
                 UpdateRestartButton.IsVisible = false;
+                UpdateNotesLink.IsVisible = false;
                 break;
             case UpdateState.ReadyToRestart:
                 UpdateBanner.IsVisible = true;
                 UpdateText.Text = $"Update {_update.TargetVersion} is ready.";
                 UpdateRestartButton.IsVisible = true;
+                UpdateNotesLink.IsVisible = true;
                 break;
             default:
                 UpdateBanner.IsVisible = false;

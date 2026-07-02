@@ -94,6 +94,27 @@ jobs:
           --publish
           --releaseName "Shelfbound Tray ${{ needs.version.outputs.version }}"
           --tag "${{ github.ref_name }}"
+      # Set the Release body from CHANGELOG.md (single source of release notes; the tray links to it).
+      - name: Set release notes from CHANGELOG
+        if: startsWith(github.ref, 'refs/tags/tray-v')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $version = '${{ needs.version.outputs.version }}'
+          $changelog = Get-Content CHANGELOG.md -Raw
+          $pattern = "(?ms)^## \[$([regex]::Escape($version))\].*?(?=^## \[|\z)"
+          $match = [regex]::Match($changelog, $pattern)
+          if (-not $match.Success) {
+            Write-Host "::warning::No CHANGELOG section for [$version]; leaving vpk's default notes."
+            exit 0
+          }
+          $lines = $match.Value.Trim() -split "`r?`n"
+          $notes = (($lines | Select-Object -Skip 1) -join "`n").Trim()   # drop the "## [x] - date" header
+          if ([string]::IsNullOrWhiteSpace($notes)) { $notes = $match.Value.Trim() }
+          $file = Join-Path $env:RUNNER_TEMP 'release-notes.md'
+          Set-Content -Path $file -Value $notes -Encoding utf8
+          gh release edit '${{ github.ref_name }}' --notes-file $file
+          Write-Host "Release notes set from CHANGELOG [$version]."
 
   linux:
     # After windows so the tagged Release already exists — avoids a create-release race on first upload.

@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -24,7 +23,7 @@ public static class ConnectFlow
 
         string url = $"{webAppUrl.TrimEnd('/')}/connect" +
             $"?cb={Uri.EscapeDataString(callback)}&device={Uri.EscapeDataString(deviceName)}&state={state}";
-        OpenBrowser(url);
+        Browser.Open(url);
 
         using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(3));
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, timeout.Token);
@@ -70,17 +69,5 @@ public static class ConnectFlow
         int port = ((IPEndPoint)listener.LocalEndpoint).Port;
         listener.Stop();
         return port;
-    }
-
-    private static void OpenBrowser(string url)
-    {
-        try
-        {
-            Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
-        }
-        catch
-        {
-            // If the launcher fails the user can paste the URL manually; not worth crashing over.
-        }
     }
 }

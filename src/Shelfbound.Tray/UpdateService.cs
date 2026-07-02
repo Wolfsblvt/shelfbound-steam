@@ -13,15 +13,12 @@ public enum UpdateState { Unsupported, UpToDate, Checking, Downloading, ReadyToR
 /// </summary>
 public sealed class UpdateService
 {
-    // The public repo that hosts the tray's release assets (Setup.exe + delta/full nupkgs).
-    private const string RepoUrl = "https://github.com/Wolfsblvt/shelfbound-steam";
-
     private readonly UpdateManager _manager;
     private UpdateInfo? _pending;
 
     public UpdateService()
     {
-        _manager = new UpdateManager(new GithubSource(RepoUrl, accessToken: null, prerelease: false));
+        _manager = new UpdateManager(new GithubSource(AppInfo.RepoUrl, accessToken: null, prerelease: false));
         State = _manager.IsInstalled ? UpdateState.UpToDate : UpdateState.Unsupported;
     }
 
@@ -29,6 +26,9 @@ public sealed class UpdateService
 
     /// <summary>The version being offered/downloaded, when <see cref="State"/> is Downloading/ReadyToRestart.</summary>
     public string? TargetVersion { get; private set; }
+
+    /// <summary>The GitHub Release page for the offered update's notes, or null when none is pending.</summary>
+    public string? TargetReleaseUrl => TargetVersion is null ? null : AppInfo.ReleaseUrl(TargetVersion);
 
     public bool IsSupported => _manager.IsInstalled;
 
