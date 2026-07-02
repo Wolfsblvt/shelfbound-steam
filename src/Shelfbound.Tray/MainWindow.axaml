@@ -101,17 +101,8 @@
               </StackPanel>
               <StackPanel x:Name="DevicesSection" Spacing="6">
                 <TextBlock Classes="label" Text="DEVICES" FontSize="10"/>
-                <ItemsControl x:Name="DevicesList">
-                  <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="local:DeviceRow">
-                      <Grid ColumnDefinitions="*,Auto" Margin="0,2">
-                        <TextBlock Grid.Column="0" Text="{Binding Title}" Foreground="#cbd5e1" FontSize="12" TextWrapping="Wrap"/>
-                        <TextBlock Grid.Column="1" Text="{Binding Detail}" Foreground="#7c89a8" FontSize="11"
-                                   VerticalAlignment="Center" Margin="10,0,0,0"/>
-                      </Grid>
-                    </DataTemplate>
-                  </ItemsControl.ItemTemplate>
-                </ItemsControl>
+                <TextBlock x:Name="ThisDeviceText" Foreground="#cbd5e1" FontSize="12"/>
+                <Button x:Name="ManageDevicesButton" Classes="ghost" Content="Manage devices in dashboard" HorizontalAlignment="Left" FontSize="12"/>
               </StackPanel>
               <Button x:Name="SignOutButton" Classes="ghost" Content="Sign out" HorizontalAlignment="Left"/>
             </StackPanel>

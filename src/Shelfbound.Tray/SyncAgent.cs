@@ -30,14 +30,6 @@ public sealed class SyncAgent : IDisposable
     // works offline / pre-deploy, so these stay null/empty until a successful RefreshAccountAsync.
     public AccountInfo? Account { get; private set; }
     public Entitlements? Entitlements { get; private set; }
-    public IReadOnlyList<DeviceToken> Devices { get; private set; } = [];
-
-    /// <summary>This device's entry in <see cref="Devices"/>, matched by the token's display prefix.</summary>
-    public DeviceToken? CurrentDevice => FindCurrentDevice();
-
-    // The non-secret display fragment the server stores per token (first 10 chars of the raw token).
-    private string? CurrentDevicePrefix =>
-        _token is null ? null : _token.Length <= 10 ? _token : _token[..10];
 
     public event Action? Changed;
 
@@ -126,14 +118,13 @@ public sealed class SyncAgent : IDisposable
         }
     }
 
-    /// <summary>Pulls the signed-in account, plan entitlements, and connected devices for the account card.</summary>
+    /// <summary>Pulls the signed-in account and plan entitlements for the account card.</summary>
     public async Task RefreshAccountAsync(CancellationToken ct = default)
     {
         if (!IsConnected)
         {
             Account = null;
             Entitlements = null;
-            Devices = [];
             Changed?.Invoke();
             return;
         }
@@ -141,14 +132,12 @@ public sealed class SyncAgent : IDisposable
         try
         {
             using var client = new ShelfboundClient(Settings.ServerUrl, _token!);
-            // Independent reads — run them together; each swallows its own failure and returns null/empty.
+            // Independent reads — run them together; each swallows its own failure and returns null.
             Task<AccountInfo?> account = client.GetAccountAsync(ct);
             Task<Entitlements?> entitlements = client.GetEntitlementsAsync(ct);
-            Task<IReadOnlyList<DeviceToken>> devices = client.GetDevicesAsync(ct);
-            await Task.WhenAll(account, entitlements, devices);
+            await Task.WhenAll(account, entitlements);
             Account = account.Result;
             Entitlements = entitlements.Result;
-            Devices = devices.Result;
         }
         catch (Exception ex)
         {
@@ -158,38 +147,19 @@ public sealed class SyncAgent : IDisposable
     }
 
     /// <summary>
-    /// Signs this device out: best-effort revokes its server-side token (so it can't be reused) and always
-    /// clears the local token, stopping auto-sync. Reconnecting mints a fresh token.
+    /// Signs this device out locally: clears the stored token and stops auto-sync. Reconnecting mints a
+    /// fresh token. Server-side revoke requires a cookie session (M-4); tokens expire at 90 days or can
+    /// be revoked from the web dashboard.
     /// </summary>
-    public async Task SignOutAsync()
+    public Task SignOutAsync()
     {
-        DeviceToken? current = FindCurrentDevice();
-        if (current is not null && _token is not null)
-        {
-            try
-            {
-                using var client = new ShelfboundClient(Settings.ServerUrl, _token);
-                await client.RevokeDeviceAsync(current.Id);
-            }
-            catch
-            {
-                // Revoke is best-effort — a network failure must not block the local sign-out below.
-            }
-        }
-
         TokenStore.Clear();
         _token = null;
         Account = null;
         Entitlements = null;
-        Devices = [];
         Log("Signed out.");
         Reschedule(); // IsConnected is now false → auto-sync timer is torn down.
-    }
-
-    private DeviceToken? FindCurrentDevice()
-    {
-        string? prefix = CurrentDevicePrefix;
-        return prefix is null ? null : Devices.FirstOrDefault(d => d.Prefix == prefix);
+        return Task.CompletedTask;
     }
 
     private void Reschedule()

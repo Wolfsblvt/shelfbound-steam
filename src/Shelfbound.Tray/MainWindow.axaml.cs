@@ -4,9 +4,6 @@ using Avalonia.Threading;
 
 namespace Shelfbound.Tray;
 
-/// <summary>A device row as shown in the account card: a title (with a "this device" marker) and a detail.</summary>
-public sealed record DeviceRow(string Title, string Detail);
-
 public partial class MainWindow : Window
 {
     private readonly SyncAgent _agent;
@@ -48,6 +45,7 @@ public partial class MainWindow : Window
         SyncButton.Click += async (_, _) => await _agent.SyncNowAsync();
         ConnectButton.Click += async (_, _) => await _agent.ConnectAsync();
         SignOutButton.Click += async (_, _) => await _agent.SignOutAsync();
+        ManageDevicesButton.Click += (_, _) => Browser.Open(_agent.Settings.WebAppUrl);
         UpdateRestartButton.Click += (_, _) => _update?.ApplyAndRestart();
         CheckUpdateButton.Click += (_, _) => { _ = _update?.CheckAsync(); };
         ReleaseNotesLink.PointerPressed += (_, _) => Browser.Open(AppInfo.ReleasesUrl);
@@ -128,14 +126,10 @@ public partial class MainWindow : Window
             ? $"{e.Plan} plan · up to {e.MaxDevices} {(e.MaxDevices == 1 ? "device" : "devices")}"
             : _agent.Account is null ? "Account details unavailable" : "Loading plan…";
 
-        Guid? currentId = _agent.CurrentDevice?.Id;
-        var rows = _agent.Devices
-            .Select(d => new DeviceRow(
-                d.Name + (d.Id == currentId ? "  (this device)" : ""),
-                d.LastUsedAt is { } lu ? $"synced {lu.LocalDateTime:MMM d}" : "not synced yet"))
-            .ToList();
-        DevicesList.ItemsSource = rows;
-        DevicesSection.IsVisible = rows.Count > 0;
+        string deviceName = _agent.Settings.DeviceName ?? Environment.MachineName;
+        ThisDeviceText.Text = $"This device: {deviceName}";
+        // TODO(dashboard): link directly to the device-management page once the dashboard UI ships.
+        DevicesSection.IsVisible = true;
     }
 
     private void RefreshUpdate()
