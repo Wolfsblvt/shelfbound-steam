@@ -123,8 +123,8 @@ here" rule, and it is being followed. Specifics:
 - **Finding (low): a public doc points into the private repo.** `mcp-design.md`'s "Planned" section
   links to a doc *path inside the private repo* by name. It leaks no secret, but a public reader cannot
   follow it and it needlessly names private structure. **Recommend:** describe the planned MCP tools
-  without the private-repo pointer (drop or reword the parenthetical). *(Follow-up, not fixed here — this
-  doc moves no code and edits nothing else.)*
+  without the private-repo pointer (drop or reword the parenthetical). *(Fixed 2026-07-02: the "Planned"
+  parenthetical now describes the tracking/taste layer without naming the private repo or its doc path.)*
 - **Not a leak (intended):** "the local Steam data is the moat" (in `PROJECT.md`) is public-safe framing
   — it states the open value proposition and reveals nothing about the private engine. Leave it.
 - **Not a leak (intended):** the tray's `localhost` server/web URLs are dev defaults; production URLs are

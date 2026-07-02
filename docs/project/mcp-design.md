@@ -39,7 +39,7 @@ instructions push the model to record useful facts whenever the user reveals the
 **Built:** `record_game_status`, `record_game_opinion` (rating + aspects), `set_game_completion`,
 `set_category_definition`, `remember`, plus `delete_memory` / `get_game_user_data` / `get_remembered`.
 
-**Planned (the tracking/taste layer — see `shelfbound-cloud/docs/project/tracking-and-taste.md`):**
+**Planned (the tracking/taste layer — advanced taste modelling and per-game review queues):**
 - `record_game_rating` (loved/liked/mixed/disliked/never_again) and `record_game_reasons` (default + custom
   **reason chips** — the "why", which matters more than the score).
 - `record_played_elsewhere` / `record_external_ownership` (platform = Switch/PS5/Epic/GOG/Game Pass…) — so
