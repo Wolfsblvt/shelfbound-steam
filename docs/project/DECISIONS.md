@@ -126,8 +126,7 @@ context whenever the user states an opinion/status/meaning. The deterministic pr
 the shared `ProfileQuery`; the model drives the conversation.
 
 ### Deferred (technical, recorded so it isn't re-litigated)
-- **Distribution** — the **tray agent** now ships via Velopack installers + GitHub Releases (see
-  "Packaging & distribution" below); still deferred: packaging the CLI/MCP server as a `dotnet tool`.
+- **Distribution** — resolved; see "Packaging & distribution" below (tray via Velopack, CLI/MCP as .NET tools).
 - **Modern dynamic collections** (leveldb) to complement the legacy categories already parsed.
 - **Steam Deck** specifics (SD-card install location) and a future **Decky plugin** that emits the
   same snapshot contract.
@@ -154,5 +153,13 @@ Windows (`Setup.exe`) and Linux (`AppImage`, self-contained `linux-x64` — the 
 publish to the tagged Release; the Linux upload runs after Windows so the Release already exists (avoids a
 create-release race). **macOS** builds an **unsigned** artifact for testers only — Gatekeeper blocks
 un-notarized apps, so public macOS distribution waits on an Apple Developer ID cert + notarization. Windows
-Authenticode signing is optional and gated on the `WINDOWS_CERT_*` CI secrets (unsigned otherwise). Branded
-installer icons (`.ico` / `.icns`) are a follow-up; Linux uses the existing tray PNG.
+Authenticode signing is optional and gated on the `WINDOWS_CERT_*` CI secrets (unsigned otherwise). Icons come
+from one `assets/icon.svg` source rasterized by `scripts/icons.ps1` (generate-and-commit, not per-build).
+
+### CLI + MCP distribution — .NET global tools via the existing NuGet (OIDC) flow
+The `shelfbound` CLI and `shelfbound-mcp` server are `PackAsTool` packages published to NuGet by the existing
+`nuget-publish.yml` (Trusted Publishing / OIDC, no stored key) on a `v*` tag — the same flow that ships the
+`Shelfbound.*` libraries, so no separate pipeline. They keep independent `.csproj` versions (they mature at a
+different rate than the tray). *Considered and rejected:* attaching nupkgs to GitHub Releases for manual
+`--add-source` installs (worse UX than `dotnet tool install -g`) and a dedicated tools workflow (redundant —
+`nuget-publish.yml` already packs every packable project).

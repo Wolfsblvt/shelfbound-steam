@@ -24,7 +24,7 @@ jobs:
     outputs:
       version: ${{ steps.v.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - id: v
         run: |
           ref='${{ github.ref_name }}'
@@ -43,8 +43,8 @@ jobs:
       run:
         shell: pwsh
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '10.0.x'
       - name: Install Velopack CLI
@@ -78,9 +78,11 @@ jobs:
           } else {
             Write-Host '::notice::No code-signing cert configured — producing an unsigned installer.'
           }
+          # Branded installer icon when generated (scripts/icons.ps1); Velopack's default otherwise.
+          if (Test-Path 'assets/icon.ico') { $packArgs += @('--icon', 'assets/icon.ico') }
           vpk @packArgs
       - name: Upload installer artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: shelfbound-tray-win-x64
           path: Releases/*Setup.exe
@@ -121,8 +123,8 @@ jobs:
     needs: [version, windows]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '10.0.x'
       - name: Install AppImage runtime dependency
@@ -147,7 +149,7 @@ jobs:
           --packTitle Shelfbound
           --icon src/Shelfbound.Tray/Assets/tray.png
       - name: Upload installer artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: shelfbound-tray-linux-x64
           path: Releases/*.AppImage
@@ -168,8 +170,8 @@ jobs:
     needs: version
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '10.0.x'
       - name: Install Velopack CLI
@@ -187,7 +189,7 @@ jobs:
           --mainExe Shelfbound.Tray
           --packTitle Shelfbound
       - name: Upload build artifact (unsigned — testing only)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: shelfbound-tray-osx-arm64-unsigned
           path: |

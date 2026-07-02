@@ -41,7 +41,16 @@ separate private repo. See [docs/project/PROJECT.md](docs/project/PROJECT.md) fo
 
 ## Quick start
 
-Requires the **.NET 10 SDK**.
+**Install as global tools** (published to NuGet on each release; requires the **.NET 10 runtime**):
+
+```bash
+dotnet tool install -g Shelfbound.Cli    # the `shelfbound` command
+dotnet tool install -g Shelfbound.Mcp    # the `shelfbound-mcp` server
+shelfbound setup                         # one-time: shows config + how to add an API key
+shelfbound scan --pretty
+```
+
+**Or run from source** (requires the **.NET 10 SDK**):
 
 ```bash
 dotnet build

@@ -94,10 +94,11 @@ the legacy file is stale for modern-UI users ([steam-collections.md](./steam-col
 
 Local-first — prove the data model locally before anything depends on it.
 
-1. **Distribution:** the **tray agent** ships as a **Velopack installer with self-update** from GitHub
-   Releases via the `Release Tray` workflow on a `tray-v*` tag — Windows (`Setup.exe`) and Linux
-   (`AppImage`) publish; macOS is an unsigned test artifact until it's notarized. Still to do: package the
-   CLI/MCP server as a `dotnet tool` + GitHub Releases so those can be installed too.
+1. **Distribution (mostly shipped):** the **tray agent** installs + self-updates via **Velopack** on a
+   `tray-v*` tag — Windows (`Setup.exe`) and Linux (`AppImage`); macOS is an unsigned test artifact until
+   notarized. The **CLI/MCP ship as .NET global tools** on NuGet (`dotnet tool install -g Shelfbound.Cli` /
+   `Shelfbound.Mcp`) via the `v*` tag publish. Process: [releasing.md](./releasing.md). Remaining: macOS
+   signing + notarization, and pointing the tray at production URLs before a public build.
 2. **Taste/profile depth:** user-data now merges into query results (filter by status/rating/completion);
    remaining — a "what Shelfbound remembers" review/edit view and optional metered LLM extraction.
 3. **Remaining local data:** Steam Deck SD-card awareness, Windows registry-based install discovery,
@@ -106,7 +107,8 @@ Local-first — prove the data model locally before anything depends on it.
 
 Done: local scanner, local categories (modern collections + legacy fallback), owned-not-installed +
 playtime (Steam Web API), the query engine (merging facts + user-data), the local MCP server (read +
-write tools), and the user-data store + identity seam.
+write tools), the user-data store + identity seam, the tray installer + self-update (Velopack), and the
+CLI/MCP packaged as .NET global tools.
 
 > Hosted and paid features (if any) are developed separately and are intentionally out of scope here.
 

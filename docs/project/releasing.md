@@ -18,6 +18,20 @@ The tray links to the Release notes in-app; a future website can render the same
 - **Distribution** — GitHub Releases (free, fits open-core; no extra hosting). The app updates via Velopack's
   `GithubSource`.
 
+## Before the first *public* release (deferrable)
+
+The tray builds, self-updates, and runs locally today. These are only needed before you hand installers to
+real users — safe to defer until then:
+
+- [ ] **Production URLs.** `AppSettings` defaults `ServerUrl`/`WebAppUrl` to `localhost`. Point them at the
+      real Shelfbound endpoints (or add a first-run config) before shipping — otherwise Connect/Sync do
+      nothing on an installed build. The URLs are hosted-product config, deliberately not hardcoded here.
+- [ ] **Windows code signing** (optional but removes SmartScreen warnings) — see [Signing](#signing).
+- [ ] **macOS signing + notarization** — required before macOS is public — see [Signing](#signing).
+- [ ] **Branded icons** — replace the placeholder — see [Icons](#icons).
+
+None block local use or a Windows/Linux beta.
+
 ## Cut a release
 
 1. **Land the work** on the branch, with `CHANGELOG.md`'s `[Unreleased]` section kept current as you go.
@@ -85,11 +99,33 @@ resolves the version (from the tag, else `Directory.Build.props`), then
   `docs/project/research/` and fold the decision here + into `DECISIONS.md`. Publishing to GitHub Releases
   uses the built-in `GITHUB_TOKEN` (no secret).
 
-## Icons (placeholder)
+## Icons
 
-The only in-repo asset is a 32×32 `src/Shelfbound.Tray/Assets/tray.png` (used for the Linux AppImage icon).
-A crisp installer needs a larger source: drop a ≥256×256 `icon.png` and pass `--icon icon.ico` (Windows) /
-`--icon icon.icns` (macOS) in the pack steps. Deferred until branded assets exist.
+**`assets/icon.svg` is the single source of truth** (a placeholder mark today; drop in branded artwork later,
+same filename). Neither Avalonia's tray icon nor the OS installers consume SVG directly — they need raster at
+fixed sizes — so we **generate-and-commit** the rasters rather than rasterize on every build (keeps CI free of
+an SVG toolchain, and macOS `.icns` needs macOS tooling anyway):
+
+```pwsh
+./scripts/icons.ps1        # requires ImageMagick; regenerates the raster icons from the SVG
+```
+
+That produces `src/Shelfbound.Tray/Assets/tray.png` (in-app icon), `assets/icon-256.png` (Linux AppImage),
+`assets/icon.ico` (Windows — auto-picked up by the pack step when present), and best-effort `assets/icon.icns`
+(prefer `iconutil` on a Mac for crisp results). Commit the regenerated files. Until they're generated the
+installers fall back to Velopack's default icon — nothing breaks.
+
+## CLI / MCP tools (separate release stream)
+
+The `shelfbound` CLI and `shelfbound-mcp` server ship as **.NET global tools**, published to NuGet by
+[`.github/workflows/nuget-publish.yml`](../../.github/workflows/nuget-publish.yml) on a **`v<version>`** tag
+(Trusted Publishing / OIDC — no stored API key). That workflow already packs every packable project; the
+tools are just `PackAsTool` projects, so a `v*` tag publishes them alongside the `Shelfbound.*` libraries.
+Their versions come from their own `.csproj` (`Shelfbound.Cli` 0.1.0, `Shelfbound.Mcp` 0.3.0), independent of
+the tray. Users install with `dotnet tool install -g Shelfbound.Cli` / `Shelfbound.Mcp`.
+
+> First publish of a new package id needs the nuget.org Trusted Publishing policy to cover it (the
+> `Shelfbound.*` prefix / `nuget` environment). Push is `--skip-duplicate`, so unchanged versions are no-ops.
 
 ## Rules to keep (every release)
 

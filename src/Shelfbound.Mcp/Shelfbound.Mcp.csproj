@@ -11,6 +11,12 @@
     <InvariantGlobalization>true</InvariantGlobalization>
     <PackageLicenseExpression>AGPL-3.0-or-later</PackageLicenseExpression>
     <Description>Shelfbound local MCP server: exposes the Steam library snapshot to AI tools over MCP (stdio).</Description>
+    <!-- Ship as a global tool: `dotnet tool install -g Shelfbound.Mcp` installs the `shelfbound-mcp` command.
+         Packed + pushed to NuGet by nuget-publish.yml on a v* tag. -->
+    <IsPackable>true</IsPackable>
+    <PackAsTool>true</PackAsTool>
+    <PackageId>Shelfbound.Mcp</PackageId>
+    <ToolCommandName>shelfbound-mcp</ToolCommandName>
   </PropertyGroup>
 
   <ItemGroup>

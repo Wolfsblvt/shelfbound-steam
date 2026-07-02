@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Shelfbound placeholder mark: indigo rounded square with a simple bookshelf. Single source of truth
+     for all app/installer icons — run scripts/icons.ps1 to (re)generate the raster formats. Replace with
+     branded artwork when available; keep the same filename so the pipeline picks it up. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect x="0" y="0" width="512" height="512" rx="120" fill="#6366f1"/>
+  <g fill="#ffffff">
+    <!-- book spines -->
+    <rect x="158" y="194" width="52" height="150" rx="10"/>
+    <rect x="230" y="162" width="52" height="182" rx="10"/>
+    <rect x="302" y="206" width="52" height="138" rx="10"/>
+    <!-- shelf -->
+    <rect x="136" y="344" width="240" height="28" rx="14"/>
+  </g>
+</svg>
