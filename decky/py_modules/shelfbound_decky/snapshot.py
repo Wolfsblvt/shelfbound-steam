@@ -1,0 +1,218 @@
+"""Builds a Shelfbound snapshot (contract v0.4.0) from a local Steam installation.
+
+Mirrors the C# SteamScanner (src/Shelfbound.Steam/Steam/SteamScanner.cs): same file
+walk, same fallbacks, same warning texts, same output shape. The snapshot dict is
+emitted in canonical field order with null/absent fields omitted — byte-compatible in
+spirit with SnapshotSerializer's camelCase / omit-null conventions.
+
+Known prototype divergences from the C# scanner (documented in the plugin README):
+- Modern Steam collections (Chromium leveldb) are NOT read; only the legacy
+  sharedconfig.vdf fallback. Categories may be stale or empty for modern-UI users.
+- No Steam Web API enrichment (owned-but-not-installed + playtime), so `stats.scope`
+  is always `installedOnly` and `playtimeMinutes` is never emitted.
+"""
+
+from __future__ import annotations
+
+import os
+import uuid
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+
+from . import SCHEMA_VERSION, TOOL_NAME
+from .steam_files import (
+    SteamAccount,
+    SteamLibraryFolder,
+    parse_app_manifest,
+    parse_library_folders,
+    parse_login_users,
+    parse_shared_config,
+)
+
+
+@dataclass
+class ScanOutput:
+    """A produced snapshot plus non-fatal warnings and local-only context.
+
+    `library_paths` (library index -> absolute filesystem path) exists ONLY for the
+    on-device storage view and privacy screen. It is never part of the snapshot —
+    the contract deliberately excludes filesystem paths.
+    """
+
+    snapshot: dict
+    warnings: list[str] = field(default_factory=list)
+    library_paths: dict[int, str] = field(default_factory=dict)
+
+
+def build_snapshot(
+    steam_root: str,
+    device: dict,
+    tool_version: str,
+    *,
+    now: datetime | None = None,
+    snapshot_id: str | None = None,
+) -> ScanOutput:
+    """Scans `steam_root` and assembles the versioned snapshot document."""
+    warnings: list[str] = []
+    folders = _read_libraries(steam_root, warnings)
+    accounts = _read_accounts(steam_root, warnings)
+    categories_by_app = _read_categories(steam_root, accounts, warnings)
+
+    games: list[dict] = []
+    libraries: list[dict] = []
+    library_paths: dict[int, str] = {}
+
+    for folder in folders:
+        library_paths[folder.index] = folder.path
+        count_in_library = 0
+        for app_id in folder.app_ids:
+            manifest_path = os.path.join(folder.path, "steamapps", f"appmanifest_{app_id}.acf")
+            if not os.path.isfile(manifest_path):
+                warnings.append(f"Missing manifest for app {app_id} in library {folder.index}.")
+                continue
+
+            try:
+                manifest = parse_app_manifest(_read_text(manifest_path))
+            except Exception as error:  # noqa: BLE001 — any bad manifest is a warning, never fatal
+                warnings.append(f"Failed to parse manifest for app {app_id}: {error}")
+                continue
+
+            game: dict = {
+                "appId": manifest.app_id,
+                "name": manifest.name,
+                "installed": manifest.is_fully_installed,
+                "libraryIndex": folder.index,
+            }
+            if manifest.install_dir is not None:
+                game["installDir"] = manifest.install_dir
+            if manifest.size_on_disk is not None:
+                game["sizeOnDiskBytes"] = manifest.size_on_disk
+            if manifest.last_updated is not None:
+                game["lastUpdated"] = manifest.last_updated.isoformat()
+            if manifest.last_played is not None:
+                game["lastPlayed"] = manifest.last_played.isoformat()
+            game["categories"] = list(categories_by_app.get(manifest.app_id, []))
+
+            games.append(game)
+            count_in_library += 1
+
+        libraries.append({
+            "index": folder.index,
+            "label": folder.label,
+            "gameCount": count_in_library,
+        })
+
+    created_at = now if now is not None else datetime.now(timezone.utc)
+    snapshot = {
+        "schemaVersion": SCHEMA_VERSION,
+        "snapshotId": snapshot_id or str(uuid.uuid4()),
+        "createdAt": created_at.isoformat(),
+        "source": {
+            "tool": TOOL_NAME,
+            "toolVersion": tool_version,
+            "platform": device["os"],
+        },
+        "device": device,
+        "steamAccounts": [_account_dict(account) for account in accounts],
+        "libraries": libraries,
+        "games": games,
+        "categories": _summarize_categories(categories_by_app),
+        "stats": {
+            "libraryCount": len(libraries),
+            "installedGameCount": sum(1 for game in games if game["installed"]),
+            "totalSizeOnDiskBytes": sum(game.get("sizeOnDiskBytes") or 0 for game in games),
+            # No Steam Web API enrichment in this producer — the game list is
+            # installed-only and absence must never imply non-ownership.
+            "scope": "installedOnly",
+        },
+    }
+
+    return ScanOutput(snapshot=snapshot, warnings=warnings, library_paths=library_paths)
+
+
+def _read_libraries(steam_root: str, warnings: list[str]) -> list[SteamLibraryFolder]:
+    library_folders_path = os.path.join(steam_root, "steamapps", "libraryfolders.vdf")
+    if os.path.isfile(library_folders_path):
+        return parse_library_folders(_read_text(library_folders_path))
+
+    warnings.append(
+        f"libraryfolders.vdf not found at '{library_folders_path}'; using the primary library only."
+    )
+    return [SteamLibraryFolder(index=0, path=steam_root, label="library-0", app_ids=())]
+
+
+def _read_accounts(steam_root: str, warnings: list[str]) -> list[SteamAccount]:
+    login_users = os.path.join(steam_root, "config", "loginusers.vdf")
+    if not os.path.isfile(login_users):
+        warnings.append("config/loginusers.vdf not found; no Steam accounts recorded.")
+        return []
+
+    try:
+        return parse_login_users(_read_text(login_users))
+    except Exception as error:  # noqa: BLE001
+        warnings.append(f"Failed to parse loginusers.vdf: {error}")
+        return []
+
+
+def _read_categories(
+    steam_root: str, accounts: list[SteamAccount], warnings: list[str]
+) -> dict[int, list[str]]:
+    """Reads local categories for the most-recent account that has them.
+
+    The C# scanner prefers the MODERN Steam collections (Chromium leveldb + snappy)
+    and falls back to the legacy sharedconfig.vdf. This prototype only implements the
+    legacy fallback — reimplementing the leveldb reader in dependency-free Python was
+    deliberately out of scope. Consumers still get a valid snapshot; categories may
+    just be stale for users who manage collections in the modern Steam UI.
+    """
+    if not accounts:
+        return {}
+
+    warnings.append(
+        "Modern Steam collections are not read by this prototype; categories come from "
+        "the legacy sharedconfig.vdf and may be stale or empty."
+    )
+
+    ordered = sorted(accounts, key=lambda account: 0 if account.most_recent else 1)
+    for account in ordered:
+        account_id = account.account_id
+        if account_id is None:
+            continue
+
+        path = os.path.join(steam_root, "userdata", str(account_id), "7", "remote", "sharedconfig.vdf")
+        if not os.path.isfile(path):
+            continue
+
+        try:
+            return parse_shared_config(_read_text(path))
+        except Exception as error:  # noqa: BLE001
+            warnings.append(f"Failed to parse sharedconfig.vdf for account {account_id}: {error}")
+
+    warnings.append("No categories found (legacy sharedconfig.vdf).")
+    return {}
+
+
+def _account_dict(account: SteamAccount) -> dict:
+    result: dict = {"steamId64": account.steam_id64}
+    if account.account_name is not None:
+        result["accountName"] = account.account_name
+    if account.persona_name is not None:
+        result["personaName"] = account.persona_name
+    result["mostRecent"] = account.most_recent
+    return result
+
+
+def _summarize_categories(categories_by_app: dict[int, list[str]]) -> list[dict]:
+    counts: dict[str, int] = {}
+    for categories in categories_by_app.values():
+        for name in categories:
+            counts[name] = counts.get(name, 0) + 1
+
+    # Count desc, then name asc (codepoint order — matches C# StringComparer.Ordinal).
+    ordered = sorted(counts.items(), key=lambda item: (-item[1], item[0]))
+    return [{"name": name, "gameCount": count} for name, count in ordered]
+
+
+def _read_text(path: str) -> str:
+    with open(path, "r", encoding="utf-8-sig", errors="replace") as handle:
+        return handle.read()

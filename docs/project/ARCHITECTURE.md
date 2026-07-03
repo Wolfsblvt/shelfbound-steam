@@ -8,9 +8,9 @@ How the core is built and why the boundaries are where they are. Code is the sou
 - **.NET (C#), targeting `net10.0`** for everything the maintainer controls — local core, CLI, tray
   app, and the local MCP server. Chosen for development speed in the maintainer's primary language and a
   **first-class official MCP SDK** (`ModelContextProtocol`, v1.0+, maintained with Microsoft).
-- Other languages only where a platform forces them: a future **Decky plugin** (Steam Deck) is
-  Python + React/TS by Decky's design. Such clients interoperate through the **snapshot JSON
-  contract**, not by sharing C# code.
+- Other languages only where a platform forces them: the **Decky plugin** (Steam Deck) is
+  Python + React/TS by Decky's design — a hardware-gated prototype lives in `decky/`. Such clients
+  interoperate through the **snapshot JSON contract**, not by sharing C# code.
 
 ## The keystone: the snapshot contract
 
@@ -66,6 +66,9 @@ tests/
                                    snappy/leveldb collections reader.
 schema/
   snapshot.v0.schema.json          The language-neutral contract.
+decky/
+  Steam Deck (Decky) plugin prototype — Python backend + React/TS panel emitting the same
+  snapshot contract. Own toolchain (pnpm/rollup + stdlib Python), hardware-gated; see decky/README.md.
 ```
 
 The whole repo is **AGPL-3.0-or-later** (single license; see [DECISIONS.md](./DECISIONS.md) and the

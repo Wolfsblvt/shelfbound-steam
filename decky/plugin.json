@@ -1,0 +1,11 @@
+{
+  "name": "Shelfbound",
+  "author": "Wolfsblvt",
+  "flags": ["debug"],
+  "api_version": 1,
+  "publish": {
+    "tags": ["library", "steam", "storage"],
+    "description": "Per-storage install view and privacy-first snapshot sync for your Steam library. Prototype — not submitted to the Decky store.",
+    "image": "https://opengraph.githubassets.com/1/Wolfsblvt/shelfbound-steam"
+  }
+}
