@@ -40,7 +40,7 @@ public sealed class SnapshotContext(ISteamWebApiClient steamWebApiClient, IUserD
             SnapshotDocument loaded = SnapshotSerializer.Deserialize(await File.ReadAllTextAsync(snapshotFile, cancellationToken));
             _snapshot = loaded;
             OwnerId = ResolveOwner(config, loaded);
-            LibraryReconciler.RecordFirstSeen(userDataStore, OwnerId, loaded.Games.Select(g => g.AppId));
+            LibraryReconciler.RecordFirstSeen(userDataStore, OwnerId, loaded.Games.Select(g => g.AppId), loaded.Stats.Scope);
             logger.LogInformation("Loaded snapshot from {File} ({Games} games).", snapshotFile, loaded.Games.Count);
             return;
         }
@@ -87,7 +87,7 @@ public sealed class SnapshotContext(ISteamWebApiClient steamWebApiClient, IUserD
         }
 
         _snapshot = snapshot;
-        LibraryReconciler.RecordFirstSeen(userDataStore, OwnerId, snapshot.Games.Select(g => g.AppId));
+        LibraryReconciler.RecordFirstSeen(userDataStore, OwnerId, snapshot.Games.Select(g => g.AppId), snapshot.Stats.Scope);
         logger.LogInformation("Snapshot ready: {Games} games, {Installed} installed, {Categories} categories (owner {Owner}).",
             snapshot.Games.Count, snapshot.Stats.InstalledGameCount, snapshot.Categories.Count, OwnerId);
     }

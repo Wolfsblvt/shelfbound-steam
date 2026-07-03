@@ -282,3 +282,35 @@ paths still are not).
 device-aware "fits on your SD card" / "free up space" recommendations — is a separate cloud task. Because
 the change is additive, cloud ingest keeps working untouched until it opts in; the cloud repo's schema
 copy just needs to follow the **0.5.0** bump.
+
+---
+
+## Recency correctness — newly-visible ≠ newly-added (2026-07-03)
+
+### First-observation is "added" only under a stable scan scope; a scope expansion baselines, not dates
+Steam exposes no purchase/added date, so Shelfbound infers "recently added" from when it **first observed
+a game owned**, relative to a once-set baseline (`UserProfile.FirstScanAt`). That holds only while the
+scan's *coverage* is stable. When coverage **widens** — an `installedOnly` baseline (no Steam Web API key)
+then a `fullLibrary` scan — previously-owned games become visible for the first time *after* the baseline
+and were falsely flagged "Added N days ago". This skewed the owner's own dev library: a stale narrow
+baseline made a later full scan look full of "new" games.
+
+Decision (**implemented**): the profile records the **widest scan scope observed so far**
+(`UserProfile.WidestScanScope`, a high-water mark; `LibraryScope` is ordered by increasing coverage). A
+scan broader than that mark **baselines** the games it reveals — stamps their first-seen at `FirstScanAt`
+rather than "now" — so a scope expansion never fires recency. Games first seen under a stable-or-narrower
+scope are genuine acquisitions and get the current timestamp; a real purchase after scope has stabilized
+at full still reads "Added N days ago". Steam can't distinguish a purchase made *during* a scope change
+from a pure reveal, so the rule errs conservative: **a missed novelty nudge beats a whole library falsely
+flagged**. The fix is entirely upstream in the first-seen derivation (`UserDataActions.RecordFirstSeen`
+plus the `SnapshotContext` ingest passing `stats.scope`); the consuming cloud signal (`RecentlyAddedSignal`,
+`LibraryGame.AddedAgo != null && unplayed → +3`) is unchanged.
+
+*Considered and rejected:* **freezing the first baseline's scope** instead of a high-water mark — every
+later full scan would then read as "broader than baseline" and wrongly baseline genuine purchases forever,
+breaking the real-acquisition case. **Gating recency at read time** on scope-stability — masks the symptom
+in one view without fixing stored data and suppresses legitimate post-baseline acquisitions. The additive
+`WidestScanScope` defaults to `installedOnly` (matching `SnapshotStats.Scope`), so a legacy profile
+lacking it never treats a later full scan as a wave of real purchases. For an already-skewed profile,
+`shelfbound profile --reset-recency` re-establishes the baseline from the current library (recency state
+only; ratings/statuses/memories untouched).
