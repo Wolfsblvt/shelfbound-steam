@@ -1,3 +1,5 @@
+using Shelfbound.Core.Model;
+
 namespace Shelfbound.Core.UserData;
 
 /// <summary>
@@ -23,6 +25,16 @@ public sealed record UserProfile
 
     /// <summary>First time each app id was observed owned — a proxy for when it was added/bought.</summary>
     public Dictionary<int, DateTimeOffset> FirstSeen { get; init; } = [];
+
+    /// <summary>
+    /// The widest scan coverage observed so far (a high-water mark). When a later scan is broader than
+    /// this (e.g. <see cref="LibraryScope.InstalledOnly"/> → <see cref="LibraryScope.FullLibrary"/>), the
+    /// previously-owned games it reveals are newly <em>visible</em>, not newly <em>added</em>, so they're
+    /// baselined instead of dated. Defaults to <see cref="LibraryScope.InstalledOnly"/> (the conservative
+    /// assumption, matching <see cref="Model.SnapshotStats.Scope"/>) so a legacy profile lacking this
+    /// field never treats a later full scan as a wave of genuine acquisitions.
+    /// </summary>
+    public LibraryScope WidestScanScope { get; set; } = LibraryScope.InstalledOnly;
 
     public DateTimeOffset CreatedAt { get; init; }
     public DateTimeOffset UpdatedAt { get; init; }

@@ -24,7 +24,7 @@ switch (args[0])
     case "setup":
         return RunSetup(args);
     case "profile":
-        return RunProfile();
+        return RunProfile(args);
     case "scan":
         return await RunScanAsync(args, version);
     case "upload":
@@ -387,8 +387,22 @@ static int RunSetup(string[] args)
 
 static string Mask(string value) => value.Length <= 4 ? "****" : new string('*', value.Length - 4) + value[^4..];
 
-static int RunProfile()
+static int RunProfile(string[] args)
 {
+    bool resetRecency = false;
+    for (int i = 1; i < args.Length; i++)
+    {
+        switch (args[i])
+        {
+            case "--reset-recency":
+                resetRecency = true;
+                break;
+            default:
+                Console.Error.WriteLine($"Unknown profile option '{args[i]}'.");
+                return 2;
+        }
+    }
+
     var config = ShelfboundConfig.Load();
     string? steamRoot = SteamInstallLocator.Locate();
     if (steamRoot is null)
@@ -408,7 +422,21 @@ static int RunProfile()
         ?? scan.Snapshot.SteamAccounts.FirstOrDefault();
     string ownerId = ProfileIdentity.Resolve(config, account?.SteamId64);
 
-    UserProfile profile = new JsonUserDataStore(ShelfboundPaths.ProfilesDirectory).Load(ownerId);
+    var store = new JsonUserDataStore(ShelfboundPaths.ProfilesDirectory);
+
+    // Recovery path: forget the "recently added" baseline so the next scan re-establishes it from the
+    // current library. Fixes a profile skewed by a scope change (owned games that a wider scan revealed
+    // as if newly added). Only touches recency state — ratings, statuses, and memories are untouched.
+    if (resetRecency)
+    {
+        store.Update(ownerId, profile => { UserDataActions.ResetRecencyBaseline(profile); return 0; });
+        Console.WriteLine($"Reset the 'recently added' baseline for profile {ownerId}.");
+        Console.WriteLine("The next scan (e.g. an MCP client connecting) re-establishes it: the current");
+        Console.WriteLine("library becomes the baseline, and only games added later count as new.");
+        return 0;
+    }
+
+    UserProfile profile = store.Load(ownerId);
     LibraryView view = LibraryViewBuilder.Build(scan.Snapshot, profile);
     ProfileSummary summary = ProfileQuery.Summarize(view);
 
@@ -483,9 +511,13 @@ static void PrintUsage()
 
         USAGE:
           shelfbound setup [--steam-api-key <key>] [--show]
-          shelfbound profile
+          shelfbound profile [--reset-recency]
           shelfbound scan [options]
           shelfbound upload [scan options] [--server <url>] [--token <tok>] [--watch] [--interval <sec>]
+
+        PROFILE OPTIONS:
+          --reset-recency        Clear the "recently added" baseline; the next scan re-establishes it
+                                 (use if a scope change made owned games look newly added)
 
         SCAN OPTIONS:
           --steam-path <dir>     Steam install root (else auto-detected / SHELFBOUND_STEAM_PATH)

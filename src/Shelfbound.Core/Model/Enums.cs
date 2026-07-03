@@ -49,6 +49,8 @@ public enum StorageKind
 /// the full owned library (including owned-but-not-installed games) requires Steam Web API enrichment.
 /// Consumers MUST treat <see cref="InstalledOnly"/> as "absence is not proof of non-ownership": a game
 /// missing from such a snapshot may simply be owned-but-not-installed, not un-owned.
+/// The values are ordered by increasing coverage, and recency baselining relies on that ordering to
+/// detect a scope expansion (see <c>UserDataActions.RecordFirstSeen</c>) — keep it monotonic.
 /// </summary>
 public enum LibraryScope
 {

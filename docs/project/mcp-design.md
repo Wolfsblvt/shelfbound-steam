@@ -63,6 +63,21 @@ alongside raw dates — models weight "3 days ago" over "2026-06-24". Steam expo
 becoming meaningful as the user keeps using Shelfbound. Last-played for owned-but-not-installed games
 comes from the Steam Web API (`rtime_last_played`).
 
+**Newly *visible* ≠ newly *added*.** First-observation is a good proxy for "added" only while the scan's
+coverage is stable. When it *widens* — an `installedOnly` baseline followed by a `fullLibrary` scan (a
+Steam Web API key added) — previously-owned games appear for the first time *after* the baseline, yet
+they were never newly acquired, only newly seen. So the profile records the **widest scan scope observed
+so far** (`UserProfile.WidestScanScope`, a high-water mark), and a scan broader than that **baselines**
+the games it reveals (stamps their first-seen at the baseline scan time) instead of dating them — they
+never read as "recently added". Only games first seen under a stable-or-narrower scope are treated as
+genuine acquisitions. Steam can't tell a purchase made *during* a scope change from a pure reveal, so
+this errs toward *not* crying "new" (a missed nudge beats a whole library falsely flagged). See
+[DECISIONS.md](./DECISIONS.md) → "Recency correctness — newly-visible ≠ newly-added".
+
+If a profile's baseline was skewed before this existed (a stale narrow baseline, then a full scan),
+`shelfbound profile --reset-recency` clears the baseline (scan time, per-app first-seen, widest scope) so
+the next scan re-establishes it from the current library — ratings, statuses, and memories are untouched.
+
 ## Steam deep links
 
 Game results include `steam://` **deep links** so the model can offer one-click access on a machine with
