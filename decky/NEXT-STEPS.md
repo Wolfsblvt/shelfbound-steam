@@ -43,25 +43,14 @@ behavior, token-never-in-frontend invariant, and pairing state transitions.
 
 ## Phase B — contract evolution (cross-producer, coordinate with the hosted side)
 
-**B1. Per-storage as contract data (additive, minor schema bump).** Today storage kind is UI-only
-by design. To make hosted device-aware views possible ("fits on your SD card", "free up space",
-cross-device installed-where), extend the snapshot additively — sketch:
-
-```jsonc
-"libraries": [{
-  "index": 0, "label": "…", "gameCount": 12,
-  "storage": {                    // optional, additive
-    "kind": "internal | sdCard | external | network | unknown",
-    "freeBytes": 123, "totalBytes": 456   // device facts, shown in the privacy preview
-  }
-}]
-```
-
-Producer duties: Decky classifies from the mount table (this repo's `storage.py`, hardware-validated
-first); desktop CLI/tray classify from drive info per OS. Consumers stay lenient. Requires the usual
-contract dance: `SnapshotSchema.Version` bump, `schema/snapshot.v0.schema.json`, `snapshot-schema.md`,
-C# model + serializer round-trip tests — then the plugin swaps its UI to read the contract field
-instead of classifying twice. **No paths, ever** — kind + sizes only.
+**B1. Per-storage as contract data — DONE (v0.5.0).** Shipped additively: optional `libraries[].storage`
+= `{ kind: internal|sdCard|external|network|unknown, freeBytes?, totalBytes? }`, emitted by both
+producers (C# `StorageClassifier` via `DriveInfo`; decky `storage.py` via the mount table, read back by
+the on-device panel instead of classifying twice). **No paths, ever** — kind + sizes only. See the
+DECISIONS entry "Snapshot contract — per-storage on libraries" and `docs/project/snapshot-schema.md`.
+*Remaining follow-up (separate cloud task):* the **hosted consumer** that ingests per-storage for
+device-aware "fits on your SD card" / "free up space" views — additive, so cloud ingest keeps working
+until it opts into the 0.5.0 field.
 
 ## Phase C — product polish (post-validation; order flexible)
 

@@ -20,7 +20,7 @@ this seam matters.
 
 ## Versioning
 
-`schemaVersion` (semver) is present in every document. Current: **`0.4.0`**.
+`schemaVersion` (semver) is present in every document. Current: **`0.5.0`**.
 
 - **Patch/minor:** additive, backward-compatible (new optional fields). Consumers ignore unknowns.
 - **Major:** breaking changes; consumers must branch on the major version.
@@ -28,7 +28,7 @@ this seam matters.
 Pre-1.0 the contract may still move; once hosted ingestion exists, changes go through versioned
 migrations. `SnapshotSchema.Version` is the single source of truth in code.
 
-## Document shape (v0.4.0)
+## Document shape (v0.5.0)
 
 | Field | Type | Notes |
 |---|---|---|
@@ -39,7 +39,8 @@ migrations. `SnapshotSchema.Version` is the single source of truth in code.
 | `device` | object | `id`, `name`, `type`, `os`, optional `specs` |
 | `device.specs?` | object | best-effort hardware: `cpu?`, `logicalCores?`, `totalMemoryBytes?`, `gpu?`, `osDescription?`, `architecture?` — device facts only, no identifiers/serials |
 | `steamAccounts[]` | array | `steamId64`, `accountName?`, `personaName?`, `mostRecent` |
-| `libraries[]` | array | `index`, `label`, `gameCount` — **no filesystem path** |
+| `libraries[]` | array | `index`, `label`, `gameCount`, optional `storage` — **no filesystem path** |
+| `libraries[].storage?` | object | `kind` (`internal`/`sdCard`/`external`/`network`/`unknown`), `freeBytes?`, `totalBytes?` — storage medium + capacity, **no path**. Producers emit `unknown` rather than guess |
 | `games[]` | array | see below |
 | `categories[]` | array | `name`, `gameCount` — the user's local collections vocabulary |
 | `stats` | object | `libraryCount`, `installedGameCount`, `totalSizeOnDiskBytes`, `scope` |
@@ -51,15 +52,17 @@ API), `lastUpdated?`, `lastPlayed?`, `categories[]` (the user's category names f
 Steam's tag order; empty if uncategorized).
 
 Enums: `osPlatform` = `unknown|windows|linux|macOs`; `deviceType` =
-`unknown|desktop|laptop|steamDeck|server`; `libraryScope` = `installedOnly|fullLibrary`.
+`unknown|desktop|laptop|steamDeck|server`; `libraryScope` = `installedOnly|fullLibrary`;
+`storageKind` = `internal|sdCard|external|network|unknown`.
 
 ## Privacy rules baked into the contract
 
 These are contract-level guarantees, not just scanner behavior (see
 [privacy-and-data.md](./privacy-and-data.md)):
 
-- **No full filesystem paths.** Libraries carry only `index` + `label`; games carry only the
-  relative `installDir` name. This keeps a snapshot safe-by-default even if later uploaded.
+- **No full filesystem paths.** Libraries carry only `index` + `label` (and an optional `storage`
+  medium kind + capacity, never a path); games carry only the relative `installDir` name. This keeps a
+  snapshot safe-by-default even if later uploaded.
 - **`device.id` is random and locally persisted** — not derived from hardware or account.
 - **No credentials, saves, screenshots, or arbitrary files** are ever represented.
 - `accountName` (the Steam login name) is included for local completeness but is a candidate for
@@ -79,7 +82,9 @@ The scanner emits **installed Steam games per library**, plus accounts, device i
 - **Owned-not-installed games + playtime** — populated only when a Steam Web API key is provided
   (`--steam-api-key` / `STEAM_WEB_API_KEY`). Without a key, only installed games are listed and
   `stats.scope` stays `installedOnly`; with a key it becomes `fullLibrary`.
-- **Per-device install nuance** (Steam Deck internal SSD vs SD card) and non-Steam shortcuts.
+- **Non-Steam shortcuts** and deeper per-device install nuance beyond the per-library `storage` kind +
+  free/total already in the contract (added additively in v0.5.0; classified per OS by the desktop
+  scanner and per mount-table by the decky plugin).
 
 When these land they extend the contract additively and bump the schema version.
 
@@ -87,13 +92,16 @@ When these land they extend the contract additively and bump the schema version.
 
 ```json
 {
-  "schemaVersion": "0.4.0",
+  "schemaVersion": "0.5.0",
   "snapshotId": "1b9d…",
   "createdAt": "2026-06-28T10:00:00+00:00",
   "source": { "tool": "shelfbound-cli", "toolVersion": "0.6.0", "platform": "windows" },
   "device": { "id": "b54997ab-…", "name": "GERALT", "type": "unknown", "os": "windows" },
   "steamAccounts": [ { "steamId64": "765611…", "personaName": "…", "mostRecent": true } ],
-  "libraries": [ { "index": 0, "label": "library-0", "gameCount": 11 } ],
+  "libraries": [
+    { "index": 0, "label": "library-0", "gameCount": 11,
+      "storage": { "kind": "internal", "freeBytes": 240000000000, "totalBytes": 1000000000000 } }
+  ],
   "games": [
     { "appId": 753640, "name": "Outer Wilds", "installed": true,
       "libraryIndex": 1, "installDir": "Outer Wilds", "sizeOnDiskBytes": 11652599956,

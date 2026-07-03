@@ -36,11 +36,12 @@ The snapshot is built to be **safe-by-default even if you later choose to share/
 [snapshot-schema.md](./snapshot-schema.md)):
 
 **Included:** Steam account id(s), app ids, game names, installed yes/no, library index + label,
-device name/type/os + best-effort hardware specs, relative install-dir name, sizes/timestamps,
+optional per-library storage kind (internal/SD/external/network) + free/total capacity, device
+name/type/os + best-effort hardware specs, relative install-dir name, sizes/timestamps,
 category/collection names, and a library-scope marker (installed-only vs full owned library).
 
 **Excluded:** passwords/credentials, save files, screenshots, arbitrary files, **full install
-paths**, library filesystem paths, install scripts, depot internals.
+paths**, library filesystem paths, mount points, device names, install scripts, depot internals.
 
 The device id is a **random GUID persisted locally** — not derived from hardware or account. The
 Steam login `accountName` is included for local completeness; treat the snapshot file as personal.

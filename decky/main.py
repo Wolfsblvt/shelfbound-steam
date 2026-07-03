@@ -22,7 +22,7 @@ if _PY_MODULES not in sys.path:
 
 import decky  # noqa: E402 — injected by Decky Loader at runtime
 from shelfbound_decky import SCHEMA_VERSION, TOOL_NAME, TOOL_VERSION  # noqa: E402
-from shelfbound_decky import device_identity, locator, overview, privacy, storage  # noqa: E402
+from shelfbound_decky import device_identity, locator, overview, privacy  # noqa: E402
 from shelfbound_decky.cloud import PairingUnavailableError, ShelfboundServer  # noqa: E402
 from shelfbound_decky.settings import SettingsStore, TokenStore  # noqa: E402
 from shelfbound_decky.snapshot import ScanOutput, build_snapshot  # noqa: E402
@@ -79,11 +79,10 @@ class Plugin:
 
     async def get_storage_overview(self) -> dict:
         try:
+            # The snapshot already carries per-library storage (kind + free/total); the
+            # overview just groups it for display — no second classification pass.
             scan = await asyncio.to_thread(self._scan)
-            mounts = await asyncio.to_thread(storage.read_mounts)
-            result = await asyncio.to_thread(
-                overview.build_storage_overview, scan.snapshot, scan.library_paths, mounts
-            )
+            result = await asyncio.to_thread(overview.build_storage_overview, scan.snapshot)
             return {"ok": True, **result, "warnings": scan.warnings}
         except Exception as error:  # noqa: BLE001
             return self._fail("get_storage_overview", error)

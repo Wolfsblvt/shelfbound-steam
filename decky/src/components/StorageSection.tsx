@@ -5,8 +5,9 @@ import { formatBytes } from "../format";
 
 /**
  * The Deck-specific view: installed games grouped by internal SSD vs microSD, with
- * free space and the biggest installs. All of this is on-device intelligence — none
- * of it is part of the uploaded snapshot.
+ * free space and the biggest installs. The storage kind + free/total come from the
+ * snapshot's per-library `storage` field (contract v0.5.0); the grouping and
+ * largest-installs are composed on-device for display. Filesystem paths never leave.
  */
 export function StorageSection() {
   const [overview, setOverview] = useState<StorageOverviewResponse | null>(null);

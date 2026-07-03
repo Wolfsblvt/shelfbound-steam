@@ -1,10 +1,10 @@
 """Per-storage classification for Steam libraries — the Deck-specific signal.
 
 Answers "is this library on the internal SSD, the microSD card, or an external
-drive?" from /proc/mounts plus path heuristics. This is UI-ONLY intelligence: the
-snapshot contract (v0.4.0, additionalProperties: false) has no per-storage fields, so
-none of this is ever uploaded. When the contract later grows per-storage detail it
-goes through normal schema evolution (see the plugin README).
+drive?" from /proc/mounts plus path heuristics. Since contract v0.5.0 this feeds the
+snapshot's optional `libraries[].storage` field (via `classify_storage`) as well as
+the on-device panel view — the classification runs once, here. Only the kind + free/
+total bytes leave the device; the filesystem path never does.
 
 Classification is a pure function over mount-table text so it is testable off-Deck.
 [NEEDS-DECK] The heuristics encode expected SteamOS behaviour (SD card = mmcblk
@@ -18,19 +18,30 @@ from __future__ import annotations
 import os
 import posixpath
 from dataclasses import dataclass
+from typing import Callable
 
-# Storage kinds (UI vocabulary, NOT snapshot contract values).
+# Storage kinds — the snapshot contract's `storageKind` vocabulary
+# (schema/snapshot.v0.schema.json). The Deck classifier produces internal/sdCard/
+# external/network/unknown; the desktop (C#) producer emits the same set.
 INTERNAL = "internal"
 SD_CARD = "sdCard"
 EXTERNAL = "external"
+NETWORK = "network"
 UNKNOWN = "unknown"
 
 STORAGE_LABELS = {
     INTERNAL: "Internal SSD",
     SD_CARD: "microSD card",
     EXTERNAL: "External drive",
+    NETWORK: "Network drive",
     UNKNOWN: "Unknown storage",
 }
+
+# Linux network filesystem types — a library on one of these is `network` regardless
+# of its backing device name.
+NETWORK_FS_TYPES = frozenset({
+    "nfs", "nfs4", "cifs", "smb", "smb3", "smbfs", "afs", "ncpfs", "9p", "fuse.sshfs",
+})
 
 
 @dataclass(frozen=True)
@@ -83,6 +94,8 @@ def classify_library_path(path: str, mounts: list[MountEntry], home: str | None 
     """Storage kind for a Steam library path. Pure; pass mount text + home explicitly in tests."""
     entry = find_mount(path, mounts)
     if entry is not None:
+        if entry.fs_type in NETWORK_FS_TYPES:
+            return NETWORK
         kind = classify_block_device(entry.device)
         if kind != UNKNOWN:
             return kind
@@ -114,6 +127,26 @@ def storage_usage(path: str) -> tuple[int, int] | None:
     except (AttributeError, OSError):
         return None
     return (stats.f_bavail * stats.f_frsize, stats.f_blocks * stats.f_frsize)
+
+
+def classify_storage(
+    path: str,
+    mounts: list[MountEntry],
+    *,
+    usage_fn: Callable[[str], tuple[int, int] | None] = storage_usage,
+    home: str | None = None,
+) -> dict:
+    """Builds the contract `libraries[].storage` object for a local library path.
+
+    Returns the storage kind plus best-effort free/total bytes. Sizes are omitted (not
+    written as null) when unavailable, matching the snapshot's omit-null convention.
+    Never includes the path — kind + sizes only.
+    """
+    result: dict = {"kind": classify_library_path(path, mounts, home)}
+    usage = usage_fn(path)
+    if usage is not None:
+        result["freeBytes"], result["totalBytes"] = usage
+    return result
 
 
 def _is_within(path: str, ancestor: str) -> bool:

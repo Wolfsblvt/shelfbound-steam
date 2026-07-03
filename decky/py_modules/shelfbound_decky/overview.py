@@ -1,29 +1,21 @@
 """Per-storage overview for the panel UI — internal SSD vs microSD at a glance.
 
-Composes the snapshot with local-only context (library paths, mount table, free
-space) into the view the Deck panel shows. Everything here is UI-only: none of it is
-part of the snapshot or ever uploaded.
+Groups the snapshot's libraries and installed games by the storage kind + free space
+the contract now carries (`libraries[].storage`, since v0.5.0) — the classification is
+done once, in the snapshot producer, and read here. The grouping, largest-installs, and
+labels are on-device presentation composed from that already-uploaded data.
 """
 
 from __future__ import annotations
 
-from typing import Callable
-
 from . import storage
-from .storage import STORAGE_LABELS, MountEntry
+from .storage import STORAGE_LABELS
 
-_KIND_ORDER = [storage.INTERNAL, storage.SD_CARD, storage.EXTERNAL, storage.UNKNOWN]
+_KIND_ORDER = [storage.INTERNAL, storage.SD_CARD, storage.EXTERNAL, storage.NETWORK, storage.UNKNOWN]
 _LARGEST_GAMES_SHOWN = 3
 
 
-def build_storage_overview(
-    snapshot: dict,
-    library_paths: dict[int, str],
-    mounts: list[MountEntry],
-    *,
-    usage_fn: Callable[[str], tuple[int, int] | None] = storage.storage_usage,
-    home: str | None = None,
-) -> dict:
+def build_storage_overview(snapshot: dict) -> dict:
     """Groups the snapshot's libraries and installed games by storage kind."""
     games_by_library: dict[int, list[dict]] = {}
     for game in snapshot.get("games", []):
@@ -34,12 +26,12 @@ def build_storage_overview(
     groups: dict[str, dict] = {}
     for library in snapshot.get("libraries", []):
         index = library["index"]
-        path = library_paths.get(index)
-        kind = storage.classify_library_path(path, mounts, home) if path else storage.UNKNOWN
+        storage_info = library.get("storage") or {}
+        kind = storage_info.get("kind", storage.UNKNOWN)
 
         group = groups.setdefault(kind, {
             "kind": kind,
-            "label": STORAGE_LABELS[kind],
+            "label": STORAGE_LABELS.get(kind, STORAGE_LABELS[storage.UNKNOWN]),
             "libraries": [],
             "gameCount": 0,
             "installedGameCount": 0,
@@ -59,10 +51,9 @@ def build_storage_overview(
         group["sizeOnDiskBytes"] += sum(game.get("sizeOnDiskBytes") or 0 for game in games)
         group["games"].extend(games)
 
-        if group["freeBytes"] is None and path:
-            usage = usage_fn(path)
-            if usage is not None:
-                group["freeBytes"], group["totalBytes"] = usage
+        if group["freeBytes"] is None and storage_info.get("freeBytes") is not None:
+            group["freeBytes"] = storage_info["freeBytes"]
+            group["totalBytes"] = storage_info.get("totalBytes")
 
     storages = []
     for kind in _KIND_ORDER:

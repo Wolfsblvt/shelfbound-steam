@@ -23,6 +23,28 @@ public enum DeviceType
 }
 
 /// <summary>
+/// The kind of storage medium a Steam library sits on. Enables device-aware views ("fits on your SD
+/// card", "free up space") without ever exposing a filesystem path. Producers emit <see cref="Unknown"/>
+/// when the OS can't tell the medium apart (e.g. SD-vs-USB on a desktop card reader) — they never guess.
+/// </summary>
+public enum StorageKind
+{
+    Unknown = 0,
+
+    /// <summary>Internal fixed drive (the machine's built-in SSD/HDD).</summary>
+    Internal,
+
+    /// <summary>Removable SD/microSD/eMMC card — the Steam Deck's expansion slot.</summary>
+    SdCard,
+
+    /// <summary>External/removable drive (e.g. a USB SSD or stick).</summary>
+    External,
+
+    /// <summary>Network-mounted storage (NFS/SMB and similar).</summary>
+    Network,
+}
+
+/// <summary>
 /// How complete a snapshot's game list is. A local scan only sees the games installed on this device;
 /// the full owned library (including owned-but-not-installed games) requires Steam Web API enrichment.
 /// Consumers MUST treat <see cref="InstalledOnly"/> as "absence is not proof of non-ownership": a game

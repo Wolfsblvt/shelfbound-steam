@@ -1,5 +1,11 @@
 from shelfbound_decky import storage
-from shelfbound_decky.storage import MountEntry, classify_library_path, find_mount, parse_proc_mounts
+from shelfbound_decky.storage import (
+    MountEntry,
+    classify_library_path,
+    classify_storage,
+    find_mount,
+    parse_proc_mounts,
+)
 
 # A realistic SteamOS mount table (trimmed): rootfs + /home on nvme, SD card on mmcblk.
 DECK_MOUNTS = """\
@@ -54,3 +60,28 @@ def test_fallbacks_without_mount_table():
     assert classify_library_path("/run/media/mmcblk0p1/lib", [], "/home/deck") == storage.SD_CARD
     assert classify_library_path("/run/media/deck/Card/lib", [], "/home/deck") == storage.EXTERNAL
     assert classify_library_path("/mnt/somewhere", [], "/home/deck") == storage.UNKNOWN
+
+
+def test_network_filesystem_classified_as_network():
+    # fs_type wins over the device-name heuristic — a network share is `network`.
+    entries = [MountEntry("//nas/games", "/mnt/nas", "cifs")]
+    assert classify_library_path("/mnt/nas/steamlib", entries, "/home/deck") == storage.NETWORK
+
+
+def test_classify_storage_emits_contract_dict_with_sizes():
+    entries = mounts()
+    result = classify_storage(
+        "/run/media/mmcblk0p1/steamlib",
+        entries,
+        usage_fn=lambda _: (10_000, 50_000),
+        home="/home/deck",
+    )
+    assert result == {"kind": "sdCard", "freeBytes": 10_000, "totalBytes": 50_000}
+
+
+def test_classify_storage_omits_sizes_when_usage_unavailable():
+    # os.statvfs is unavailable on Windows dev machines -> sizes omitted, never null.
+    result = classify_storage(
+        "/home/deck/.local/share/Steam", mounts(), usage_fn=lambda _: None, home="/home/deck"
+    )
+    assert result == {"kind": "internal"}

@@ -1,10 +1,13 @@
 from shelfbound_decky.overview import build_storage_overview
-from shelfbound_decky.storage import MountEntry
 
+# The snapshot now carries per-library storage (kind + free/total); the overview reads
+# it directly instead of re-classifying from paths + a mount table.
 SNAPSHOT = {
     "libraries": [
-        {"index": 0, "label": "library-0", "gameCount": 2},
-        {"index": 1, "label": "SD Card", "gameCount": 2},
+        {"index": 0, "label": "library-0", "gameCount": 2,
+         "storage": {"kind": "internal", "freeBytes": 111, "totalBytes": 999}},
+        {"index": 1, "label": "SD Card", "gameCount": 2,
+         "storage": {"kind": "sdCard", "freeBytes": 10_000, "totalBytes": 50_000}},
     ],
     "games": [
         {"appId": 1, "name": "Small", "installed": True, "libraryIndex": 0, "sizeOnDiskBytes": 100},
@@ -14,22 +17,9 @@ SNAPSHOT = {
     ],
 }
 
-LIBRARY_PATHS = {0: "/home/deck/.local/share/Steam", 1: "/run/media/mmcblk0p1/steamlib"}
-
-MOUNTS = [
-    MountEntry("/dev/nvme0n1p8", "/home", "ext4"),
-    MountEntry("/dev/mmcblk0p1", "/run/media/mmcblk0p1", "ext4"),
-]
-
-
-def fake_usage(path):
-    return (10_000, 50_000) if "mmcblk" in path else (111, 999)
-
 
 def test_groups_by_storage_kind_with_usage_and_largest():
-    result = build_storage_overview(
-        SNAPSHOT, LIBRARY_PATHS, MOUNTS, usage_fn=fake_usage, home="/home/deck"
-    )
+    result = build_storage_overview(SNAPSHOT)
 
     kinds = [group["kind"] for group in result["storages"]]
     assert kinds == ["internal", "sdCard"]  # fixed display order
@@ -45,7 +35,23 @@ def test_groups_by_storage_kind_with_usage_and_largest():
     assert (sd["freeBytes"], sd["totalBytes"]) == (10_000, 50_000)
 
 
-def test_missing_path_goes_to_unknown():
-    result = build_storage_overview(SNAPSHOT, {0: "/home/deck/x"}, [], usage_fn=lambda _: None, home="/home/deck")
+def test_missing_storage_field_falls_back_to_unknown():
+    # A lenient consumer: a library without a storage field groups under "unknown".
+    snapshot = {
+        "libraries": [
+            {"index": 0, "label": "library-0", "gameCount": 1, "storage": {"kind": "internal"}},
+            {"index": 1, "label": "mystery", "gameCount": 1},  # no storage field at all
+        ],
+        "games": [
+            {"appId": 1, "name": "A", "installed": True, "libraryIndex": 0, "sizeOnDiskBytes": 100},
+            {"appId": 2, "name": "B", "installed": True, "libraryIndex": 1, "sizeOnDiskBytes": 200},
+        ],
+    }
+
+    result = build_storage_overview(snapshot)
     kinds = {group["kind"] for group in result["storages"]}
     assert kinds == {"internal", "unknown"}
+
+    unknown = next(group for group in result["storages"] if group["kind"] == "unknown")
+    assert unknown["label"] == "Unknown storage"
+    assert unknown["freeBytes"] is None  # no sizes available for an unclassified library

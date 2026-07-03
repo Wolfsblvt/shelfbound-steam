@@ -54,7 +54,8 @@ The local Steam data is the moat. AI reasoning is commodity; good structured fac
 ## Current status
 
 **Implemented (local core):**
-- Snapshot contract `v0.4.0` (`schema/snapshot.v0.schema.json`, models in `Shelfbound.Core`).
+- Snapshot contract `v0.5.0` (`schema/snapshot.v0.schema.json`, models in `Shelfbound.Core`) — adds
+  optional per-library `storage` (medium kind + free/total, no path).
 - Local Steam scanner (`Shelfbound.Steam`): install discovery, `libraryfolders.vdf`,
   `appmanifest_*.acf`, `loginusers.vdf`, **local categories** — modern Steam collections (a hand-rolled
   Chromium-leveldb reader) with the legacy `sharedconfig.vdf` as fallback — and a minimal VDF parser.

@@ -71,7 +71,18 @@
         "properties": {
           "index": { "type": "integer" },
           "label": { "type": "string", "description": "Library label; full filesystem path is deliberately omitted." },
-          "gameCount": { "type": "integer", "minimum": 0 }
+          "gameCount": { "type": "integer", "minimum": 0 },
+          "storage": {
+            "type": "object",
+            "additionalProperties": false,
+            "description": "Optional storage-medium facts for this library (additive, >= 0.5.0). Kind + sizes only; the filesystem path is never included.",
+            "required": ["kind"],
+            "properties": {
+              "kind": { "$ref": "#/$defs/storageKind" },
+              "freeBytes": { "type": "integer", "minimum": 0, "description": "Free space in bytes on the backing filesystem (best-effort; absent when unavailable)." },
+              "totalBytes": { "type": "integer", "minimum": 0, "description": "Total capacity in bytes of the backing filesystem (best-effort; absent when unavailable)." }
+            }
+          }
         }
       }
     },
@@ -127,6 +138,11 @@
   "$defs": {
     "osPlatform": { "type": "string", "enum": ["unknown", "windows", "linux", "macOs"] },
     "deviceType": { "type": "string", "enum": ["unknown", "desktop", "laptop", "steamDeck", "server"] },
+    "storageKind": {
+      "type": "string",
+      "enum": ["internal", "sdCard", "external", "network", "unknown"],
+      "description": "Storage-medium kind for a library. 'unknown' when the OS can't determine it (e.g. SD-vs-USB on a desktop card reader, an unknown bus) — producers emit 'unknown' rather than guess."
+    },
     "libraryScope": {
       "type": "string",
       "enum": ["installedOnly", "fullLibrary"],
