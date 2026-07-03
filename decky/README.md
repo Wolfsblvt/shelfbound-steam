@@ -9,7 +9,8 @@ the signal desktop can't see), a **privacy preview** of exactly what a sync woul
 > **never run on a real Steam Deck**. Nothing here is a public claim of Deck support; per the
 > project's device posture, public language stays "SteamOS devices" until real hardware validates
 > the path. Not submitted to the Decky store. See
-> [Needs a real Steam Deck](#needs-a-real-steam-deck-to-validate).
+> [Needs a real Steam Deck](#needs-a-real-steam-deck-to-validate); the designed follow-up work is
+> in [NEXT-STEPS.md](./NEXT-STEPS.md).
 
 ## What it is (and deliberately isn't)
 
