@@ -109,6 +109,7 @@ The whole repository is licensed **AGPL-3.0-or-later** (see [License](#license))
 | `src/Shelfbound.Cli` | The `shelfbound` command-line tool (setup/scan/profile/upload). |
 | `src/Shelfbound.Tray` | The cross-platform tray app (Avalonia): background sync, status, and account connect. |
 | `src/Shelfbound.Mcp` | The `shelfbound-mcp` local MCP server. |
+| `decky/` | Steam Deck (Decky) plugin **prototype** — own Python/TS toolchain, emits the same snapshot contract. Hardware-gated; see [decky/README.md](decky/README.md). |
 | `tests/…` | Unit + integration tests. |
 
 ## Documentation

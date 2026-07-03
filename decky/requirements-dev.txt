@@ -1,0 +1,5 @@
+# Dev/test-only. The plugin runtime is pure stdlib — never add runtime pip deps casually
+# (Decky plugins ship self-contained; the store review is audit-minded).
+pytest>=8
+jsonschema>=4.21
+rfc3339-validator>=0.1.4

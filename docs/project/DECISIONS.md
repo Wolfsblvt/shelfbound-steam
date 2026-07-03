@@ -214,3 +214,41 @@ accept Bearer and are unaffected.
 
 *Considered:* keeping a best-effort revoke call on sign-out (would swallow the 403 silently). Rejected — cleaner
 to be explicit about local-only rather than pretend the revoke might succeed.
+
+---
+
+## Decky plugin — exploratory prototype (2026-07-03)
+
+### Built as a thin controller on a prototype branch; hardware-gated, no public claims
+
+The device plan sequences a Decky plugin only after the tray/CLI path is boringly reliable. This
+prototype (`decky/`, branch `feat/decky-prototype`) de-risks that future build without waiting: a
+runnable-in-theory plugin (React/TS quick-access panel + stdlib-Python backend) that emits the
+standard snapshot contract. It has **never run on a real Steam Deck**; it exists to make the real
+build cheap and the unknowns explicit — `decky/README.md` carries the needs-hardware validation list.
+
+**Decisions (implemented):**
+
+- **One producer contract, enforced by test.** The Python backend mirrors the C# scanner
+  (VDF semantics, fallbacks, warning texts), and the emitted snapshot is validated against the
+  **unmodified** `schema/snapshot.v0.schema.json` in an off-Deck pytest suite (44 tests). No forked
+  data model, `source.tool: "shelfbound-decky"`.
+- **Per-storage intelligence stays UI-only.** Internal-SSD vs microSD classification, free space,
+  and library paths are shown on-device and never uploaded (`additionalProperties: false` would
+  reject invented fields anyway). Per-storage contract fields arrive later via normal additive
+  schema evolution, not by prototype fiat.
+- **Shared device identity.** The plugin reuses the CLI's `~/.config/Shelfbound/device-id`, so
+  desktop-mode and Gaming-Mode syncs from the same Deck stay one device.
+- **Pairing-code claim (proposed endpoints), not loopback OAuth.** `POST /devices/pair` +
+  `/devices/pair/poll` are sketched in `cloud.py` and the plugin UI; against today's server it
+  honestly reports "pairing not available" rather than faking success. The device token lives 0600
+  in the Decky settings dir, never crosses to the frontend; disconnect is local-only (post-M-4
+  posture, same as the tray).
+- **No root, no background work, no runtime pip deps.** Scans/uploads are user-triggered only; the
+  backend is auditable stdlib. The **modern-collections (leveldb) reader was deliberately cut** —
+  legacy `sharedconfig.vdf` only, flagged by a snapshot warning — the biggest known gap, decided
+  rather than hidden.
+
+*Considered:* shelling out to the .NET CLI from the plugin instead of a native Python scan path (the
+feasibility research weighs both). Deferred, not rejected — the prototype favors a self-contained
+scan; the CLI shell-out gets a fair look once a real Deck exposes the actual runtime constraints.

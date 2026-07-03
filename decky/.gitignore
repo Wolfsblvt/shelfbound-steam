@@ -1,0 +1,19 @@
+# Build output
+dist/
+
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Python
+__pycache__/
+.pytest_cache/
+.venv/
+
+# Decky CLI (vendored per-machine, never committed)
+out/
+cli/
+
+# Editors / OS
+.DS_Store
+Thumbs.db
