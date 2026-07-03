@@ -18,16 +18,16 @@ This is a **thin controller** over the same open core everything else uses — a
 not a second scanner architecture:
 
 - **One producer contract.** The backend emits the standard versioned snapshot
-  ([`schema/snapshot.v0.schema.json`](../schema/snapshot.v0.schema.json), currently **0.4.0**) with
+  ([`schema/snapshot.v0.schema.json`](../schema/snapshot.v0.schema.json), currently **0.5.0**) with
   `source.tool: "shelfbound-decky"`. Same shape the CLI/tray produce; no forked data model, no
   special ingest path. The scanner code deliberately mirrors the C# reference
   (`src/Shelfbound.Steam`) file-for-file: same VDF semantics (case-insensitive keys, last-wins),
   same fallbacks, same warning texts.
-- **Per-storage intelligence stays UI-only.** The contract has no per-storage fields (and
-  `additionalProperties: false` would reject invented ones), so internal-vs-SD classification,
-  free space, and library paths are shown **on-device only** and never uploaded. When per-storage
-  detail becomes contract-worthy it goes through normal schema evolution — e.g. an additive
-  `libraries[].storage` object — like every other producer change.
+- **Per-storage is a contract field; paths are not.** As of contract **v0.5.0** each library carries
+  an optional `storage` object — medium kind (internal/sdCard/external/network/unknown) + free/total
+  bytes — classified from the mount table and emitted like every other producer's storage data. The
+  on-device panel reads that same field (classified once, not twice). Library **paths** stay a
+  local-only side channel and are **never** uploaded — kind + sizes only.
 - **One device identity.** The backend reuses the CLI's persisted random device id
   (`~/.config/Shelfbound/device-id`), so a Deck that synced from desktop mode and from Gaming Mode
   stays *one* device. The id is random, never derived from hardware.
@@ -49,8 +49,8 @@ decky/
     locator.py              Steam-root discovery (Linux/SteamOS candidates + env override)
     device_identity.py      Shared device-id, Deck detection, best-effort specs
     snapshot.py             Snapshot builder — the contract emitter (mirrors SteamScanner)
-    storage.py              /proc/mounts parsing + internal/sdCard/external classification (UI-only)
-    overview.py             Per-storage panel view (games, sizes, free space, largest installs)
+    storage.py              /proc/mounts parsing + storage classification → contract `storage` field
+    overview.py             Per-storage panel view (reads the contract field; groups games, sizes, largest)
     privacy.py              Privacy preview payload (real upload body + summary)
     cloud.py                HTTP client: /ingest, /auth/me, /auth/entitlements + PROPOSED pairing
     settings.py             Plugin settings + 0600 token store (Decky settings dir)
@@ -149,6 +149,6 @@ packaging/deploy loop is unverified from this monorepo subdirectory.
 
 Same hard rules as the core ([privacy-and-data.md](../docs/project/privacy-and-data.md)): only
 Steam library metadata is read; the privacy preview shows the **real upload body** before anything
-is sent; no filesystem paths, credentials, saves, screenshots, or serials — and the Deck-only
-storage detail (which drive, free space) is explicitly **never** uploaded. License:
-AGPL-3.0-or-later (whole repo).
+is sent; no filesystem paths, credentials, saves, screenshots, or serials. Per-library storage kind
+and free/total capacity **are** part of the snapshot (contract v0.5.0), but the drive **path**, mount
+points, and device names are never included. License: AGPL-3.0-or-later (whole repo).

@@ -233,10 +233,11 @@ build cheap and the unknowns explicit — `decky/README.md` carries the needs-ha
   (VDF semantics, fallbacks, warning texts), and the emitted snapshot is validated against the
   **unmodified** `schema/snapshot.v0.schema.json` in an off-Deck pytest suite (44 tests). No forked
   data model, `source.tool: "shelfbound-decky"`.
-- **Per-storage intelligence stays UI-only.** Internal-SSD vs microSD classification, free space,
-  and library paths are shown on-device and never uploaded (`additionalProperties: false` would
-  reject invented fields anyway). Per-storage contract fields arrive later via normal additive
-  schema evolution, not by prototype fiat.
+- **Per-storage intelligence: UI-only in the prototype, now an additive contract field.** The
+  prototype classified internal-SSD vs microSD + free space on-device only (`additionalProperties:
+  false` rejected invented fields); library **paths** remain a local-only side channel and are never
+  uploaded. The per-storage contract fields it anticipated landed additively in **v0.5.0** (kind +
+  free/total, still no path) — see "Snapshot contract — per-storage on libraries" below.
 - **Shared device identity.** The plugin reuses the CLI's `~/.config/Shelfbound/device-id`, so
   desktop-mode and Gaming-Mode syncs from the same Deck stay one device.
 - **Pairing-code claim (proposed endpoints), not loopback OAuth.** `POST /devices/pair` +
@@ -252,3 +253,32 @@ build cheap and the unknowns explicit — `decky/README.md` carries the needs-ha
 *Considered:* shelling out to the .NET CLI from the plugin instead of a native Python scan path (the
 feasibility research weighs both). Deferred, not rejected — the prototype favors a self-contained
 scan; the CLI shell-out gets a fair look once a real Deck exposes the actual runtime constraints.
+
+---
+
+## Snapshot contract — per-storage on libraries (2026-07-03)
+
+### `libraries[].storage` added additively (v0.5.0) — kind + free/total, never a path
+Storage medium + free space is device intelligence the hosted side can't see, and a wedge on two
+devices: the **Steam Deck** (internal SSD vs microSD — "fits on your SD card", "free up space") and the
+**PC** (internal vs external/network, for the tray). The decky prototype already classified storage but
+kept it UI-only because `additionalProperties: false` rejected invented fields. Decision
+(**implemented**): extend the snapshot **additively** with optional `libraries[].storage` =
+`{ kind: internal|sdCard|external|network|unknown, freeBytes?, totalBytes? }`, bump
+`SnapshotSchema.Version` 0.4.0 → **0.5.0** (minor/additive, `additionalProperties: false` preserved),
+and have **both producers emit it**: the C# desktop scanner (`StorageClassifier` over
+`DriveInfo.DriveType` + free/total per library path, covering CLI/tray/MCP through the shared
+`SteamScanner`) and the decky plugin (`storage.py` mount-table classification), which now emits into the
+contract and reads it back for the on-device panel **instead of classifying twice**. Old snapshots
+without `storage` still validate; consumers stay lenient.
+
+**No paths, ever** — kind + sizes only (a path would leak the filesystem layout; same rule the prototype
+set). Where the OS can't tell the medium apart (SD-vs-USB on a desktop card reader, an unknown bus) the
+producer emits `"unknown"` rather than guess. The decky privacy preview's "never uploaded" copy was
+corrected accordingly (storage kind + free/total are now in the upload; mount points, device names, and
+paths still are not).
+
+*Follow-up (out of scope here):* the **hosted consumer** — cloud ingest reasoning over per-storage for
+device-aware "fits on your SD card" / "free up space" recommendations — is a separate cloud task. Because
+the change is additive, cloud ingest keeps working untouched until it opts in; the cloud repo's schema
+copy just needs to follow the **0.5.0** bump.

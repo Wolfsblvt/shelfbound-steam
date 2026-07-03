@@ -17,6 +17,7 @@ INCLUDED_FACTS = [
     "A random, locally persisted device id (not derived from hardware)",
     "Installed games: app id, name, install state, size, timestamps",
     "Library index + label (no filesystem paths)",
+    "Per-library storage kind (internal/SD/external) and free/total capacity",
     "Your Steam category/collection names",
 ]
 
@@ -24,8 +25,7 @@ NEVER_INCLUDED = [
     "Full filesystem paths (libraries carry only index + label)",
     "Passwords, credentials, saves, screenshots, arbitrary files",
     "Serial numbers or hardware fingerprints",
-    "Which storage a game is on (internal/SD) — shown on-device only",
-    "Free-space and mount details — shown on-device only",
+    "Mount points, device names, or which folder a library lives in",
 ]
 
 

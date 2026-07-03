@@ -12,4 +12,10 @@ public sealed record SnapshotLibrary
     public required string Label { get; init; }
 
     public required int GameCount { get; init; }
+
+    /// <summary>
+    /// Optional storage-medium facts (kind + free/total bytes). Additive; may be null. Carries no
+    /// filesystem path — kind + sizes only.
+    /// </summary>
+    public SnapshotStorage? Storage { get; init; }
 }

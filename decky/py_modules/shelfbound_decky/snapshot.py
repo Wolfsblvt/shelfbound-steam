@@ -1,9 +1,13 @@
-"""Builds a Shelfbound snapshot (contract v0.4.0) from a local Steam installation.
+"""Builds a Shelfbound snapshot (contract v0.5.0) from a local Steam installation.
 
 Mirrors the C# SteamScanner (src/Shelfbound.Steam/Steam/SteamScanner.cs): same file
 walk, same fallbacks, same warning texts, same output shape. The snapshot dict is
 emitted in canonical field order with null/absent fields omitted — byte-compatible in
 spirit with SnapshotSerializer's camelCase / omit-null conventions.
+
+Since v0.5.0 each library carries an optional `storage` object (medium kind + free/
+total bytes), classified once from the mount table — the same source the on-device
+panel reads. Only kind + sizes are emitted; the library path stays local.
 
 Known prototype divergences from the C# scanner (documented in the plugin README):
 - Modern Steam collections (Chromium leveldb) are NOT read; only the legacy
@@ -18,8 +22,10 @@ import os
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from typing import Callable
 
-from . import SCHEMA_VERSION, TOOL_NAME
+from . import SCHEMA_VERSION, TOOL_NAME, storage
+from .storage import MountEntry
 from .steam_files import (
     SteamAccount,
     SteamLibraryFolder,
@@ -34,9 +40,10 @@ from .steam_files import (
 class ScanOutput:
     """A produced snapshot plus non-fatal warnings and local-only context.
 
-    `library_paths` (library index -> absolute filesystem path) exists ONLY for the
-    on-device storage view and privacy screen. It is never part of the snapshot —
-    the contract deliberately excludes filesystem paths.
+    `library_paths` (library index -> absolute filesystem path) is a local-only side
+    channel — kept for on-device/debug reference and to prove paths never enter the
+    snapshot. Storage classification reads the folder path directly during the scan;
+    the contract carries only the resulting kind + sizes, never a path.
     """
 
     snapshot: dict
@@ -51,12 +58,22 @@ def build_snapshot(
     *,
     now: datetime | None = None,
     snapshot_id: str | None = None,
+    mounts: list[MountEntry] | None = None,
+    usage_fn: Callable[[str], tuple[int, int] | None] | None = None,
+    home: str | None = None,
 ) -> ScanOutput:
-    """Scans `steam_root` and assembles the versioned snapshot document."""
+    """Scans `steam_root` and assembles the versioned snapshot document.
+
+    `mounts` / `usage_fn` / `home` feed per-library storage classification; they default
+    to live reads (`/proc/mounts`, `os.statvfs`, `~`) and are injectable for tests.
+    """
     warnings: list[str] = []
     folders = _read_libraries(steam_root, warnings)
     accounts = _read_accounts(steam_root, warnings)
     categories_by_app = _read_categories(steam_root, accounts, warnings)
+
+    resolved_mounts = mounts if mounts is not None else storage.read_mounts()
+    resolved_usage = usage_fn if usage_fn is not None else storage.storage_usage
 
     games: list[dict] = []
     libraries: list[dict] = []
@@ -100,6 +117,11 @@ def build_snapshot(
             "index": folder.index,
             "label": folder.label,
             "gameCount": count_in_library,
+            # Storage medium + free/total, classified from the (local-only) path. Kind +
+            # sizes only reach the contract; the path never does.
+            "storage": storage.classify_storage(
+                folder.path, resolved_mounts, usage_fn=resolved_usage, home=home
+            ),
         })
 
     created_at = now if now is not None else datetime.now(timezone.utc)

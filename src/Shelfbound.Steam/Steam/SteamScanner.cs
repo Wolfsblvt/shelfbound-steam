@@ -66,6 +66,9 @@ public sealed class SteamScanner
                 Index = folder.Index,
                 Label = folder.Label,
                 GameCount = countInLibrary,
+                // Storage medium + free/total, classified from the (local-only) library path. Kind +
+                // sizes only reach the contract; the path never does. Best-effort — null when unreadable.
+                Storage = StorageClassifier.Describe(folder.Path),
             });
         }
 

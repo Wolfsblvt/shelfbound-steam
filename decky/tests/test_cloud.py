@@ -9,7 +9,7 @@ import pytest
 
 from shelfbound_decky.cloud import PairingUnavailableError, ShelfboundServer
 
-SNAPSHOT = {"schemaVersion": "0.4.0", "games": [{"appId": 1}, {"appId": 2}]}
+SNAPSHOT = {"schemaVersion": "0.5.0", "games": [{"appId": 1}, {"appId": 2}]}
 
 
 class _Handler(BaseHTTPRequestHandler):

@@ -11,6 +11,7 @@ from jsonschema import Draft202012Validator, FormatChecker
 
 from shelfbound_decky import SCHEMA_VERSION
 from shelfbound_decky.snapshot import build_snapshot
+from shelfbound_decky.storage import MountEntry
 from steamroot_fixture import MISSING_MANIFEST_APP_ID, make_steam_root
 
 SCHEMA_PATH = Path(__file__).resolve().parents[2] / "schema" / "snapshot.v0.schema.json"
@@ -27,7 +28,22 @@ DEVICE = {
 @pytest.fixture()
 def scan(tmp_path):
     paths = make_steam_root(tmp_path)
-    return build_snapshot(paths["steam_root"], DEVICE, "0.1.0"), paths
+    # Deterministic storage classification: map the two fixture libraries to an nvme
+    # (internal) and an mmcblk (SD) mount, with fixed free/total, instead of the live
+    # machine's mount table.
+    mounts = [
+        MountEntry("/dev/nvme0n1p8", paths["internal_lib"], "ext4"),
+        MountEntry("/dev/mmcblk0p1", paths["sd_lib"], "ext4"),
+    ]
+
+    def fake_usage(path):
+        return (1_000, 2_000) if "sdcard" in path.replace("\\", "/") else (3_000, 4_000)
+
+    output = build_snapshot(
+        paths["steam_root"], DEVICE, "0.1.0",
+        mounts=mounts, usage_fn=fake_usage, home=paths["internal_lib"],
+    )
+    return output, paths
 
 
 def test_snapshot_validates_against_the_real_schema(scan):
@@ -47,7 +63,7 @@ def test_round_trips_through_json(scan):
 def test_header_and_source(scan):
     output, _ = scan
     snapshot = output.snapshot
-    assert snapshot["schemaVersion"] == SCHEMA_VERSION == "0.4.0"
+    assert snapshot["schemaVersion"] == SCHEMA_VERSION == "0.5.0"
     assert snapshot["source"] == {"tool": "shelfbound-decky", "toolVersion": "0.1.0", "platform": "linux"}
     # createdAt parses as an aware UTC timestamp.
     created_at = datetime.fromisoformat(snapshot["createdAt"])
@@ -86,6 +102,15 @@ def test_games_libraries_and_stats_mirror_the_scanner_semantics(scan):
         game.get("sizeOnDiskBytes", 0) for game in snapshot["games"]
     )
     assert stats["scope"] == "installedOnly"  # no web enrichment in this producer
+
+
+def test_libraries_carry_per_storage_contract_field(scan):
+    output, _ = scan
+    libraries = {lib["index"]: lib for lib in output.snapshot["libraries"]}
+
+    # Classified once, into the contract — kind + free/total, no path.
+    assert libraries[0]["storage"] == {"kind": "internal", "freeBytes": 3_000, "totalBytes": 4_000}
+    assert libraries[1]["storage"] == {"kind": "sdCard", "freeBytes": 1_000, "totalBytes": 2_000}
 
 
 def test_accounts_and_categories(scan):
