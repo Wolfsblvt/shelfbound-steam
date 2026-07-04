@@ -80,10 +80,11 @@ tokens expire at 90 days or are revoked from the dashboard (the post-M-4 posture
 
 **Verified off-Deck (runs in this repo, no hardware):**
 
-- `pytest` suite (44 tests): VDF parser semantics, every file parser against C#-mirrored
+- `pytest` suite (50 tests): VDF parser semantics, every file parser against C#-mirrored
   expectations, storage classification from fixture mount tables, device-id reuse/creation, the
-  HTTP client's exact status mapping against a real local server, and — the core check — a
-  Deck-shaped fixture scan whose **snapshot validates against the real, unmodified JSON Schema**.
+  HTTP client's exact status mapping against a real local server, backend `Plugin` response
+  envelopes/token boundary/pairing state transitions, and — the core check — a Deck-shaped fixture
+  scan whose **snapshot validates against the real, unmodified JSON Schema**.
 - Frontend builds clean under strict TypeScript with the current `@decky/*` toolchain.
 
 **Theory until a real Deck says otherwise:** everything in the next section.

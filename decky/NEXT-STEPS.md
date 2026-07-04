@@ -37,9 +37,9 @@ needs explicit denial reasons before the server implements it:
   not on tokens — a Deck that pairs from Gaming Mode *and* connects the tray in desktop mode shares
   one `~/.config/Shelfbound/device-id` but holds two tokens; it must count as **one** device.
 
-**A5. Backend Plugin-class tests.** `main.py` is thin but untested (it imports the loader-injected
-`decky` module). Inject a stub `decky` into `sys.modules` in a test fixture and cover the envelope
-behavior, token-never-in-frontend invariant, and pairing state transitions.
+**A5. Backend Plugin-class tests — DONE.** `main.py` imports off-loader through a stubbed
+`decky` module in pytest, covering the envelope behavior, token-never-in-frontend invariant, and
+pairing state transitions.
 
 ## Phase B — contract evolution (cross-producer, coordinate with the hosted side)
 
