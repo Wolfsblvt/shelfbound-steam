@@ -26,8 +26,12 @@ DEVICE = {
 
 
 @pytest.fixture()
-def scan(tmp_path):
+def scan(tmp_path, monkeypatch):
     paths = make_steam_root(tmp_path)
+    # No modern Chromium leveldb in the fixture: point the locator at a nonexistent dir so
+    # the scan deterministically falls back to the legacy sharedconfig.vdf and never reads
+    # the test machine's real Steam Local Storage.
+    monkeypatch.setenv("SHELFBOUND_STEAM_LOCALSTORAGE", str(tmp_path / "no-leveldb"))
     # Deterministic storage classification: map the two fixture libraries to an nvme
     # (internal) and an mmcblk (SD) mount, with fixed free/total, instead of the live
     # machine's mount table.
@@ -156,10 +160,14 @@ def test_no_filesystem_paths_leak_into_the_snapshot(scan):
     assert set(output.library_paths) == {0, 1}
 
 
-def test_warnings_report_missing_manifest_and_prototype_limits(scan):
+def test_warnings_report_missing_manifest_and_legacy_fallback(scan):
     output, _ = scan
     assert f"Missing manifest for app {MISSING_MANIFEST_APP_ID} in library 1." in output.warnings
-    assert any("Modern Steam collections are not read" in warning for warning in output.warnings)
+    # The fixture has no Chromium leveldb, so the scan falls back to the legacy
+    # sharedconfig.vdf — the fallback warning fires only because it actually fell back.
+    assert any(
+        "came from the legacy sharedconfig.vdf" in warning for warning in output.warnings
+    )
 
 
 def test_missing_libraryfolders_falls_back_to_primary_library(tmp_path):

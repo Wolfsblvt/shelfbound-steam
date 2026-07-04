@@ -4,6 +4,11 @@
 > snappy/LevelDB reader) reads modern collections, with the legacy `sharedconfig.vdf` as a fallback. The
 > scanner prefers it. Validated end-to-end on a real install (Slay the Princess → `Finished`); decision
 > in [DECISIONS.md](./DECISIONS.md).
+>
+> **Also ported to Python** for the Decky plugin (`decky/py_modules/shelfbound_decky/`: `snappy.py`,
+> `chromium_leveldb.py`, `steam_collections.py`, `steam_localstorage.py`) — stdlib-only, same semantics,
+> mirroring the C# oracle tests. The one Deck-TBD piece is the SteamOS Local Storage *path* (env override
+> + candidate; validated on hardware under decky `NEXT-STEPS.md` §A1).
 
 ## The bug
 

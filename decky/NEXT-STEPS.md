@@ -9,18 +9,24 @@ has produced facts.
 
 **A1. Run the validation list on a real Deck** (README §Needs a real Steam Deck) and record the
 results here. Everything below is re-scoped by what this finds — especially SD mount patterns,
-Gaming-Mode env, and QAM UI behavior.
+Gaming-Mode env, QAM UI behavior, and the modern-collections Local Storage leveldb path (README
+item 10 — the one hardware-TBD seam left by the A2 port; `steam_localstorage.py` has the candidate
++ `SHELFBOUND_STEAM_LOCALSTORAGE` override, so it should be a one-line confirm).
 
-**A2. Categories: measure, then decide.** On a modern-UI Deck, check how stale the legacy
-`sharedconfig.vdf` really is (expected: very). Then pick one:
-- *Port the modern-collections reader to Python* — the C# reader
-  (`src/Shelfbound.Steam/Collections`: hand-rolled snappy + leveldb + the Chromium Local Storage
-  key format) is small and dependency-free, so a stdlib Python port is feasible and keeps the
-  plugin self-contained.
-- *Shell out to the CLI/agent where installed* — reuses the battle-tested reader, but adds a
-  runtime dependency and review surface (the feasibility research weighs this).
-Decision criteria: does Steam-running file locking bite either path; SteamOS Python behavior;
-Decky review friendliness. Until then the snapshot warning stays.
+**A2. Categories: ported the modern-collections reader to Python.** ✅ The staleness was already
+proven (Slay the Princess → wrong via the legacy VDF, `Finished` via modern), so this skipped the
+measure step and took the **port** arm: a stdlib snappy + Chromium LevelDB reader
+(`decky/py_modules/shelfbound_decky/`: `snappy.py`, `chromium_leveldb.py`, `steam_collections.py`,
+`steam_localstorage.py`) mirroring the C# `Shelfbound.Steam.Collections` reader and its oracle
+tests — no runtime pip deps. The scanner now **prefers modern collections and falls back to the
+legacy `sharedconfig.vdf`**, warning only on an actual fallback (not unconditionally). Static
+`added` lists only; dynamic `filterSpec` collections skipped (v1 parity with C#); can lag the live
+client by the last unflushed edit.
+
+*Left for A1 (hardware):* the one hardware-TBD seam is the SteamOS Local Storage leveldb path — the
+env override + candidate path make it testable off-Deck and a one-line fix on real hardware.
+*Deliberately still out of scope:* dynamic `filterSpec` collections and the CLI shell-out
+alternative. See the DECISIONS entry and docs/project/steam-collections.md.
 
 **A3. Surface entitlements in the panel.** `cloud.py` already has `get_entitlements()`
 (plan, autoSync, minUploadIntervalSeconds, maxDevices) — it's just not wired into the UI. Show

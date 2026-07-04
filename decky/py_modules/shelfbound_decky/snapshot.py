@@ -9,9 +9,12 @@ Since v0.5.0 each library carries an optional `storage` object (medium kind + fr
 total bytes), classified once from the mount table — the same source the on-device
 panel reads. Only kind + sizes are emitted; the library path stays local.
 
+Categories are read from the MODERN Steam collections (Chromium leveldb, ported to
+stdlib Python in steam_collections.py), falling back to the legacy sharedconfig.vdf —
+same prefer-modern/fallback-legacy behaviour as the C# scanner. The one hardware-TBD
+seam is the SteamOS Local Storage path (see steam_localstorage.py / A1).
+
 Known prototype divergences from the C# scanner (documented in the plugin README):
-- Modern Steam collections (Chromium leveldb) are NOT read; only the legacy
-  sharedconfig.vdf fallback. Categories may be stale or empty for modern-UI users.
 - No Steam Web API enrichment (owned-but-not-installed + playtime), so `stats.scope`
   is always `installedOnly` and `playtimeMinutes` is never emitted.
 """
@@ -24,7 +27,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Callable
 
-from . import SCHEMA_VERSION, TOOL_NAME, storage
+from . import SCHEMA_VERSION, TOOL_NAME, steam_collections, storage
 from .storage import MountEntry
 from .steam_files import (
     SteamAccount,
@@ -181,36 +184,45 @@ def _read_categories(
 ) -> dict[int, list[str]]:
     """Reads local categories for the most-recent account that has them.
 
-    The C# scanner prefers the MODERN Steam collections (Chromium leveldb + snappy)
-    and falls back to the legacy sharedconfig.vdf. This prototype only implements the
-    legacy fallback — reimplementing the leveldb reader in dependency-free Python was
-    deliberately out of scope. Consumers still get a valid snapshot; categories may
-    just be stale for users who manage collections in the modern Steam UI.
+    Mirrors the C# SteamScanner.ReadCategories: prefer the MODERN Steam collections
+    (Chromium leveldb, via steam_collections.try_read) and fall back to the legacy
+    sharedconfig.vdf — stale for users who manage collections in the modern Steam UI. The
+    fallback warning fires only when we actually use the legacy file, so a successful
+    modern read is silent. See docs/project/steam-collections.md.
     """
-    if not accounts:
-        return {}
-
-    warnings.append(
-        "Modern Steam collections are not read by this prototype; categories come from "
-        "the legacy sharedconfig.vdf and may be stale or empty."
-    )
-
     ordered = sorted(accounts, key=lambda account: 0 if account.most_recent else 1)
     for account in ordered:
         account_id = account.account_id
         if account_id is None:
             continue
 
+        # Prefer modern collections; a non-empty result wins outright.
+        try:
+            modern = steam_collections.try_read(account_id, steam_root=steam_root)
+            if modern:
+                return modern
+        except Exception as error:  # noqa: BLE001 — a bad modern read just falls back to legacy
+            warnings.append(f"Failed to read modern collections for account {account_id}: {error}")
+
+        # Fall back to the legacy sharedconfig.vdf.
         path = os.path.join(steam_root, "userdata", str(account_id), "7", "remote", "sharedconfig.vdf")
         if not os.path.isfile(path):
             continue
 
         try:
-            return parse_shared_config(_read_text(path))
+            legacy = parse_shared_config(_read_text(path))
         except Exception as error:  # noqa: BLE001
             warnings.append(f"Failed to parse sharedconfig.vdf for account {account_id}: {error}")
+            continue
 
-    warnings.append("No categories found (legacy sharedconfig.vdf).")
+        warnings.append(
+            f"Modern Steam collections were unavailable for account {account_id}; categories "
+            "came from the legacy sharedconfig.vdf and may be stale."
+        )
+        return legacy
+
+    if accounts:
+        warnings.append("No categories found (modern collections or sharedconfig.vdf).")
     return {}
 
 

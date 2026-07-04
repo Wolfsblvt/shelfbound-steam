@@ -7,6 +7,7 @@ identically. Pure text-in/data-out; no filesystem access here.
 
 from __future__ import annotations
 
+import json
 import posixpath
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -142,8 +143,10 @@ def parse_login_users(vdf_text: str) -> list[SteamAccount]:
 def parse_shared_config(vdf_text: str) -> dict[int, list[str]]:
     """Parses userdata/<id>/7/remote/sharedconfig.vdf into app id -> ordered category names.
 
-    This is Steam's legacy category store; the modern collections (Chromium leveldb)
-    are read by the C# core but not by this prototype — see the plugin README.
+    This is Steam's LEGACY category store — stale for users who manage collections in the
+    modern Steam desktop UI. The scanner prefers the modern collections
+    (`steam_collections.try_read`) and falls back to this. See the plugin README and
+    docs/project/steam-collections.md.
     """
     apps = vdf.parse(vdf_text)
     for key in ("UserRoamingConfigStore", "Software", "Valve", "Steam", "apps"):
@@ -172,6 +175,66 @@ def parse_shared_config(vdf_text: str) -> dict[int, list[str]]:
             result[app_id] = categories
 
     return result
+
+
+def parse_collections_namespace(json_text: str) -> dict[int, list[str]] | None:
+    """Parses the cloud-storage-namespace-1 JSON into app id -> ordered category names.
+
+    Mirrors SteamCollectionsReader.ParseNamespaceJson (the testable seam): the value is an
+    array of [entryKey, {value: "<collection-json-string>"}] pairs. v1 reads only STATIC
+    collections (explicit `added` lists); dynamic rule-based (`filterSpec`) collections are
+    skipped, and a single malformed collection never sinks the rest. Returns None when the
+    store holds no usable collections, so the caller falls back to the legacy VDF.
+
+    Raises on a genuinely corrupt top-level value — the caller treats that as "fall back
+    to legacy", exactly like the C# reader.
+    """
+    root = json.loads(json_text)
+    if not isinstance(root, list):
+        return None
+
+    # Preserve the order collections appear in (Steam's own ordering) for each game.
+    by_app: dict[int, list[str]] = {}
+    for pair in root:
+        if not isinstance(pair, list) or len(pair) != 2:
+            continue
+        entry_key, entry = pair
+        if not isinstance(entry_key, str) or not entry_key.startswith("user-collections."):
+            continue
+        if not isinstance(entry, dict) or not isinstance(entry.get("value"), str):
+            continue
+        _add_collection(entry["value"], by_app)
+
+    return by_app or None
+
+
+def _add_collection(collection_json: str, by_app: dict[int, list[str]]) -> None:
+    try:
+        collection = json.loads(collection_json)
+    except ValueError:
+        return  # a single malformed collection shouldn't sink the rest
+    if not isinstance(collection, dict):
+        return
+
+    # Skip dynamic collections — their membership is rule-based, not the stored 'added' list.
+    if collection.get("filterSpec") is not None:
+        return
+
+    name = collection.get("name")
+    if not isinstance(name, str) or not name.strip():
+        return
+
+    added = collection.get("added")
+    if not isinstance(added, list):
+        return
+
+    for app_id in added:
+        # bool is an int subclass in Python; exclude it and non-integers (e.g. floats).
+        if not isinstance(app_id, int) or isinstance(app_id, bool):
+            continue
+        names = by_app.setdefault(app_id, [])
+        if name not in names:
+            names.append(name)
 
 
 def _parse_int(text: str | None) -> int | None:

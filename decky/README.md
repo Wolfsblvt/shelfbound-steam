@@ -45,7 +45,11 @@ decky/
   decky.pyi                 Vendored loader typing stub (IDE support only)
   py_modules/shelfbound_decky/
     vdf.py                  Text VDF parser (mirrors src/Shelfbound.Steam/Vdf)
-    steam_files.py          libraryfolders / appmanifest / loginusers / sharedconfig parsers
+    steam_files.py          libraryfolders / appmanifest / loginusers / sharedconfig parsers + modern-collections JSON seam
+    snappy.py               Snappy block decompression (mirrors Collections/Snappy.cs)
+    chromium_leveldb.py     Chromium Local Storage LevelDB reader: *.ldb SSTables + *.log WAL (mirrors ChromiumLevelDb.cs)
+    steam_collections.py    Modern collections facade: key build + value decode + JSON parse (mirrors SteamCollectionsReader.cs)
+    steam_localstorage.py   Local Storage leveldb dir discovery (SteamOS candidate + env override; mirrors SteamLocalStorageLocator.cs)
     locator.py              Steam-root discovery (Linux/SteamOS candidates + env override)
     device_identity.py      Shared device-id, Deck detection, best-effort specs
     snapshot.py             Snapshot builder — the contract emitter (mirrors SteamScanner)
@@ -80,11 +84,13 @@ tokens expire at 90 days or are revoked from the dashboard (the post-M-4 posture
 
 **Verified off-Deck (runs in this repo, no hardware):**
 
-- `pytest` suite (50 tests): VDF parser semantics, every file parser against C#-mirrored
-  expectations, storage classification from fixture mount tables, device-id reuse/creation, the
-  HTTP client's exact status mapping against a real local server, backend `Plugin` response
-  envelopes/token boundary/pairing state transitions, and — the core check — a Deck-shaped fixture
-  scan whose **snapshot validates against the real, unmodified JSON Schema**.
+- `pytest` suite (74 tests): VDF parser semantics, every file parser against C#-mirrored
+  expectations, the modern-collections reader (byte-level snappy vectors + a Chromium LevelDB WAL
+  fixture + the collections-JSON parse seam, all mirroring the C# oracle tests), storage
+  classification from fixture mount tables, device-id reuse/creation, the HTTP client's exact status
+  mapping against a real local server, backend `Plugin` response envelopes/token boundary/pairing
+  state transitions, and — the core check — a Deck-shaped fixture scan whose **snapshot validates
+  against the real, unmodified JSON Schema**.
 - Frontend builds clean under strict TypeScript with the current `@decky/*` toolchain.
 
 **Theory until a real Deck says otherwise:** everything in the next section.
@@ -110,17 +116,22 @@ tokens expire at 90 days or are revoked from the dashboard (the post-M-4 posture
 7. **Network from the plugin backend** in Gaming Mode (the upload path), including against HTTPS.
 8. **Suspend/resume** mid-scan and mid-upload.
 9. **Update churn:** plugin surviving a SteamOS update / Decky reinstall cycle.
-10. **Category staleness in practice:** how stale legacy `sharedconfig.vdf` really is on a
-    modern-UI Deck — this decides how urgent the modern-collections port is (see below).
+10. **Modern collections on real hardware:** confirm the SteamOS Local Storage leveldb path
+    (`steam_localstorage.py` — the one hardware-TBD seam; env override + candidate provided) and
+    that the ported reader reads current collections end-to-end on a modern-UI Deck. (The reader
+    itself is Chromium/Steam-client format, not OS-specific, and is unit-tested off-Deck.)
 11. **Pairing UX end-to-end** once the server endpoints exist: code entry on a phone, expiry
     handling, poll cadence.
 
 ## Known divergences from the C# scanner (deliberate prototype cuts)
 
-- **Modern Steam collections are not read.** The C# core reads the Chromium leveldb (hand-rolled
-  snappy + leveldb reader); this prototype only reads the legacy `sharedconfig.vdf` fallback and
-  says so in a snapshot warning. Follow-up options: port the reader to Python, or shell out to the
-  CLI where installed (the feasibility research covers the trade-off).
+- **Modern Steam collections are now read** (ported from the C# core): a stdlib snappy + Chromium
+  LevelDB reader (`snappy.py`, `chromium_leveldb.py`, `steam_collections.py`) reads the current
+  collections, preferring them and falling back to the legacy `sharedconfig.vdf` — a fallback that
+  now warns **only when it actually happens**, instead of unconditionally. v1 reads static `added`
+  lists only and skips dynamic `filterSpec` collections, exactly like the C# reader, and can lag
+  the live client by the last unflushed edit. **[NEEDS-DECK]** the exact SteamOS Local Storage path
+  is the one hardware-TBD seam (`steam_localstorage.py`; env override + candidate provided).
 - **No Steam Web API enrichment** (owned-but-not-installed + playtime): `stats.scope` is always
   `installedOnly`, `playtimeMinutes` never emitted. Enrichment likely stays a desktop/CLI concern.
 - **GPU spec not collected** (C# uses the `Hardware.Info` library); other specs are best-effort

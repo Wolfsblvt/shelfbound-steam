@@ -246,13 +246,31 @@ build cheap and the unknowns explicit — `decky/README.md` carries the needs-ha
   in the Decky settings dir, never crosses to the frontend; disconnect is local-only (post-M-4
   posture, same as the tray).
 - **No root, no background work, no runtime pip deps.** Scans/uploads are user-triggered only; the
-  backend is auditable stdlib. The **modern-collections (leveldb) reader was deliberately cut** —
-  legacy `sharedconfig.vdf` only, flagged by a snapshot warning — the biggest known gap, decided
-  rather than hidden.
+  backend is auditable stdlib. The modern-collections (leveldb) reader was initially cut (legacy
+  `sharedconfig.vdf` only + a snapshot warning) — **since ported to stdlib Python** (see the
+  modern-collections entry below), so the plugin now reads current collections like the C# core.
 
 *Considered:* shelling out to the .NET CLI from the plugin instead of a native Python scan path (the
-feasibility research weighs both). Deferred, not rejected — the prototype favors a self-contained
-scan; the CLI shell-out gets a fair look once a real Deck exposes the actual runtime constraints.
+feasibility research weighs both). Initially deferred; **now resolved in favor of the self-contained
+port** for the categories reader (see the next entry) — it keeps the plugin auditable with no runtime
+deps. A CLI shell-out remains a fallback idea if hardware later argues for it.
+
+### Modern collections — ported to stdlib Python (prefer-modern, fallback-legacy)
+
+The prototype's biggest known gap (modern collections cut; legacy `sharedconfig.vdf` only + a warning)
+is **resolved**: the decky backend ports the C# `Shelfbound.Steam.Collections` reader to
+dependency-free Python (`snappy.py`, `chromium_leveldb.py`, `steam_collections.py`,
+`steam_localstorage.py`), faithfully mirroring its semantics and oracle tests — prefer modern
+collections, fall back to the legacy VDF (**warning only on an actual fallback**, no longer
+unconditional), static `added` lists only, skip dynamic `filterSpec`, tolerate a malformed collection,
+accept lag-by-last-unflushed-edit. This **mirrors, and does not re-decide,** the core "Modern
+collections — hand-rolled Chromium-leveldb reader" decision above. *Chosen over A2's other arm* —
+shelling out to the .NET CLI where installed (reuses the battle-tested reader but adds a runtime
+dependency + Decky review surface); the self-contained stdlib port keeps the plugin auditable, no
+runtime pip deps. **One hardware-TBD seam:** the SteamOS Local Storage leveldb *path* (env override
+`SHELFBOUND_STEAM_LOCALSTORAGE` + a candidate path; validated on a real Deck under A1). Dynamic
+`filterSpec` collections remain a later item. See `decky/NEXT-STEPS.md` §A2 and
+[steam-collections.md](./steam-collections.md).
 
 ---
 
