@@ -8,6 +8,14 @@ Built on the official C# MCP SDK (`ModelContextProtocol`). The server scans the 
 (optionally enriched via the Steam Web API) and serves it; it can also load a snapshot file. Query
 logic lives in the reusable `Shelfbound.Query` engine.
 
+## Steam Web API key logging
+
+MCP stdout remains protocol-only; diagnostic output goes to stderr. The named Steam Web API client raises
+its framework HTTP logging to `Warning`, preventing its request URI from being emitted at Information.
+The stderr logging boundary additionally redacts common secret query values (`key`, `api_key`, `token`,
+`client_secret`, and `access_token`) from messages, scopes, and exception text; it suppresses an event if
+redaction cannot be applied. Steam still receives its API-mandated `key` query parameter.
+
 ## Philosophy
 
 - **Provide structured facts; let the AI reason.** Shelfbound's job is reliable, well-shaped data —

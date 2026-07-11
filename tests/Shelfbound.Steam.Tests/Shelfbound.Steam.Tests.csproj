@@ -25,6 +25,7 @@
     <ProjectReference Include="..\..\src\Shelfbound.Steam\Shelfbound.Steam.csproj" />
     <ProjectReference Include="..\..\src\Shelfbound.Query\Shelfbound.Query.csproj" />
     <ProjectReference Include="..\..\src\Shelfbound.Storage\Shelfbound.Storage.csproj" />
+    <ProjectReference Include="..\..\src\Shelfbound.Mcp\Shelfbound.Mcp.csproj" />
   </ItemGroup>
 
 </Project>

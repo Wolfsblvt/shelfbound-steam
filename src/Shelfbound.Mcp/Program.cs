@@ -2,16 +2,20 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Shelfbound.Mcp;
-using Shelfbound.Steam.Web;
+using Shelfbound.Mcp.Logging;
 using Shelfbound.Storage;
 using Shelfbound.Storage.Config;
 
 var builder = Host.CreateApplicationBuilder(args);
 
-// MCP over stdio uses stdout for the protocol — all logging MUST go to stderr.
-builder.Logging.AddConsole(options => options.LogToStandardErrorThreshold = LogLevel.Trace);
+// MCP over stdio uses stdout for the protocol — all logging MUST go to stderr. The sink redacts
+// secret-bearing query values before writing, and Steam's named HTTP client suppresses URI-bearing
+// framework Information logs. See docs/project/mcp-design.md.
+builder.Logging.ClearProviders();
+builder.Logging.AddProvider(new RedactingStderrLoggerProvider());
+builder.Logging.AddSteamWebApiLogging();
 
-builder.Services.AddHttpClient<ISteamWebApiClient, SteamWebApiClient>();
+builder.Services.AddSteamWebApiClient();
 builder.Services.AddSingleton<SnapshotContext>();
 builder.Services.AddSingleton<IUserDataStore>(_ => new JsonUserDataStore(ShelfboundPaths.ProfilesDirectory));
 
