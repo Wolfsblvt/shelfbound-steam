@@ -4,8 +4,8 @@ using System.Text.Json.Serialization;
 namespace Shelfbound.Tray;
 
 /// <summary>
-/// Tray agent settings, persisted as JSON under the user's app-data folder. The API token is NOT kept
-/// here — it lives in <see cref="TokenStore"/> (DPAPI/secret store) so the settings file holds no secret.
+/// Tray agent settings, persisted as JSON under the user's app-data folder. The upload-only device token
+/// is NOT kept here — it lives in <see cref="TokenStore"/> so the settings file holds no secret.
 /// </summary>
 public sealed class AppSettings
 {

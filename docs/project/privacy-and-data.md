@@ -41,7 +41,7 @@ name/type/os + best-effort hardware specs, relative install-dir name, sizes/time
 category/collection names, and a library-scope marker (installed-only vs full owned library).
 
 **Excluded:** passwords/credentials, save files, screenshots, arbitrary files, **full install
-paths**, library filesystem paths, mount points, device names, install scripts, depot internals.
+paths**, library filesystem paths, mount points, storage-device names, install scripts, depot internals.
 
 The device id is a **random GUID persisted locally** — not derived from hardware or account. The
 Steam login `accountName` is included for local completeness; treat the snapshot file as personal.

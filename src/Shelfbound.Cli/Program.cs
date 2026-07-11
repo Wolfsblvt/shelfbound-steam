@@ -253,6 +253,9 @@ static async Task<bool> UploadOnceAsync(ShelfboundClient client, SnapshotBuildOp
         case UploadStatus.Unauthorized:
             Console.Error.WriteLine("Upload rejected: invalid or missing API token. Create one in the Shelfbound web app.");
             return false;
+        case UploadStatus.DeviceNameMismatch:
+            Console.Error.WriteLine("Upload rejected: the snapshot device name does not match this device token. Reconnect the device.");
+            return false;
         default:
             Console.Error.WriteLine($"Upload failed: {result.Message}");
             return false;

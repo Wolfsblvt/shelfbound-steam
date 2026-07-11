@@ -59,11 +59,14 @@ src/
   Shelfbound.Client    Shared scan-to-snapshot builder + Shelfbound-server client, reused by the CLI
                        and the tray.
   Shelfbound.Cli       `shelfbound` CLI — setup, scan (+ enrichment), profile, upload.
-  Shelfbound.Tray      Cross-platform tray agent (Avalonia): background sync, status, account connect.
+  Shelfbound.Tray      Cross-platform tray agent (Avalonia): background sync, status, one-time-code
+                       connect, and upload-only device-token storage.
   Shelfbound.Mcp       `shelfbound-mcp` — local MCP server (stdio): read + write/remember tools.
 tests/
   Shelfbound.Steam.Tests           xUnit + Shouldly. Parsers, scanner, query engine, enricher,
                                    snappy/leveldb collections reader.
+  Shelfbound.Tray.Tests            xUnit + Shouldly. Numeric-loopback validation, code redemption,
+                                   device binding, token containment, and upload error handling.
 schema/
   snapshot.v0.schema.json          The language-neutral contract.
 decky/

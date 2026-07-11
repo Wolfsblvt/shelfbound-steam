@@ -11,5 +11,6 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Shelfbound.Steam.Tests/Shelfbound.Steam.Tests.csproj" />
+    <Project Path="tests/Shelfbound.Tray.Tests/Shelfbound.Tray.Tests.csproj" />
   </Folder>
 </Solution>
