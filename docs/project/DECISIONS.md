@@ -162,13 +162,32 @@ un-notarized apps, so public macOS distribution waits on an Apple Developer ID c
 Authenticode signing is optional and gated on the `WINDOWS_CERT_*` CI secrets (unsigned otherwise). Icons come
 from one `assets/icon.svg` source rasterized by `scripts/icons.ps1` (generate-and-commit, not per-build).
 
-### CLI + MCP distribution — .NET global tools via the existing NuGet (OIDC) flow
-The `shelfbound` CLI and `shelfbound-mcp` server are `PackAsTool` packages published to NuGet by the existing
-`nuget-publish.yml` (Trusted Publishing / OIDC, no stored key) on a `v*` tag — the same flow that ships the
-`Shelfbound.*` libraries, so no separate pipeline. They keep independent `.csproj` versions (they mature at a
-different rate than the tray). *Considered and rejected:* attaching nupkgs to GitHub Releases for manual
-`--add-source` installs (worse UX than `dotnet tool install -g`) and a dedicated tools workflow (redundant —
-`nuget-publish.yml` already packs every packable project).
+### CLI + MCP distribution — .NET global tools with independent release identities
+The `shelfbound` CLI and `shelfbound-mcp` server are `PackAsTool` packages on NuGet and keep independent
+`.csproj` versions (they mature at a different rate than the tray and libraries). The immutable library
+`v*` stream now packs **only** `Shelfbound.Core/Query/Steam`; otherwise an unchanged tool version would
+either make a library release fail as a duplicate or require the unsafe `--skip-duplicate` behavior.
+The next tool update therefore gets a project-scoped tag/workflow rather than hitching a ride on a library
+tag. *Rejected:* attaching nupkgs to GitHub Releases for manual `--add-source` installs (worse UX than
+`dotnet tool install -g`) and continuing the mixed publish set with silent duplicate skips.
+
+### Library package identity — immutable version/schema/commit, gated before publish
+The current library release is **package `0.7.0` carrying snapshot schema `0.5.0`**. Published `0.6.0`
+remains its historical schema-`0.4.0` payload forever; an immutable version is never repacked. The .NET SDK's
+built-in Source Link support emits portable symbols and the exact repository commit, while the nuspec release
+notes embed the schema mapping. CI packs and inspects all three libraries, compares schema/package changes to
+the previous `v*` release, and runs SDK package validation against the previous published package.
+
+API breaks are fail-closed. Before 1.0, an intentional break requires a minor package bump plus a reviewed,
+target-specific APICompat suppression; package `0.7.0` records the existing three-argument →
+four-argument `RecordFirstSeen` break explicitly. A new suppression on a patch/same version fails policy.
+NuGet publishing preflights that the version is absent and pushes without `--skip-duplicate`, so a race or
+partial prior publish also fails visibly.
+
+The published library set stays **Core, Query, Steam**. `Shelfbound.Storage` is deliberately not a package:
+it owns local config and user-data persistence, not the portable snapshot boundary. The similarly named
+`SnapshotStorage` contract DTO lives in `Shelfbound.Core`, so storage facts round-trip without exporting the
+local persistence assembly.
 
 ---
 

@@ -55,7 +55,8 @@ The local Steam data is the moat. AI reasoning is commodity; good structured fac
 
 **Implemented (local core):**
 - Snapshot contract `v0.5.0` (`schema/snapshot.v0.schema.json`, models in `Shelfbound.Core`) — adds
-  optional per-library `storage` (medium kind + free/total, no path).
+  optional per-library `storage` (medium kind + free/total, no path). The immutable library package
+  mapping is `0.7.0` → schema `0.5.0`; published `0.6.0` remains schema `0.4.0`.
 - Local Steam scanner (`Shelfbound.Steam`): install discovery, `libraryfolders.vdf`,
   `appmanifest_*.acf`, `loginusers.vdf`, **local categories** — modern Steam collections (a hand-rolled
   Chromium-leveldb reader) with the legacy `sharedconfig.vdf` as fallback — and a minimal VDF parser.
@@ -103,7 +104,8 @@ Local-first — prove the data model locally before anything depends on it.
 1. **Distribution (mostly shipped):** the **tray agent** installs + self-updates via **Velopack** on a
    `tray-v*` tag — Windows (`Setup.exe`) and Linux (`AppImage`); macOS is an unsigned test artifact until
    notarized. The **CLI/MCP ship as .NET global tools** on NuGet (`dotnet tool install -g Shelfbound.Cli` /
-   `Shelfbound.Mcp`) via the `v*` tag publish. Process: [releasing.md](./releasing.md). Remaining: macOS
+   `Shelfbound.Mcp`) with independent versions; immutable library `v*` releases deliberately pack only
+   Core/Query/Steam. Process: [releasing.md](./releasing.md). Remaining: macOS
    signing + notarization, and pointing the tray at production URLs before a public build.
 2. **Taste/profile depth:** user-data now merges into query results (filter by status/rating/completion);
    remaining — a "what Shelfbound remembers" review/edit view and optional metered LLM extraction.

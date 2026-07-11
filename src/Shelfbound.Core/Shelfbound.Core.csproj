@@ -4,6 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <PackageId>Shelfbound.Core</PackageId>
     <PackageLicenseExpression>AGPL-3.0-or-later</PackageLicenseExpression>
     <Description>Shelfbound core domain models and the versioned library snapshot contract.</Description>
   </PropertyGroup>

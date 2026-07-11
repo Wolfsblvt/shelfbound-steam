@@ -1,10 +1,56 @@
-# Releasing the tray
+# Releasing Shelfbound
 
-The canonical, repeatable process for shipping a new **Shelfbound tray** version. Humans and agents follow
-this so releases, notes, and docs stay consistent. Decisions behind it: see the "Packaging & distribution"
-section of [DECISIONS.md](./DECISIONS.md).
+The canonical, repeatable processes for the immutable **library packages** and the **Shelfbound tray**.
+Humans and agents follow these so releases, notes, source identity, and docs stay consistent. Decisions
+behind them: see the "Packaging & distribution" section of [DECISIONS.md](./DECISIONS.md).
 
-## The model in one breath
+## Open-core library packages
+
+`Directory.Build.props` binds the current library package version to its snapshot schema version.
+For this release, `Shelfbound.Core`, `Shelfbound.Query`, and `Shelfbound.Steam` are package `0.7.0`
+and produce schema `0.5.0`. `Shelfbound.Storage` is local persistence and remains non-packable; the
+portable `SnapshotStorage` DTO is already in Core.
+
+The `v<version>` tag triggers `nuget-publish.yml`. The workflow:
+
+1. runs the complete solution with warnings as errors;
+2. exercises the producer rejection gates (reused version, schema change without package bump, and an
+   unapproved public-API break);
+3. package-validates against the previous published release and verifies nuspec package/schema/commit;
+4. packs only Core/Query/Steam; and
+5. pushes through Trusted Publishing **without** `--skip-duplicate`.
+
+The cloud repository enforces the fourth gate (a stale consumer pin), then independently packs this
+exact producer commit to a unique throwaway version in a local feed, restores its consumer against that
+feed, and sends old/current/next golden JSON through `SnapshotSerializer` + `/ingest`. A missing producer
+checkout or skipped HTTP test is a failure.
+
+### Owner publish steps after both repositories merge
+
+Merge the producer first, then the cloud consumer so cloud CI can pack steam `main`. On clean `main`
+checkouts, run the gates once more:
+
+```pwsh
+dotnet test Shelfbound.slnx -c Release -warnaserror
+pwsh scripts/test-package-release-gates.ps1
+pwsh scripts/test-package-release.ps1 -CloudRepo <path-to-shelfbound-cloud>
+```
+
+Then create and push the immutable library tag (the implementation agent does not do this):
+
+```pwsh
+git tag -a v0.7.0 -m "Shelfbound libraries 0.7.0 (snapshot schema 0.5.0)"
+git push origin v0.7.0
+```
+
+The publish workflow requires `v0.7.0` to point at the commit whose `Directory.Build.props` says
+`0.7.0`, and requires all three package ids to be absent at that version. After the workflow succeeds,
+verify each nuget.org page reports `0.7.0`, schema `0.5.0` in release notes, the tagged repository commit,
+and a symbol package.
+
+## Releasing the tray
+
+### The model in one breath
 
 `Directory.Build.props` version → `CHANGELOG.md` → **`tray-v<version>` tag** → the **Release Tray** CI
 workflow builds Windows + Linux, publishes them (and the update packages) to a **GitHub Release**, and sets
@@ -18,7 +64,7 @@ The tray links to the Release notes in-app; a future website can render the same
 - **Distribution** — GitHub Releases (free, fits open-core; no extra hosting). The app updates via Velopack's
   `GithubSource`.
 
-## Before the first *public* release (deferrable)
+### Before the first *public* release (deferrable)
 
 The tray builds, self-updates, and runs locally today. These are only needed before you hand installers to
 real users — safe to defer until then:
@@ -32,7 +78,7 @@ real users — safe to defer until then:
 
 None block local use or a Windows/Linux beta.
 
-## Cut a release
+### Cut a release
 
 1. **Land the work** on the branch, with `CHANGELOG.md`'s `[Unreleased]` section kept current as you go.
 2. **Prepare** — bump the version, promote the changelog, commit, and tag. Use the helper (does all of it
@@ -58,7 +104,7 @@ None block local use or a Windows/Linux beta.
 > Push the *commit* (to the branch/main) as well per normal git rules; the **tag** is what the workflow
 > triggers on.
 
-## Test a build without releasing
+### Test a build without releasing
 
 Run the workflow via **`workflow_dispatch`** (Actions tab → *Release Tray* → *Run workflow*, or
 `gh workflow run release-tray.yml --ref <branch>`). It builds all platforms and uploads the installers as
@@ -74,7 +120,7 @@ dotnet publish src/Shelfbound.Tray -c Release -r win-x64 --self-contained -o pub
 vpk pack --packId Shelfbound.Tray --packVersion 0.6.1 --packDir publish --mainExe Shelfbound.Tray.exe --packTitle Shelfbound
 ```
 
-## CI workflow shape
+### CI workflow shape
 
 [`.github/workflows/release-tray.yml`](../../.github/workflows/release-tray.yml): a shared **`version`** job
 resolves the version (from the tag, else `Directory.Build.props`), then
@@ -85,7 +131,7 @@ resolves the version (from the tag, else `Directory.Build.props`), then
 | `linux` | `ubuntu-latest` | `AppImage` (+ update packages) | published to the Release (runs after `windows` to avoid a create-release race) |
 | `macos` | `macos-latest` | `.app` (unsigned) | **artifact only** — never published (see Signing) |
 
-## Signing
+### Signing
 
 - **Windows (optional now).** Unsigned installers work but trip SmartScreen. To sign, add repo secrets
   `WINDOWS_CERT_BASE64` (base64 of the `.pfx`) and `WINDOWS_CERT_PASSWORD`; the `windows` job then
@@ -99,7 +145,7 @@ resolves the version (from the tag, else `Directory.Build.props`), then
   `docs/project/research/` and fold the decision here + into `DECISIONS.md`. Publishing to GitHub Releases
   uses the built-in `GITHUB_TOKEN` (no secret).
 
-## Icons
+### Icons
 
 **`assets/icon.svg` is the single source of truth** (a placeholder mark today; drop in branded artwork later,
 same filename). Neither Avalonia's tray icon nor the OS installers consume SVG directly — they need raster at
@@ -117,15 +163,14 @@ installers fall back to Velopack's default icon — nothing breaks.
 
 ## CLI / MCP tools (separate release stream)
 
-The `shelfbound` CLI and `shelfbound-mcp` server ship as **.NET global tools**, published to NuGet by
-[`.github/workflows/nuget-publish.yml`](../../.github/workflows/nuget-publish.yml) on a **`v<version>`** tag
-(Trusted Publishing / OIDC — no stored API key). That workflow already packs every packable project; the
-tools are just `PackAsTool` projects, so a `v*` tag publishes them alongside the `Shelfbound.*` libraries.
-Their versions come from their own `.csproj` (`Shelfbound.Cli` 0.1.0, `Shelfbound.Mcp` 0.3.0), independent of
-the tray. Users install with `dotnet tool install -g Shelfbound.Cli` / `Shelfbound.Mcp`.
+The `shelfbound` CLI and `shelfbound-mcp` server ship as **.NET global tools**. Their versions come from
+their own `.csproj` (`Shelfbound.Cli` 0.1.0, `Shelfbound.Mcp` 0.3.0), independent of the tray and library
+packages. Users install with `dotnet tool install -g Shelfbound.Cli` / `Shelfbound.Mcp`.
 
 > First publish of a new package id needs the nuget.org Trusted Publishing policy to cover it (the
-> `Shelfbound.*` prefix / `nuget` environment). Push is `--skip-duplicate`, so unchanged versions are no-ops.
+> `Shelfbound.*` prefix / `nuget` environment). Library `v*` tags deliberately exclude these tools so
+> an unchanged tool can never be a silent duplicate; add a project-scoped tag/workflow before the next
+> tool update.
 
 ## Rules to keep (every release)
 
