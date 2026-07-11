@@ -4,8 +4,9 @@ namespace Shelfbound.Core;
 public static class SnapshotSchema
 {
     /// <summary>
-    /// Current snapshot schema version (semver). Bump on contract changes;
-    /// see docs/project/snapshot-schema.md and schema/snapshot.v0.schema.json.
+    /// Current snapshot schema version (semver). Bump on contract changes and keep the package-to-schema
+    /// mapping in Directory.Build.props synchronized; see docs/project/snapshot-schema.md and
+    /// schema/snapshot.v0.schema.json.
     /// </summary>
     public const string Version = "0.5.0";
 

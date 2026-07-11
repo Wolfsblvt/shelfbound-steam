@@ -2,20 +2,37 @@
 
   <!-- Shared package/assembly metadata for the whole solution. -->
   <PropertyGroup>
-    <Version>0.6.0</Version>
+    <Version>0.7.0</Version>
+    <!-- Package 0.7.0 carries snapshot schema 0.5.0. Keep this mapping in sync with
+         SnapshotSchema.Version; scripts/test-package-release.ps1 enforces it. -->
+    <SnapshotSchemaVersion>0.5.0</SnapshotSchemaVersion>
     <Authors>Wolfsblvt</Authors>
     <Company>Wolfsblvt</Company>
     <Product>Shelfbound</Product>
     <RepositoryType>git</RepositoryType>
     <RepositoryUrl>https://github.com/Wolfsblvt/shelfbound-steam</RepositoryUrl>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
     <PackageProjectUrl>https://github.com/Wolfsblvt/shelfbound-steam</PackageProjectUrl>
     <PackageTags>steam;mcp;model-context-protocol;game-library;shelfbound</PackageTags>
   </PropertyGroup>
 
-  <!-- Only the reusable libraries ship as NuGet packages (consumed by the private cloud). -->
+  <!-- Only these reusable libraries form the published package contract. Shelfbound.Storage is
+       local config/user-data persistence; SnapshotStorage, the snapshot DTO, lives in Core. -->
   <PropertyGroup>
-    <IsPackable Condition="'$(MSBuildProjectName)' == 'Shelfbound.Core' Or '$(MSBuildProjectName)' == 'Shelfbound.Query' Or '$(MSBuildProjectName)' == 'Shelfbound.Steam'">true</IsPackable>
+    <IsOpenCoreLibraryPackage Condition="'$(MSBuildProjectName)' == 'Shelfbound.Core' Or '$(MSBuildProjectName)' == 'Shelfbound.Query' Or '$(MSBuildProjectName)' == 'Shelfbound.Steam'">true</IsOpenCoreLibraryPackage>
+    <IsPackable Condition="'$(IsOpenCoreLibraryPackage)' == 'true'">true</IsPackable>
+    <IsPackable Condition="'$(MSBuildProjectName)' == 'Shelfbound.Storage'">false</IsPackable>
     <IsPackable Condition="'$(IsPackable)' == ''">false</IsPackable>
+    <IncludeSymbols Condition="'$(IsOpenCoreLibraryPackage)' == 'true'">true</IncludeSymbols>
+    <SymbolPackageFormat Condition="'$(IsOpenCoreLibraryPackage)' == 'true'">snupkg</SymbolPackageFormat>
+    <PackageReadmeFile Condition="'$(IsOpenCoreLibraryPackage)' == 'true'">README.md</PackageReadmeFile>
+    <PackageReleaseNotes Condition="'$(IsOpenCoreLibraryPackage)' == 'true'">Snapshot schema: $(SnapshotSchemaVersion). Source commit is recorded in repository metadata.</PackageReleaseNotes>
   </PropertyGroup>
+
+  <ItemGroup Condition="'$(IsOpenCoreLibraryPackage)' == 'true'">
+    <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="/" Link="README.md" />
+  </ItemGroup>
 
 </Project>

@@ -28,6 +28,19 @@ this seam matters.
 Pre-1.0 the contract may still move; once hosted ingestion exists, changes go through versioned
 migrations. `SnapshotSchema.Version` is the single source of truth in code.
 
+The NuGet package version and JSON schema version are separate identities. The explicit mapping for
+the immutable library releases is:
+
+| Library package version | Snapshot schema produced | Notes |
+|---|---|---|
+| `0.6.0` | `0.4.0` | Historical published payload; immutable, no `libraries[].storage` |
+| `0.7.0` | `0.5.0` | Adds optional `libraries[].storage`; current source |
+
+`Directory.Build.props` records the current mapping as `Version` + `SnapshotSchemaVersion`. CI compares
+both to the previous `v*` release, package-validates the public API, and inspects the packed nuspec's
+version/schema/repository commit. A schema change without both its schema bump and a new package version
+fails; a published package version is never overwritten.
+
 ## Document shape (v0.5.0)
 
 | Field | Type | Notes |
@@ -95,7 +108,7 @@ When these land they extend the contract additively and bump the schema version.
   "schemaVersion": "0.5.0",
   "snapshotId": "1b9d…",
   "createdAt": "2026-06-28T10:00:00+00:00",
-  "source": { "tool": "shelfbound-cli", "toolVersion": "0.6.0", "platform": "windows" },
+  "source": { "tool": "shelfbound-cli", "toolVersion": "0.7.0", "platform": "windows" },
   "device": { "id": "b54997ab-…", "name": "GERALT", "type": "unknown", "os": "windows" },
   "steamAccounts": [ { "steamId64": "765611…", "personaName": "…", "mostRecent": true } ],
   "libraries": [

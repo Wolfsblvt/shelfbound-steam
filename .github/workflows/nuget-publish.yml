@@ -27,13 +27,33 @@ jobs:
     environment: nuget # must match the environment in the nuget.org Trusted Publishing policy
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # release gates require tags and the exact source commit
       - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: "10.0.x"
-      - run: dotnet pack -c Release -o ./artifacts
+      - run: dotnet test Shelfbound.slnx -c Release -warnaserror
+      - name: Reject reused versions and mismatched tag/schema/API identity
+        run: |
+          pwsh scripts/test-package-release-gates.ps1
+          pwsh scripts/test-package-release.ps1 -CheckPublishedVersion -RequireReleaseTag
+      # A v* tag is the immutable library stream. Pack only its three version-locked libraries:
+      # independently-versioned CLI/MCP tools cannot turn a library release into duplicate no-ops.
+      - run: |
+          dotnet pack src/Shelfbound.Core/Shelfbound.Core.csproj -c Release --no-restore -warnaserror -o ./artifacts
+          dotnet pack src/Shelfbound.Query/Shelfbound.Query.csproj -c Release --no-restore -warnaserror -o ./artifacts
+          dotnet pack src/Shelfbound.Steam/Shelfbound.Steam.csproj -c Release --no-restore -warnaserror -o ./artifacts
       - name: Mint a short-lived NuGet API key via Trusted Publishing
         id: nuget-login
         uses: NuGet/login@v1
         with:
           user: ${{ env.NUGET_USER }}
-      - run: dotnet nuget push "./artifacts/*.nupkg" --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate
+      - name: Publish the immutable library set
+        shell: pwsh
+        run: |
+          [xml]$props = Get-Content -Raw Directory.Build.props
+          $version = @($props.Project.PropertyGroup.Version)[0]
+          foreach ($packageId in @('Shelfbound.Core', 'Shelfbound.Query', 'Shelfbound.Steam')) {
+            dotnet nuget push "./artifacts/$packageId.$version.nupkg" --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }

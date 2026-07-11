@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  APICompat baseline: published Shelfbound.Core 0.6.0.
+  This pre-1.0 breaking change is intentional in package 0.7.0. New suppressions require a package
+  version change allowed by scripts/package-release-gates.psm1; unreviewed breaks fail package validation.
+  Diagnostic reference: https://learn.microsoft.com/dotnet/fundamentals/package-validation/diagnostic-ids
+-->
+<Suppressions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:Shelfbound.Core.UserData.UserDataActions.RecordFirstSeen(Shelfbound.Core.UserData.UserProfile,System.Collections.Generic.IEnumerable{System.Int32},System.DateTimeOffset)</Target>
+    <Left>lib/net10.0/Shelfbound.Core.dll</Left>
+    <Right>lib/net10.0/Shelfbound.Core.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+</Suppressions>

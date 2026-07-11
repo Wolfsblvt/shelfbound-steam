@@ -13,13 +13,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # package/schema gates compare against immutable v* releases
       - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '10.0.x'
       - run: dotnet restore
-      - run: dotnet build --no-restore -c Release
+      - run: dotnet build --no-restore -c Release -warnaserror
       # coverlet.collector (already referenced by the test project) emits Cobertura coverage.
-      - run: dotnet test --no-build -c Release --verbosity normal --collect:"XPlat Code Coverage" --results-directory ./coverage
+      - run: dotnet test --no-build -c Release -warnaserror --verbosity normal --collect:"XPlat Code Coverage" --results-directory ./coverage
+      - name: Release-gate rejection fixtures
+        run: pwsh scripts/test-package-release-gates.ps1
+      - name: Package identity, schema, and API compatibility
+        run: pwsh scripts/test-package-release.ps1
       # Render a coverage table into the run's job summary — visibility without an external service.
       - name: Coverage summary
         if: always()
