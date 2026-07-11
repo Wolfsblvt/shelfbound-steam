@@ -1,9 +1,9 @@
 namespace Shelfbound.Core.Model;
 
 /// <summary>
-/// The root Shelfbound snapshot: the portable, versioned contract between the local scanner,
-/// the local MCP server, and (later) hosted ingestion. This type is the architectural seam that
-/// lets every producer/consumer interoperate without sharing parsing code.
+/// The root Shelfbound snapshot: the complete portable, versioned contract between the local scanner,
+/// local MCP server, exporters, and other consumers. Official hosted clients derive a minimized
+/// projection from this personal local document rather than uploading it verbatim.
 /// See docs/project/snapshot-schema.md.
 /// </summary>
 public sealed record SnapshotDocument

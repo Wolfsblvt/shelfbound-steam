@@ -1,9 +1,9 @@
 # Shelfbound — Snapshot Schema
 
 The snapshot is Shelfbound's central contract: a versioned, portable, **language-neutral** export of
-local library context that connects the scanner, the local MCP server, hosted ingestion, and future
-clients without any of them sharing parsing code. See [ARCHITECTURE.md](./ARCHITECTURE.md) for why
-this seam matters.
+local library context that connects the scanner, local MCP server, exporters, and future clients
+without any of them sharing parsing code. Official hosted clients derive a privacy-minimized subset
+from it; the complete local document is not uploaded. See [ARCHITECTURE.md](./ARCHITECTURE.md).
 
 - Machine-readable contract: [`schema/snapshot.v0.schema.json`](../../schema/snapshot.v0.schema.json)
   (JSON Schema 2020-12).
@@ -36,9 +36,9 @@ migrations. `SnapshotSchema.Version` is the single source of truth in code.
 | `snapshotId` | string | unique per snapshot instance (GUID) |
 | `createdAt` | date-time | UTC |
 | `source` | object | `tool`, `toolVersion`, `platform` — no user data |
-| `device` | object | `id`, `name`, `type`, `os`, optional `specs` |
-| `device.specs?` | object | best-effort hardware: `cpu?`, `logicalCores?`, `totalMemoryBytes?`, `gpu?`, `osDescription?`, `architecture?` — device facts only, no identifiers/serials |
-| `steamAccounts[]` | array | `steamId64`, `accountName?`, `personaName?`, `mostRecent` |
+| `device` | object | `id`, `name`, `type`, `os`, optional `specs`; upload-capable producers use a user/neutral label, and hosted projection also neutralizes legacy hostname input |
+| `device.specs?` | object | best-effort hardware: `cpu?`, `logicalCores?`, `totalMemoryBytes?`, `gpu?`, `osDescription?`, `architecture?` — no identifiers/serials; exact OS description stays local and is coarsened for hosted upload |
+| `steamAccounts[]` | array | local-only identity detail: `steamId64`, `accountName?`, `personaName?`, `mostRecent`; the entire array is omitted from official hosted uploads |
 | `libraries[]` | array | `index`, `label`, `gameCount`, optional `storage` — **no filesystem path** |
 | `libraries[].storage?` | object | `kind` (`internal`/`sdCard`/`external`/`network`/`unknown`), `freeBytes?`, `totalBytes?` — storage medium + capacity, **no path**. Producers emit `unknown` rather than guess |
 | `games[]` | array | see below |
@@ -55,18 +55,38 @@ Enums: `osPlatform` = `unknown|windows|linux|macOs`; `deviceType` =
 `unknown|desktop|laptop|steamDeck|server`; `libraryScope` = `installedOnly|fullLibrary`;
 `storageKind` = `internal|sdCard|external|network|unknown`.
 
-## Privacy rules baked into the contract
+## Privacy rules baked into the local contract
 
 These are contract-level guarantees, not just scanner behavior (see
 [privacy-and-data.md](./privacy-and-data.md)):
 
 - **No full filesystem paths.** Libraries carry only `index` + `label` (and an optional `storage`
-  medium kind + capacity, never a path); games carry only the relative `installDir` name. This keeps a
-  snapshot safe-by-default even if later uploaded.
+  medium kind + capacity, never a path); games carry only the relative `installDir` name.
 - **`device.id` is random and locally persisted** — not derived from hardware or account.
 - **No credentials, saves, screenshots, or arbitrary files** are ever represented.
-- `accountName` (the Steam login name) is included for local completeness but is a candidate for
-  redaction before upload in cloud mode.
+- Steam ids/login/persona names are included for local completeness, so the local file is personal.
+  They are not part of the hosted projection.
+
+## Hosted upload projection v1
+
+The hosted body is a producer-side subset; it does **not** change snapshot schema v0.5.0 or the
+`/ingest` shape. C# uses `Shelfbound.Client.HostedProjection` (shared by CLI + tray), while Decky's
+Python mirror is checked against the same byte-exact golden fixture. Both are whitelist-only and have
+an explicit field-purpose manifest.
+
+| Local field/group | Hosted decision |
+|---|---|
+| `schemaVersion`, `snapshotId`, `createdAt`, `source.*` | Include for compatibility, capture identity/time, and producer provenance |
+| `steamAccounts[]` | **Drop entirely**, including `steamId64`, `accountName`, `personaName`, `mostRecent` |
+| `device.id` | Include: random, non-hardware id used for multi-device keying |
+| `device.name` | Include the user-chosen label; use `Shelfbound device` instead of an automatic hostname, including legacy-hostname input |
+| `device.type`, `device.os`, CPU/GPU/cores/RAM/architecture | Include for device-aware and compatibility recommendations |
+| `device.specs.osDescription` | Coarsen to `Windows 10/11`, `Linux`, `macOS`, or `Unknown OS`; exact build/kernel is dropped |
+| `libraries[]`, `games[]`, `categories[]`, `stats` | Include as the product data; still no full paths/serials/credentials |
+
+Game names and collection names remain personal. `games[].name` can contain a private/non-Steam title
+from future or third-party producers even though official producers are Steam-only today. See the
+preview/consent details in [privacy-and-data.md](./privacy-and-data.md).
 
 ## Scope and what's intentionally missing
 
@@ -96,7 +116,7 @@ When these land they extend the contract additively and bump the schema version.
   "snapshotId": "1b9d…",
   "createdAt": "2026-06-28T10:00:00+00:00",
   "source": { "tool": "shelfbound-cli", "toolVersion": "0.6.0", "platform": "windows" },
-  "device": { "id": "b54997ab-…", "name": "GERALT", "type": "unknown", "os": "windows" },
+  "device": { "id": "b54997ab-…", "name": "Shelfbound device", "type": "unknown", "os": "windows" },
   "steamAccounts": [ { "steamId64": "765611…", "personaName": "…", "mostRecent": true } ],
   "libraries": [
     { "index": 0, "label": "library-0", "gameCount": 11,

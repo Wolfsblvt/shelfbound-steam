@@ -42,11 +42,20 @@ Build the local core (scanner → snapshot → local MCP) before anything networ
 differentiator, has zero auth/infra/cost, can be dogfooded immediately on a real library, and
 pressure-tests the snapshot schema before anything depends on it.
 
-### Privacy-first snapshot
-The snapshot **omits full filesystem paths** (libraries → index + label; games → relative install-dir
-name only). `device.id` is a **random GUID persisted locally**, not derived from hardware/account. No
-credentials, saves, screenshots, or arbitrary files are ever read. So a snapshot is safe-by-default
-even if later exported/uploaded. See [privacy-and-data.md](./privacy-and-data.md).
+### Privacy-separated local snapshot and hosted projection (updated 2026-07-11)
+The complete local snapshot remains useful to local consumers and includes Steam identity detail. It
+still omits full filesystem paths (libraries → index + label; games → relative install-dir only), uses
+a random non-hardware `device.id`, and never represents credentials, saves, screenshots, serials, or
+arbitrary files — but it is personal, not an upload-safe anonymous blob.
+
+Official hosted clients must pass it through **projection v1** in `Shelfbound.Client`: a dedicated,
+whitelist-only DTO graph shared by CLI + tray. The projection drops `steamAccounts` entirely, prevents
+an automatic hostname label, coarsens exact OS builds, and retains product-justified device/library/
+game/category/stats fields with a leaf-by-leaf purpose manifest. Preview and transport share one
+prepared compact JSON body; tray background consent is versioned. Decky's Python mirror is pinned to
+the same byte-exact golden fixture. *Rejected:* redacting at the receiver (the data has already crossed
+the trust boundary), serializing the local model with ignored properties (new nested fields could leak),
+or maintaining separate CLI/tray payload builders (drift). See [privacy-and-data.md](./privacy-and-data.md).
 
 ### Data scope — installed games + local categories
 The local scan yields *installed* games per library plus the user's **local categories**.
@@ -126,10 +135,7 @@ context whenever the user states an opinion/status/meaning. The deterministic pr
 the shared `ProfileQuery`; the model drives the conversation.
 
 ### Deferred (technical, recorded so it isn't re-litigated)
-- **Distribution** — resolved; see "Packaging & distribution" below (tray via Velopack, CLI/MCP as .NET tools).
 - **Modern dynamic collections** (leveldb) to complement the legacy categories already parsed.
-- **Steam Deck** specifics (SD-card install location) and a future **Decky plugin** that emits the
-  same snapshot contract.
 
 ---
 
@@ -231,8 +237,9 @@ build cheap and the unknowns explicit — `decky/README.md` carries the needs-ha
 
 - **One producer contract, enforced by test.** The Python backend mirrors the C# scanner
   (VDF semantics, fallbacks, warning texts), and the emitted snapshot is validated against the
-  **unmodified** `schema/snapshot.v0.schema.json` in an off-Deck pytest suite (44 tests). No forked
-  data model, `source.tool: "shelfbound-decky"`.
+  **unmodified** `schema/snapshot.v0.schema.json` in the off-Deck pytest suite. No forked
+  data model, `source.tool: "shelfbound-decky"`. Hosted transport then mirrors the C# hosted
+  projection rather than sending that complete local document.
 - **Per-storage intelligence: UI-only in the prototype, now an additive contract field.** The
   prototype classified internal-SSD vs microSD + free space on-device only (`additionalProperties:
   false` rejected invented fields); library **paths** remain a local-only side channel and are never
@@ -292,9 +299,9 @@ without `storage` still validate; consumers stay lenient.
 
 **No paths, ever** — kind + sizes only (a path would leak the filesystem layout; same rule the prototype
 set). Where the OS can't tell the medium apart (SD-vs-USB on a desktop card reader, an unknown bus) the
-producer emits `"unknown"` rather than guess. The decky privacy preview's "never uploaded" copy was
-corrected accordingly (storage kind + free/total are now in the upload; mount points, device names, and
-paths still are not).
+producer emits `"unknown"` rather than guess. The Decky privacy preview's "never uploaded" copy was
+corrected accordingly (storage kind + free/total are in the hosted projection; mount points, storage
+device names, and paths are not).
 
 *Follow-up (out of scope here):* the **hosted consumer** — cloud ingest reasoning over per-storage for
 device-aware "fits on your SD card" / "free up space" recommendations — is a separate cloud task. Because

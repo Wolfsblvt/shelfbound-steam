@@ -13,6 +13,8 @@ not been exercised on real hardware. See the README's validation list.
 import asyncio
 import os
 import sys
+import uuid
+from dataclasses import dataclass
 from datetime import datetime, timezone
 
 # The loader puts py_modules on sys.path; insert defensively so local smoke tests work too.
@@ -24,6 +26,7 @@ import decky  # noqa: E402 — injected by Decky Loader at runtime
 from shelfbound_decky import SCHEMA_VERSION, TOOL_NAME, TOOL_VERSION  # noqa: E402
 from shelfbound_decky import device_identity, locator, overview, privacy  # noqa: E402
 from shelfbound_decky.cloud import PairingUnavailableError, ShelfboundServer  # noqa: E402
+from shelfbound_decky.hosted_projection import HostedUpload, prepare_hosted_upload  # noqa: E402
 from shelfbound_decky.settings import SettingsStore, TokenStore  # noqa: E402
 from shelfbound_decky.snapshot import ScanOutput, build_snapshot  # noqa: E402
 
@@ -32,11 +35,19 @@ from shelfbound_decky.snapshot import ScanOutput, build_snapshot  # noqa: E402
 _STATUS_TIMEOUT_SECONDS = 4.0
 
 
+@dataclass(frozen=True)
+class _PendingUpload:
+    upload_id: str
+    upload: HostedUpload
+    warnings: list[str]
+
+
 class Plugin:
     def __init__(self) -> None:
         self._settings_store = SettingsStore(decky.DECKY_PLUGIN_SETTINGS_DIR)
         self._token_store = TokenStore(decky.DECKY_PLUGIN_SETTINGS_DIR)
         self._pairing_session: dict | None = None
+        self._pending_upload: _PendingUpload | None = None
 
     # ---- panel data ------------------------------------------------------------
 
@@ -90,14 +101,18 @@ class Plugin:
     async def get_privacy_preview(self) -> dict:
         try:
             scan = await asyncio.to_thread(self._scan)
-            preview = privacy.build_privacy_preview(scan.snapshot, scan.warnings)
-            return {"ok": True, **preview}
+            upload = await asyncio.to_thread(prepare_hosted_upload, scan.snapshot)
+            pending = _PendingUpload(str(uuid.uuid4()), upload, list(scan.warnings))
+            self._pending_upload = pending
+            preview = privacy.build_privacy_preview(upload, pending.warnings)
+            return {"ok": True, "uploadId": pending.upload_id, **preview}
         except Exception as error:  # noqa: BLE001
+            self._pending_upload = None
             return self._fail("get_privacy_preview", error)
 
     # ---- sync ------------------------------------------------------------------
 
-    async def sync_now(self) -> dict:
+    async def sync_now(self, upload_id: str | None = None) -> dict:
         try:
             token = self._token_store.load()
             if not token:
@@ -107,16 +122,28 @@ class Plugin:
                     "error": "Not connected — pair this device with your Shelfbound account first.",
                 }
 
+            pending = self._pending_upload
+            if pending is None or upload_id != pending.upload_id:
+                return {
+                    "ok": False,
+                    "status": "previewRequired",
+                    "error": "Preview this upload again before syncing.",
+                }
+
+            # One confirmation authorizes one exact body. Consume it before the network call so a
+            # retry always requires a fresh preview rather than accidentally double-uploading.
+            self._pending_upload = None
             settings = self._settings_store.load()
-            scan = await asyncio.to_thread(self._scan)
             server = ShelfboundServer(settings.server_url, token)
-            outcome = await asyncio.to_thread(server.upload_snapshot, scan.snapshot)
+            outcome = await asyncio.to_thread(server.upload_prepared, pending.upload)
 
             synced_at = datetime.now(timezone.utc).isoformat()
             settings.last_sync = {
                 "at": synced_at,
                 "status": outcome.status,
                 "message": outcome.message,
+                "warning": outcome.warning,
+                "errorCode": outcome.error_code,
                 "gameCount": outcome.game_count,
             }
             self._settings_store.save(settings)
@@ -125,10 +152,14 @@ class Plugin:
                 "ok": outcome.ok,
                 "status": outcome.status,
                 "message": outcome.message,
+                "warning": outcome.warning,
+                "errorCode": outcome.error_code,
                 "gameCount": outcome.game_count,
                 "retryAfterSeconds": outcome.retry_after_seconds,
+                "plan": outcome.plan,
+                "maxDevices": outcome.max_devices,
                 "syncedAt": synced_at,
-                "warnings": scan.warnings,
+                "warnings": pending.warnings,
             }
         except Exception as error:  # noqa: BLE001
             return self._fail("sync_now", error)
@@ -195,6 +226,7 @@ class Plugin:
         try:
             self._token_store.clear()
             self._pairing_session = None
+            self._pending_upload = None
             return {"ok": True}
         except Exception as error:  # noqa: BLE001
             return self._fail("disconnect", error)
@@ -220,6 +252,7 @@ class Plugin:
             if device_name is not None:
                 settings.device_name = device_name.strip() or None
             self._settings_store.save(settings)
+            self._pending_upload = None
             return {"ok": True, "serverUrl": settings.server_url, "deviceName": settings.device_name}
         except Exception as error:  # noqa: BLE001
             return self._fail("update_settings", error)

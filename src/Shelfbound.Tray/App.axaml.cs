@@ -53,7 +53,11 @@ public partial class App : Application
         var open = new NativeMenuItem("Open Shelfbound");
         open.Click += (_, _) => ShowWindow();
         var sync = new NativeMenuItem("Sync now");
-        sync.Click += async (_, _) => await _agent!.SyncNowAsync();
+        sync.Click += async (_, _) =>
+        {
+            ShowWindow();
+            await _window!.PreviewAndSyncAsync();
+        };
         var connect = new NativeMenuItem("Connect account…");
         connect.Click += async (_, _) => await _agent!.ConnectAsync();
         var signOut = new NativeMenuItem("Sign out");

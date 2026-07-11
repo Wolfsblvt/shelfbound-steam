@@ -6,7 +6,7 @@ public sealed record SteamAccount
     /// <summary>64-bit SteamID (a public identifier).</summary>
     public required string SteamId64 { get; init; }
 
-    /// <summary>Local Steam login name. Optional; redacted before upload in cloud mode.</summary>
+    /// <summary>Local Steam login name. Optional; local-only and omitted from hosted uploads.</summary>
     public string? AccountName { get; init; }
 
     /// <summary>Public Steam display name.</summary>

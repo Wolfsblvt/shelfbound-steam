@@ -119,7 +119,7 @@ static async Task<int> RunUploadAsync(string[] args, string version)
     string? token = Environment.GetEnvironmentVariable("SHELFBOUND_TOKEN");
     string? steamPath = null, deviceName = null, steamApiKey = null;
     DeviceType? deviceType = null;
-    bool watch = false;
+    bool watch = false, dryRun = false;
     int intervalSeconds = 0;
 
     for (int i = 1; i < args.Length; i++)
@@ -135,6 +135,9 @@ static async Task<int> RunUploadAsync(string[] args, string version)
                 break;
             case "--watch":
                 watch = true;
+                break;
+            case "--dry-run":
+                dryRun = true;
                 break;
             case "--interval":
                 if (!TryTakeValue(args, ref i, a, out string? iv)) return 2;
@@ -163,12 +166,18 @@ static async Task<int> RunUploadAsync(string[] args, string version)
         }
     }
 
-    if (string.IsNullOrWhiteSpace(server))
+    if (watch && dryRun)
+    {
+        Console.Error.WriteLine("--dry-run previews one exact upload and cannot be combined with --watch.");
+        return 2;
+    }
+
+    if (!dryRun && string.IsNullOrWhiteSpace(server))
     {
         Console.Error.WriteLine("Set the Shelfbound server with --server <url> or the SHELFBOUND_SERVER environment variable.");
         return 2;
     }
-    if (string.IsNullOrWhiteSpace(token))
+    if (!dryRun && string.IsNullOrWhiteSpace(token))
     {
         Console.Error.WriteLine("Set an API token with --token <token> or the SHELFBOUND_TOKEN environment variable.");
         Console.Error.WriteLine("Create a token in the Shelfbound web app after signing in through Steam.");
@@ -176,11 +185,32 @@ static async Task<int> RunUploadAsync(string[] args, string version)
     }
 
     SnapshotBuildOptions options = BuildOptions(steamPath, deviceName, deviceType, steamApiKey, version);
-    using var client = new ShelfboundClient(server, token);
+    if (dryRun)
+        return await PreviewUploadAsync(options);
+
+    using var client = new ShelfboundClient(server!, token!);
 
     return watch
         ? await RunWatchAsync(client, options, intervalSeconds)
         : await UploadOnceAsync(client, options) ? 0 : 1;
+}
+
+// Writes the canonical compact body with no extra stdout text: these are the exact bytes UploadAsync sends.
+static async Task<int> PreviewUploadAsync(SnapshotBuildOptions options)
+{
+    try
+    {
+        SnapshotBuildResult build = await SnapshotBuilder.BuildAsync(options);
+        HostedUpload upload = HostedProjection.Prepare(build.Snapshot);
+        Console.Out.Write(upload.Json);
+        PrintWarnings(build.Warnings);
+        return 0;
+    }
+    catch (Exception ex)
+    {
+        Console.Error.WriteLine(ex.Message);
+        return 1;
+    }
 }
 
 // Continuous sync. Automatic sync is a paid feature: refuse politely for non-entitled accounts. This
@@ -244,17 +274,32 @@ static async Task<bool> UploadOnceAsync(ShelfboundClient client, SnapshotBuildOp
     {
         case UploadStatus.Success:
             Console.WriteLine($"Uploaded {result.GameCount} game(s).");
+            if (!string.IsNullOrWhiteSpace(result.Warning))
+                Console.Error.WriteLine($"warning: {result.Warning}");
             PrintScopeNotice(build.Snapshot);
             return true;
         case UploadStatus.Throttled:
             string retry = result.RetryAfterSeconds is { } s ? $" (try again in ~{s}s)" : "";
-            Console.Error.WriteLine($"Upload rejected: too soon for your plan{retry}. Automatic/frequent sync is a Pro/Lifetime feature.");
+            Console.Error.WriteLine($"Upload rejected{retry}: {result.Message}");
             return false;
         case UploadStatus.Unauthorized:
-            Console.Error.WriteLine("Upload rejected: invalid or missing API token. Create one in the Shelfbound web app.");
+            Console.Error.WriteLine($"Upload rejected: {result.Message}");
+            return false;
+        case UploadStatus.Forbidden:
+            Console.Error.WriteLine($"Upload forbidden ({result.ErrorCode}): {result.Message}");
+            return false;
+        case UploadStatus.DeviceLimited:
+            string cap = result.MaxDevices is { } max ? $" (maximum {max})" : "";
+            Console.Error.WriteLine($"Upload rejected: {result.Message}{cap}");
+            return false;
+        case UploadStatus.InvalidSnapshot:
+            Console.Error.WriteLine($"Upload rejected as invalid: {result.Message}");
+            return false;
+        case UploadStatus.PayloadTooLarge:
+            Console.Error.WriteLine($"Upload rejected as too large: {result.Message}");
             return false;
         default:
-            Console.Error.WriteLine($"Upload failed: {result.Message}");
+            Console.Error.WriteLine($"Upload failed ({result.ErrorCode}): {result.Message}");
             return false;
     }
 }
@@ -326,7 +371,8 @@ static void PrintSummary(SnapshotDocument s, SnapshotDevice device, string path)
     Console.WriteLine($"  output      : {Path.GetFullPath(path)}");
     Console.WriteLine();
     PrintScopeNotice(s);
-    Console.WriteLine("Privacy: no install paths, credentials, or save data are included.");
+    Console.WriteLine("Privacy: this local snapshot is personal (Steam accounts + library data).");
+    Console.WriteLine("No full install paths, credentials, or save data are included.");
     Console.WriteLine("See docs/project/privacy-and-data.md.");
 }
 
@@ -513,7 +559,7 @@ static void PrintUsage()
           shelfbound setup [--steam-api-key <key>] [--show]
           shelfbound profile [--reset-recency]
           shelfbound scan [options]
-          shelfbound upload [scan options] [--server <url>] [--token <tok>] [--watch] [--interval <sec>]
+          shelfbound upload [scan options] [--server <url>] [--token <tok>] [--dry-run] [--watch] [--interval <sec>]
 
         PROFILE OPTIONS:
           --reset-recency        Clear the "recently added" baseline; the next scan re-establishes it
@@ -524,7 +570,7 @@ static void PrintUsage()
           -o, --output <file>    Output file (default: shelfbound-snapshot.json)
           --stdout               Write snapshot JSON to stdout instead of a file
           --pretty               Indent the JSON output file
-          --device-name <name>   Override device name (default: machine name)
+          --device-name <name>   Friendly device label (default: "Shelfbound device")
           --device-type <type>   desktop | laptop | steamDeck | server | unknown
           --steam-api-key <key>  Add owned (not installed) games + playtime via the Steam Web API
                                  (or set STEAM_WEB_API_KEY)
@@ -532,6 +578,7 @@ static void PrintUsage()
         UPLOAD OPTIONS (also accepts the scan options above):
           --server <url>         Shelfbound server (or set SHELFBOUND_SERVER)
           --token <token>        API token from the web app (or set SHELFBOUND_TOKEN)
+          --dry-run              Print the exact privacy-minimized upload body; sends nothing
           --watch                Keep syncing on an interval (requires a Pro/Lifetime plan)
           --interval <seconds>   Watch interval (clamped to your plan's minimum)
 

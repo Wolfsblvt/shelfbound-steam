@@ -1,56 +1,96 @@
 # Shelfbound — Privacy & Data (local core)
 
-Trust is central: Shelfbound reads personal library data from local files. The product only works if
-users believe — and can verify — that it is careful. This repo is open source partly so the local
-data handling is **auditable**. This document covers the **open-source local tool**. (If you use a
-separate hosted version, that service has its own privacy policy.)
+Trust is central: Shelfbound reads personal library data from local files. This repository is open
+source partly so both the local reads and the official hosted-upload boundary are auditable. A
+separate hosted service has its own privacy policy, retention rules, and account controls.
 
 ## Principles
 
 - Read only the local data that is needed; never arbitrary filesystem contents.
-- Nothing leaves your machine. The scanner has no network access; it only writes a local snapshot
-  file that you control.
-- Never read or store Steam passwords/credentials, saves, or screenshots.
-- AI-derived facts (via the local MCP server) carry source/evidence/confidence and are
-  user-editable/deletable.
-- Be careful with anything revealing: non-Steam game names, device names, usernames, paths.
+- The scanner itself has no network access. Nothing leaves unless the user explicitly exports or
+  invokes an upload-capable client.
+- Official clients upload a separate, whitelist-only **hosted projection**, never the complete local
+  `SnapshotDocument`.
+- Never read or store Steam passwords/credentials, saves, screenshots, hardware serials, or MACs.
+- AI-derived local facts carry source/evidence/confidence and are user-editable/deletable.
+- Be honest about revealing data: game and collection names, a device label, specs, and play history
+  are personal even when they are useful product data.
 
-## What is read locally (scanner)
+## What is read locally
 
 - `steamapps/libraryfolders.vdf` — libraries and installed app ids.
-- `steamapps/appmanifest_*.acf` — game name, install state, install-dir name, size, timestamps.
+- `steamapps/appmanifest_*.acf` — game name, install state, relative install-dir name, size, timestamps.
 - `config/loginusers.vdf` — Steam accounts (id, login name, persona name).
-- **Your categories/collections** — the modern Steam collections from the desktop client's local web
+- **Your categories/collections** — modern Steam collections from the desktop client's local web
   storage (`htmlcache/Local Storage/leveldb`), falling back to the legacy
-  `userdata/<id>/7/remote/sharedconfig.vdf`. Only your collection names + which games are in them are
-  read — see [steam-collections.md](./steam-collections.md).
-- Device/environment basics (machine name, OS) and a locally persisted random device id.
-- Best-effort **hardware specs** (CPU, cores, RAM, GPU, OS, architecture) for device-aware
-  recommendations — device facts only, **no serial numbers or fingerprints**, surfaced in the tray.
+  `userdata/<id>/7/remote/sharedconfig.vdf`. Only collection names + game membership are read; see
+  [steam-collections.md](./steam-collections.md).
+- A device label, OS, and a locally persisted random device id. Upload-capable scanner paths use a
+  user choice or the neutral default `Shelfbound device`; a local-only producer may retain more local
+  detail, which is why the hosted projection also neutralizes the current machine hostname.
+- Best-effort hardware specs (CPU, cores, RAM, GPU, OS description, architecture) for device-aware
+  recommendations. No serial numbers or hardware-derived ids are collected.
 
-Nothing else. The scanner does not traverse user files, saves, or unrelated directories.
+Nothing else. The scanner does not traverse saves, unrelated user files, or arbitrary directories.
 
-## What a snapshot contains vs deliberately excludes
+## The complete local snapshot is personal
 
-The snapshot is built to be **safe-by-default even if you later choose to share/upload it** (see
-[snapshot-schema.md](./snapshot-schema.md)):
+The portable snapshot contract contains the complete local data needed by local consumers:
 
-**Included:** Steam account id(s), app ids, game names, installed yes/no, library index + label,
-optional per-library storage kind (internal/SD/external/network) + free/total capacity, device
-name/type/os + best-effort hardware specs, relative install-dir name, sizes/timestamps,
-category/collection names, and a library-scope marker (installed-only vs full owned library).
+- Steam account ids, login/persona names, app ids, game names, installed state, playtime, sizes and
+  timestamps;
+- library index + label, optional storage kind + free/total capacity, and relative install-dir names;
+- the device label/type/OS/specs and random device id;
+- category/collection names and the scan-scope marker.
 
-**Excluded:** passwords/credentials, save files, screenshots, arbitrary files, **full install
-paths**, library filesystem paths, mount points, device names, install scripts, depot internals.
+It deliberately has no passwords, credentials, saves, screenshots, full install/library paths,
+mount points, storage-device names, hardware serials, or MACs. That makes the local file safer, but
+**not anonymous and not the hosted upload body**. It contains Steam identity fields and should be
+treated as personal data. See [snapshot-schema.md](./snapshot-schema.md).
 
-The device id is a **random GUID persisted locally** — not derived from hardware or account. The
-Steam login `accountName` is included for local completeness; treat the snapshot file as personal.
+## Hosted upload projection v1
+
+`Shelfbound.Client.HostedProjection` is the C# source of truth used by the CLI and tray. Decky's
+`hosted_projection.py` mirrors the same whitelist and is pinned to the same cross-language golden
+fixture. Each implementation carries an explicit leaf-by-leaf field-purpose manifest.
+
+The hosted body includes:
+
+- snapshot version/id/capture time and producer provenance;
+- random `device.id`, the **user-chosen or neutral** `device.name`, type and OS family;
+- CPU/GPU/core/RAM/architecture specs and a **coarsened** OS description (`Windows 10/11`, `Linux`,
+  or `macOS`, never an exact build/kernel string);
+- libraries (index, label, count, optional storage kind/free/total), games, categories, and stats.
+
+It drops the complete `steamAccounts` array: `steamId64`, `accountName`, `personaName`, and
+`mostRecent` do not leave the machine. Account ownership comes from the authenticated upload token,
+not from snapshot identity fields. A legacy snapshot whose device label equals the current machine
+hostname is also replaced with `Shelfbound device` before transport.
+
+The product data remains personal. In particular, `games[].name` can reveal a private/non-Steam title
+from a future or third-party producer (official producers are Steam-only today), and collection names
+can reveal the user's own vocabulary. Hardware model combinations can also be distinctive even though
+they contain no serials; they are included specifically for device-fit recommendations.
+
+The projection is fail-closed: invalid input produces no request. It reconstructs every nested object
+instead of serializing local model objects directly, so a future local field cannot silently start
+uploading.
+
+## Preview and consent
+
+- `shelfbound upload --dry-run` prints the exact compact hosted body to stdout and sends nothing. It
+  needs neither a server URL nor token.
+- The tray builds one prepared body, displays its exact JSON, and uploads that same object only after
+  confirmation. New installs default background sync off. Background sync cannot start until a user
+  has previewed and successfully sent the current projection version; a future field-set expansion
+  invalidates that consent.
+- Decky returns one prepared body plus a one-use upload id. Confirming sends those exact bytes; a
+  stale/reused id is rejected and requires a fresh preview.
 
 ## Memory/profile guardrails (local MCP write operations)
 
 Do not let a model silently poison a user's durable profile. **Only persist explicit, user-stated
-facts** ("I loved X because…", "mark this finished", "my `Deck` category means…"). Avoid storing weak
+facts** ("I loved X because…", "mark this finished", "my `Deck` category means…"). Avoid weak
 inferences ("user asked about horror once → likes horror"). Full rules and the write-tool design are
 in [mcp-design.md](./mcp-design.md). Every stored memory has source, evidence, confidence, timestamps,
-scope, and is visible/editable/deletable — surfaced today via `shelfbound profile` and the MCP
-`get_remembered` tool (a richer review/edit view is still to come).
+scope, and is visible/editable/deletable via `shelfbound profile` and the MCP `get_remembered` tool.

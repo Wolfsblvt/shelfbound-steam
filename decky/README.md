@@ -17,12 +17,14 @@ the signal desktop can't see), a **privacy preview** of exactly what a sync woul
 This is a **thin controller** over the same open core everything else uses — a companion surface,
 not a second scanner architecture:
 
-- **One producer contract.** The backend emits the standard versioned snapshot
+- **One local producer contract, one hosted privacy boundary.** The backend emits the standard versioned snapshot
   ([`schema/snapshot.v0.schema.json`](../schema/snapshot.v0.schema.json), currently **0.5.0**) with
   `source.tool: "shelfbound-decky"`. Same shape the CLI/tray produce; no forked data model, no
   special ingest path. The scanner code deliberately mirrors the C# reference
   (`src/Shelfbound.Steam`) file-for-file: same VDF semantics (case-insensitive keys, last-wins),
-  same fallbacks, same warning texts.
+  same fallbacks, same warning texts. Before network transport, `hosted_projection.py` reconstructs
+  the same minimized whitelist as the C# client; the Python and C# serializers share one byte-exact
+  golden fixture.
 - **Per-storage is a contract field; paths are not.** As of contract **v0.5.0** each library carries
   an optional `storage` object — medium kind (internal/sdCard/external/network/unknown) + free/total
   bytes — classified from the mount table and emitted like every other producer's storage data. The
@@ -55,8 +57,9 @@ decky/
     snapshot.py             Snapshot builder — the contract emitter (mirrors SteamScanner)
     storage.py              /proc/mounts parsing + storage classification → contract `storage` field
     overview.py             Per-storage panel view (reads the contract field; groups games, sizes, largest)
-    privacy.py              Privacy preview payload (real upload body + summary)
-    cloud.py                HTTP client: /ingest, /auth/me, /auth/entitlements + PROPOSED pairing
+    hosted_projection.py    Whitelist-only hosted DTO + field-purpose manifest + canonical JSON
+    privacy.py              Privacy preview payload (exact prepared upload body + summary)
+    cloud.py                Typed /ingest outcomes, /auth/me, /auth/entitlements + PROPOSED pairing
     settings.py             Plugin settings + 0600 token store (Decky settings dir)
   src/                      React panel (@decky/ui): status, account, sync, storage, dev sections
   tests/                    pytest suite incl. schema validation — runs on any machine, no Deck
@@ -84,13 +87,14 @@ tokens expire at 90 days or are revoked from the dashboard (the post-M-4 posture
 
 **Verified off-Deck (runs in this repo, no hardware):**
 
-- `pytest` suite (74 tests): VDF parser semantics, every file parser against C#-mirrored
+- `pytest` suite: VDF parser semantics, every file parser against C#-mirrored
   expectations, the modern-collections reader (byte-level snappy vectors + a Chromium LevelDB WAL
   fixture + the collections-JSON parse seam, all mirroring the C# oracle tests), storage
   classification from fixture mount tables, device-id reuse/creation, the HTTP client's exact status
   mapping against a real local server, backend `Plugin` response envelopes/token boundary/pairing
-  state transitions, and — the core check — a Deck-shaped fixture scan whose **snapshot validates
-  against the real, unmodified JSON Schema**.
+  state transitions, typed ingest outcomes, one-use preview consent, and — the core checks — a
+  Deck-shaped fixture scan whose **snapshot validates against the real, unmodified JSON Schema** plus
+  Python hosted bytes that match the C# golden exactly.
 - Frontend builds clean under strict TypeScript with the current `@decky/*` toolchain.
 
 **Theory until a real Deck says otherwise:** everything in the next section.
@@ -111,8 +115,8 @@ tokens expire at 90 days or are revoked from the dashboard (the post-M-4 posture
 5. **File realities on ext4:** casing of `config/loginusers.vdf` & friends, manifest field casing,
    VDF quirks in the wild.
 6. **Quick-access UI:** section rendering, `ConfirmModal` with children, `TextField` + virtual
-   keyboard inside a modal, scrolling the JSON preview with a controller, panel performance with
-   1000+ games (including the preview-JSON truncation UX).
+   keyboard inside a modal, scrolling the full exact JSON preview with a controller, and panel
+   performance with 1000+ games.
 7. **Network from the plugin backend** in Gaming Mode (the upload path), including against HTTPS.
 8. **Suspend/resume** mid-scan and mid-upload.
 9. **Update churn:** plugin surviving a SteamOS update / Decky reinstall cycle.
@@ -159,8 +163,11 @@ packaging/deploy loop is unverified from this monorepo subdirectory.
 
 ## Privacy
 
-Same hard rules as the core ([privacy-and-data.md](../docs/project/privacy-and-data.md)): only
-Steam library metadata is read; the privacy preview shows the **real upload body** before anything
-is sent; no filesystem paths, credentials, saves, screenshots, or serials. Per-library storage kind
-and free/total capacity **are** part of the snapshot (contract v0.5.0), but the drive **path**, mount
-points, and device names are never included. License: AGPL-3.0-or-later (whole repo).
+Same hard rules as the core ([privacy-and-data.md](../docs/project/privacy-and-data.md)): only Steam
+library metadata is read. Preview creates one minimized, compact hosted body plus a one-use id;
+confirmation sends those exact bytes, while stale/reused ids fail closed. The upload drops the entire
+Steam-account array, automatic hostname, exact OS build, filesystem paths, credentials, saves,
+screenshots, and serials. It includes the user/neutral device label, random device id, coarse OS/specs,
+games, collections, and per-library storage kind + free/total capacity. Storage paths, mount points,
+and block-device names stay local. Game and collection names remain personal. License:
+AGPL-3.0-or-later (whole repo).

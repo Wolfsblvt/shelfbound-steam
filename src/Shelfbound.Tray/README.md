@@ -36,14 +36,30 @@ token.
   **Sign out** clears the local token and stops auto-sync immediately; the server-side token expires at 90 days
   or can be revoked from the dashboard. Plan limits are enforced by the server — the tray only displays them,
   it never gates features client-side.
-- **Sync now** uploads immediately; auto-sync runs on an interval when enabled.
-- Closing the window hides it to the tray. Auto-start on login and background auto-sync are optional and on
-  by default.
+- **Sync now** first builds the privacy-minimized hosted projection and shows its exact compact JSON.
+  Confirming sends that same prepared body — the tray does not rescan or reserialize between preview
+  and transport.
+- New installs default auto-sync off. Background sync can run on an interval after the user enables it
+  and has previewed + successfully sent the current projection version once. If the uploaded field set
+  expands later, that versioned consent is invalidated.
+- Closing the window hides it to the tray. Auto-start on login and background auto-sync are optional
+  and configurable independently.
+
+## Hosted privacy boundary
+
+The tray and CLI share `Shelfbound.Client.HostedProjection`; there is no tray-specific payload builder.
+The hosted body includes the friendly/neutral device label, random device id, coarse OS/specs, library/
+game/category data and stats. It omits every Steam-account field (`accountName`, `personaName`,
+`steamId64`), machine hostnames, exact OS builds, full paths, credentials, and hardware serials. The
+default device label is the neutral `Shelfbound device`; set a friendly label instead of relying on a
+hostname. Game and collection names are still personal data.
 
 ## Storage
 
 - Settings live in `…/AppData/shelfbound/tray.json` (server URLs default to localhost for now); the API
   token is stored separately in `token.bin` — DPAPI-encrypted on Windows, a 0600 file elsewhere.
+- The settings file also records only the consented hosted-projection version; it does not duplicate the
+  preview body.
 - Login auto-start is wired for Windows (Run key), Linux (`~/.config/autostart`), and macOS (LaunchAgent).
 
 ## Auto-update

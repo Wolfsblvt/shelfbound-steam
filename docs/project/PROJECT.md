@@ -1,6 +1,6 @@
 # Shelfbound — Project Overview (open-source core)
 
-> Status as of 2026-07-01. This file is the living overview of the **open-source core**. Read it first.
+> Status as of 2026-07-11. This file is the living overview of the **open-source core**. Read it first.
 
 ## What Shelfbound is
 
@@ -74,22 +74,27 @@ The local Steam data is the moat. AI reasoning is commodity; good structured fac
   user-data store — per-game status/rating/completion/aspects, scoped memories, category meanings, and
   **first-seen** tracking (a "recently added/bought" proxy, since Steam exposes no purchase date) —
   shared by the CLI and MCP server.
-- CLI (`Shelfbound.Cli`): `shelfbound setup` (API key), `shelfbound scan` (+ enrichment), and
-  `shelfbound profile` (a local "what Shelfbound remembers" view).
+- CLI (`Shelfbound.Cli`): `shelfbound setup` (API key), `shelfbound scan` (+ enrichment),
+  `shelfbound profile` (a local "what Shelfbound remembers" view), and privacy-minimized hosted
+  upload with an exact `--dry-run` preview.
 - **Tray agent** (`Shelfbound.Tray`, Avalonia): background auto-sync, the loopback **connect** flow
   (device token in `token.bin`), device hardware specs, and login auto-start — now with **account
-  awareness** (signed-in account, plan, connected devices, sign-out; all display-only — the server
-  enforces limits) and a **Velopack installer + self-update** from GitHub Releases (Windows + Linux
-  `AppImage` shipping; macOS unsigned/testing until notarized). *Compiles and the logic is sound; a manual
-  GUI/E2E pass is the owner's remaining step.*
-- xUnit + Shouldly tests (45). Verified on a real ~111-game / 2-library install; MCP server
-  smoke-tested over stdio (write→search round-trip, server instructions, get_profile_status).
+  awareness** (signed-in account, plan, this-device label, sign-out; all display-only — the server
+  enforces limits), an exact-body upload preview/confirmation (background sync stays gated until the
+  current projection is consented), and a **Velopack installer + self-update** from GitHub Releases
+  (Windows + Linux `AppImage` shipping; macOS unsigned/testing until notarized). *Compiles and the
+  logic is sound; a manual GUI/E2E pass is the owner's remaining step.*
+- xUnit + Shouldly tests, plus Decky pytest contract/parity coverage. Verified on a real ~111-game /
+  2-library install; MCP server smoke-tested over stdio (write→search round-trip, server instructions,
+  get_profile_status).
 - **Local only. Identity is the local machine owner; real auth slots in for the hosted layer.**
 
-**Data scope:** installed + (with an API key) owned-but-not-installed Steam games, playtime, Steam
-accounts, device info, and the user's **local categories** with per-game tags. Categories are read from
-the **modern Steam collections** (Chromium leveldb), falling back to the legacy `sharedconfig.vdf` —
-the legacy file is stale for modern-UI users ([steam-collections.md](./steam-collections.md)).
+**Local snapshot scope:** installed + (with an API key) owned-but-not-installed Steam games, playtime,
+Steam accounts, device info, and the user's **local categories** with per-game tags. Official hosted
+clients drop the account array and coarsen device identity through projection v1 before upload.
+Categories are read from the **modern Steam collections** (Chromium leveldb), falling back to the
+legacy `sharedconfig.vdf` — the legacy file is stale for modern-UI users
+([steam-collections.md](./steam-collections.md)).
 
 ## Roadmap (open core)
 
@@ -102,8 +107,8 @@ Local-first — prove the data model locally before anything depends on it.
    signing + notarization, and pointing the tray at production URLs before a public build.
 2. **Taste/profile depth:** user-data now merges into query results (filter by status/rating/completion);
    remaining — a "what Shelfbound remembers" review/edit view and optional metered LLM extraction.
-3. **Remaining local data:** Steam Deck SD-card awareness, Windows registry-based install discovery,
-   and dynamic (`filterSpec`) collections (the modern-collections reader handles static ones today).
+3. **Remaining local data:** Windows registry-based install discovery and dynamic (`filterSpec`)
+   collections (the modern-collections reader handles static ones today).
 4. **Snapshot/export polish:** validation, import/export ergonomics for other clients.
 
 Done: local scanner, local categories (modern collections + legacy fallback), owned-not-installed +

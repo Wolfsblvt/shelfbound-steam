@@ -3,8 +3,9 @@ namespace Shelfbound.Core.Model;
 /// <summary>
 /// Lightweight, best-effort hardware facts about a device, used for device-aware recommendations
 /// ("runs well on this machine", "too heavy for the Deck") and capability-based search. Every field is
-/// optional — collection is defensive and may yield nulls. These are device facts, not personal data,
-/// and carry no identifiers/serials/fingerprints. See docs/project/privacy-and-data.md.
+/// optional — collection is defensive and may yield nulls. These carry no identifiers or serials,
+/// but model combinations can still be distinctive and must be disclosed. Hosted upload coarsens the
+/// exact OS build. See docs/project/privacy-and-data.md.
 /// </summary>
 public sealed record DeviceSpecs
 {

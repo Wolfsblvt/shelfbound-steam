@@ -1,50 +1,37 @@
-"""Privacy preview — exactly what would leave the device, shown before any send.
-
-The preview payload contains the REAL snapshot JSON (the byte-for-byte upload body,
-pretty-printed) plus a human summary. Nothing is softened or elided: if it's in the
-snapshot it's in the preview, and the "never included" list states what the contract
-excludes by construction (docs/project/privacy-and-data.md).
-"""
+"""Privacy preview — the exact prepared hosted body, shown before any send."""
 
 from __future__ import annotations
 
-import json
+from .hosted_projection import HostedUpload
 
 INCLUDED_FACTS = [
-    "Steam account id(s) and display names",
-    "Steam login name (accountName) — candidate for redaction before upload",
-    "Device name, type, OS and best-effort hardware specs",
+    "User-chosen device label, device type, coarse OS and best-effort hardware specs",
     "A random, locally persisted device id (not derived from hardware)",
     "Installed games: app id, name, install state, size, timestamps",
     "Library index + label (no filesystem paths)",
     "Per-library storage kind (internal/SD/external) and free/total capacity",
     "Your Steam category/collection names",
+    "Game names can include private or non-Steam titles you added locally",
 ]
 
 NEVER_INCLUDED = [
+    "Steam account ids, login names, or persona/display names",
+    "The machine hostname",
     "Full filesystem paths (libraries carry only index + label)",
     "Passwords, credentials, saves, screenshots, arbitrary files",
-    "Serial numbers or hardware fingerprints",
-    "Mount points, device names, or which folder a library lives in",
+    "Serial numbers, MAC addresses, or hardware-derived ids",
+    "Mount points, storage device names, or which folder a library lives in",
+    "Exact OS build or kernel versions",
 ]
 
 
-def build_privacy_preview(snapshot: dict, warnings: list[str]) -> dict:
-    accounts = [
-        {
-            "steamId64": account.get("steamId64"),
-            "personaName": account.get("personaName"),
-            "accountNameIncluded": "accountName" in account,
-        }
-        for account in snapshot.get("steamAccounts", [])
-    ]
-
+def build_privacy_preview(upload: HostedUpload, warnings: list[str]) -> dict:
+    snapshot = upload.snapshot
     stats = snapshot.get("stats", {})
     device = snapshot.get("device", {})
     summary = {
         "deviceName": device.get("name"),
         "deviceType": device.get("type"),
-        "accounts": accounts,
         "libraryCount": stats.get("libraryCount", 0),
         "gameCount": len(snapshot.get("games", [])),
         "installedGameCount": stats.get("installedGameCount", 0),
@@ -57,6 +44,6 @@ def build_privacy_preview(snapshot: dict, warnings: list[str]) -> dict:
 
     return {
         "summary": summary,
-        "snapshotJson": json.dumps(snapshot, indent=2, ensure_ascii=False),
+        "snapshotJson": upload.body,
         "warnings": list(warnings),
     }
