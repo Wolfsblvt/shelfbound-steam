@@ -1,6 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Threading;
+using Shelfbound.Steam.Steam;
 
 namespace Shelfbound.Tray;
 
@@ -9,6 +10,7 @@ public partial class MainWindow : Window
     private readonly SyncAgent _agent;
     private readonly UpdateService? _update;
     private bool _loading;
+    private bool _syncInProgress;
 
     public MainWindow(SyncAgent agent, UpdateService? update = null)
     {
@@ -42,7 +44,7 @@ public partial class MainWindow : Window
     private void WireEvents()
     {
         VersionText.Text = $"Shelfbound Tray v{AppInfo.Version}";
-        SyncButton.Click += async (_, _) => await _agent.SyncNowAsync();
+        SyncButton.Click += async (_, _) => await PreviewAndSyncAsync();
         ConnectButton.Click += async (_, _) => await _agent.ConnectAsync();
         SignOutButton.Click += async (_, _) => await _agent.SignOutAsync();
         ManageDevicesButton.Click += (_, _) => Browser.Open(_agent.Settings.WebAppUrl);
@@ -68,7 +70,7 @@ public partial class MainWindow : Window
     private void ShowSpecs()
     {
         var s = _agent.Specs;
-        SpecOs.Text = s.OsDescription ?? "—";
+        SpecOs.Text = _agent.HostedOsDescription ?? "—";
         SpecCpu.Text = s.Cpu ?? "—";
         SpecCores.Text = s.LogicalCores?.ToString() ?? "—";
         SpecRam.Text = s.TotalMemoryBytes is { } bytes ? $"{bytes / 1024d / 1024d / 1024d:0.#} GB" : "—";
@@ -100,8 +102,9 @@ public partial class MainWindow : Window
     {
         StatusText.Text = _agent.StatusLine;
         DeviceText.Text = _agent.IsConnected
-            ? $"Device: {_agent.Settings.DeviceName ?? Environment.MachineName}"
+            ? $"Device: {DeviceName()}"
             : "Sign in to connect this device.";
+        SyncButton.IsEnabled = _agent.IsConnected && !_syncInProgress;
         HistoryList.ItemsSource = _agent.History;
         RefreshAccount();
     }
@@ -120,12 +123,36 @@ public partial class MainWindow : Window
             return;
         }
 
-        string deviceName = _agent.Settings.DeviceName ?? Environment.MachineName;
-        AccountName.Text = deviceName;
+        AccountName.Text = DeviceName();
         AccountPlan.Text = "Connected (upload-only)";
-        ThisDeviceText.Text = $"This device: {deviceName}";
+        ThisDeviceText.Text = $"This device: {DeviceName()}";
         // TODO(dashboard): link directly to the device-management page once the dashboard UI ships.
         DevicesSection.IsVisible = true;
+    }
+
+    /// <summary>Builds, shows, and sends one exact hosted body after explicit confirmation.</summary>
+    public async Task PreviewAndSyncAsync()
+    {
+        if (_syncInProgress)
+            return;
+        _syncInProgress = true;
+        SyncButton.IsEnabled = false;
+        try
+        {
+            PreparedSync? prepared = await _agent.PrepareSyncAsync();
+            if (prepared is null)
+                return;
+
+            var preview = new UploadPreviewWindow(prepared);
+            bool confirmed = await preview.ShowDialog<bool>(this);
+            if (confirmed)
+                await _agent.SyncNowAsync(prepared);
+        }
+        finally
+        {
+            _syncInProgress = false;
+            SyncButton.IsEnabled = _agent.IsConnected;
+        }
     }
 
     private void RefreshUpdate()
@@ -165,6 +192,10 @@ public partial class MainWindow : Window
         CheckUpdateButton.IsEnabled = _update.State is not (UpdateState.Checking or UpdateState.Downloading);
         LastCheckedText.Text = _update.LastChecked is { } t ? $"Checked {Ago(t)}" : "";
     }
+
+    private string DeviceName() => string.IsNullOrWhiteSpace(_agent.Settings.DeviceName)
+        ? DeviceIdentity.DefaultDeviceName
+        : _agent.Settings.DeviceName;
 
     private static string Ago(DateTimeOffset when)
     {

@@ -13,7 +13,9 @@ public sealed class AppSettings
     public string ServerUrl { get; set; } = "http://localhost:5080";
     public string WebAppUrl { get; set; } = "http://localhost:5173";
     public string? DeviceName { get; set; }
-    public bool AutoSync { get; set; } = true;
+    public bool AutoSync { get; set; }
+    // Background upload stays disabled until the user previews and successfully sends this projection version.
+    public string? HostedUploadConsentVersion { get; set; }
     public int IntervalMinutes { get; set; } = 60;
     public bool StartMinimized { get; set; } = true;
     public bool StartOnLogin { get; set; } = true;

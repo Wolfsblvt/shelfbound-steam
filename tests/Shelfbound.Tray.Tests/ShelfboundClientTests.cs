@@ -1,29 +1,11 @@
 using System.Net;
 using Shelfbound.Client;
-using Shelfbound.Core.Model;
 using Shouldly;
 
 namespace Shelfbound.Tray.Tests;
 
 public sealed class ShelfboundClientTests
 {
-    [Theory]
-    [InlineData(HttpStatusCode.BadRequest)]
-    [InlineData(HttpStatusCode.Forbidden)]
-    public async Task UploadSurfacesDeviceNameBindingFailures(HttpStatusCode responseStatus)
-    {
-        var handler = new StatusHandler(responseStatus);
-        var http = new HttpClient(handler) { BaseAddress = new Uri("https://api.example.test/") };
-        using var client = new ShelfboundClient(http, "dummy-upload-token");
-
-        UploadResult result = await client.UploadAsync(CreateSnapshot("Living-room Deck"));
-
-        result.Status.ShouldBe(UploadStatus.DeviceNameMismatch);
-        result.Message.ShouldNotBeNull().ShouldContain("device name");
-        handler.RequestUri.ShouldBe("https://api.example.test/ingest");
-        handler.RequestBody.ShouldContain("\"name\":\"Living-room Deck\"");
-    }
-
     [Theory]
     [InlineData("", "Bearer", new[] { "device:upload" }, "Living-room Deck")]
     [InlineData("sb_dummy", "bearer", new[] { "device:upload" }, "Living-room Deck")]
@@ -60,47 +42,6 @@ public sealed class ShelfboundClientTests
         exception.Message.ShouldBe("Connect redemption returned a malformed response.");
         if (token.Length > 0)
             exception.Message.ShouldNotContain(token);
-    }
-
-    private static SnapshotDocument CreateSnapshot(string deviceName) => new()
-    {
-        SchemaVersion = "0.5.0",
-        SnapshotId = Guid.NewGuid().ToString("D"),
-        CreatedAt = DateTimeOffset.UtcNow,
-        Source = new SnapshotSource
-        {
-            Tool = "shelfbound-tray-tests",
-            ToolVersion = "1.0.0",
-            Platform = OsPlatform.Windows,
-        },
-        Device = new SnapshotDevice
-        {
-            Id = Guid.NewGuid().ToString("D"),
-            Name = deviceName,
-            Type = DeviceType.Unknown,
-            Os = OsPlatform.Windows,
-        },
-        Stats = new SnapshotStats
-        {
-            LibraryCount = 0,
-            InstalledGameCount = 0,
-            TotalSizeOnDiskBytes = 0,
-        },
-    };
-
-    private sealed class StatusHandler(HttpStatusCode statusCode) : HttpMessageHandler
-    {
-        public string? RequestUri { get; private set; }
-        public string RequestBody { get; private set; } = "";
-
-        protected override async Task<HttpResponseMessage> SendAsync(
-            HttpRequestMessage request,
-            CancellationToken cancellationToken)
-        {
-            RequestUri = request.RequestUri?.AbsoluteUri;
-            RequestBody = await request.Content!.ReadAsStringAsync(cancellationToken);
-            return new HttpResponseMessage(statusCode);
-        }
     }
 
     private sealed class JsonResponseHandler(HttpStatusCode statusCode, object body) : HttpMessageHandler

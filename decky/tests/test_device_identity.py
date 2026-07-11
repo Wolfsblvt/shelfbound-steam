@@ -53,3 +53,12 @@ def test_resolve_device_shape():
     assert GUID_PATTERN.match(device["id"])
     if "specs" in device:
         assert isinstance(device["specs"], dict) and device["specs"]
+
+
+def test_resolve_device_uses_a_neutral_default_instead_of_the_hostname(monkeypatch):
+    monkeypatch.setattr("socket.gethostname", lambda: "synthetic-private-host")
+
+    device = device_identity.resolve_device()
+
+    assert device["name"] == device_identity.DEFAULT_DEVICE_NAME
+    assert device["name"] != "synthetic-private-host"

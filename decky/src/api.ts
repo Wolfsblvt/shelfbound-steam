@@ -39,6 +39,8 @@ export interface LastSync {
   at: string;
   status: string;
   message?: string | null;
+  warning?: string | null;
+  errorCode?: string | null;
   gameCount?: number | null;
 }
 
@@ -85,16 +87,9 @@ export interface StorageOverviewResponse {
   warnings?: string[];
 }
 
-export interface PrivacyAccountSummary {
-  steamId64?: string;
-  personaName?: string | null;
-  accountNameIncluded: boolean;
-}
-
 export interface PrivacySummary {
   deviceName?: string;
   deviceType?: string;
-  accounts: PrivacyAccountSummary[];
   libraryCount: number;
   gameCount: number;
   installedGameCount: number;
@@ -108,6 +103,7 @@ export interface PrivacySummary {
 export interface PrivacyPreviewResponse {
   ok: boolean;
   error?: string;
+  uploadId?: string;
   summary?: PrivacySummary;
   snapshotJson?: string;
   warnings?: string[];
@@ -118,8 +114,12 @@ export interface SyncResponse {
   error?: string;
   status?: string;
   message?: string | null;
+  warning?: string | null;
+  errorCode?: string;
   gameCount?: number;
   retryAfterSeconds?: number | null;
+  plan?: string | null;
+  maxDevices?: number | null;
   syncedAt?: string;
   warnings?: string[];
 }
@@ -150,7 +150,7 @@ export interface SettingsResponse {
 export const getStatus = callable<[], StatusResponse>("get_status");
 export const getStorageOverview = callable<[], StorageOverviewResponse>("get_storage_overview");
 export const getPrivacyPreview = callable<[], PrivacyPreviewResponse>("get_privacy_preview");
-export const syncNow = callable<[], SyncResponse>("sync_now");
+export const syncNow = callable<[uploadId: string], SyncResponse>("sync_now");
 export const pairingStart = callable<[], PairingStartResponse>("pairing_start");
 export const pairingPoll = callable<[], PairingPollResponse>("pairing_poll");
 export const pairingCancel = callable<[], { ok: boolean }>("pairing_cancel");

@@ -2,7 +2,7 @@
 
 The live endpoints mirror the C# ShelfboundClient (src/Shelfbound.Client/):
 
-- ``POST {server}/ingest``            Bearer device token, compact snapshot JSON.
+- ``POST {server}/ingest``            Bearer device token, compact hosted-projection JSON.
 - ``GET  {server}/auth/me``           the signed-in account behind the token.
 - ``GET  {server}/auth/entitlements`` plan limits (display only; server enforces).
 
@@ -31,12 +31,31 @@ import urllib.request
 from dataclasses import dataclass
 
 from . import TOOL_NAME, TOOL_VERSION
+from .hosted_projection import HostedUpload, prepare_hosted_upload
 
 # UploadOutcome.status values (mirror the C# UploadStatus enum, camelCased).
 UPLOAD_SUCCESS = "success"
 UPLOAD_THROTTLED = "throttled"
 UPLOAD_UNAUTHORIZED = "unauthorized"
+UPLOAD_FORBIDDEN = "forbidden"
+UPLOAD_DEVICE_LIMITED = "deviceLimited"
+UPLOAD_INVALID_SNAPSHOT = "invalidSnapshot"
+UPLOAD_PAYLOAD_TOO_LARGE = "payloadTooLarge"
 UPLOAD_ERROR = "error"
+
+ERROR_NONE = "none"
+ERROR_PROJECTION_FAILED = "projectionFailed"
+ERROR_NETWORK = "networkError"
+ERROR_INVALID_RESPONSE = "invalidResponse"
+ERROR_UNAUTHORIZED = "unauthorized"
+ERROR_INSUFFICIENT_SCOPE = "insufficientScope"
+ERROR_DEVICE_MISMATCH = "deviceMismatch"
+ERROR_FORBIDDEN = "forbidden"
+ERROR_DEVICE_LIMIT = "deviceLimitReached"
+ERROR_INVALID_SNAPSHOT = "invalidSnapshot"
+ERROR_PAYLOAD_TOO_LARGE = "payloadTooLarge"
+ERROR_TOO_SOON = "tooSoon"
+ERROR_SERVER = "serverError"
 
 
 class PairingUnavailableError(Exception):
@@ -50,11 +69,30 @@ class ServerError(Exception):
 
 
 @dataclass(frozen=True)
+class UploadResponseV1:
+    """Version 1 of the tolerant success/error body returned by ``POST /ingest``."""
+
+    schema_version: str | None = None
+    summary: dict | None = None
+    warning: str | None = None
+    error: str | None = None
+    plan: str | None = None
+    retry_after_seconds: int | None = None
+    max_devices: int | None = None
+    hint: str | None = None
+
+
+@dataclass(frozen=True)
 class UploadOutcome:
     status: str
-    game_count: int
-    message: str | None
-    retry_after_seconds: int | None
+    error_code: str
+    game_count: int = 0
+    message: str | None = None
+    warning: str | None = None
+    retry_after_seconds: int | None = None
+    plan: str | None = None
+    max_devices: int | None = None
+    response: UploadResponseV1 | None = None
 
     @property
     def ok(self) -> bool:
@@ -68,24 +106,111 @@ class ShelfboundServer:
         self._timeout = timeout_seconds
 
     def upload_snapshot(self, snapshot: dict) -> UploadOutcome:
-        """POST /ingest; maps responses exactly like the C# client."""
-        body = json.dumps(snapshot, separators=(",", ":"), ensure_ascii=False)
+        """Projects a complete local snapshot before POSTing; invalid projection never sends."""
         try:
-            status, headers, _ = self._request("POST", "ingest", body=body)
+            upload = prepare_hosted_upload(snapshot)
+        except (TypeError, ValueError) as error:
+            return UploadOutcome(
+                status=UPLOAD_ERROR,
+                error_code=ERROR_PROJECTION_FAILED,
+                message=f"Could not create the privacy-minimized upload: {error}",
+            )
+        return self.upload_prepared(upload)
+
+    def upload_prepared(self, upload: HostedUpload) -> UploadOutcome:
+        """POSTs the exact canonical body held by a previously previewed upload."""
+        try:
+            status, headers, text = self._request("POST", "ingest", body=upload.body)
         except OSError as error:
-            return UploadOutcome(UPLOAD_ERROR, 0, str(error), None)
+            return UploadOutcome(
+                status=UPLOAD_ERROR,
+                error_code=ERROR_NETWORK,
+                message=str(error),
+            )
+
+        response = _parse_response(text)
 
         if 200 <= status < 300:
-            return UploadOutcome(UPLOAD_SUCCESS, len(snapshot.get("games", [])), None, None)
-        if status == 429:
+            if response is None or not response.schema_version:
+                return UploadOutcome(
+                    status=UPLOAD_ERROR,
+                    error_code=ERROR_INVALID_RESPONSE,
+                    message="The server returned an invalid upload response.",
+                )
             return UploadOutcome(
-                UPLOAD_THROTTLED, 0,
-                "Too soon for your plan. Automatic/frequent sync is a Pro/Lifetime feature.",
-                _parse_retry_after(headers.get("retry-after")),
+                status=UPLOAD_SUCCESS,
+                error_code=ERROR_NONE,
+                game_count=upload.game_count,
+                warning=response.warning,
+                response=response,
+            )
+        if status == 429:
+            body_retry_after = response.retry_after_seconds if response else None
+            return UploadOutcome(
+                status=UPLOAD_THROTTLED,
+                error_code=ERROR_TOO_SOON,
+                message=_response_message(response, "Upload rejected: too soon for your plan."),
+                retry_after_seconds=body_retry_after
+                if body_retry_after is not None
+                else _parse_retry_after(headers.get("retry-after")),
+                plan=response.plan if response else None,
+                response=response,
             )
         if status == 401:
-            return UploadOutcome(UPLOAD_UNAUTHORIZED, 0, "Invalid or missing API token.", None)
-        return UploadOutcome(UPLOAD_ERROR, 0, f"Server returned {status}.", None)
+            return UploadOutcome(
+                status=UPLOAD_UNAUTHORIZED,
+                error_code=ERROR_UNAUTHORIZED,
+                message=_response_message(response, "Invalid or missing API token."),
+                response=response,
+            )
+        if status == 403:
+            error = response.error if response else None
+            error_code = ERROR_FORBIDDEN
+            if error and "cannot upload" in error.casefold():
+                error_code = ERROR_INSUFFICIENT_SCOPE
+            elif error and "bound to a different" in error.casefold():
+                error_code = ERROR_DEVICE_MISMATCH
+            return UploadOutcome(
+                status=UPLOAD_FORBIDDEN,
+                error_code=error_code,
+                message=_response_message(
+                    response, "This token is not allowed to upload this device snapshot."
+                ),
+                response=response,
+            )
+        if status == 409:
+            return UploadOutcome(
+                status=UPLOAD_DEVICE_LIMITED,
+                error_code=ERROR_DEVICE_LIMIT,
+                message=_response_message(response, "Device limit reached for your plan."),
+                plan=response.plan if response else None,
+                max_devices=response.max_devices if response else None,
+                response=response,
+            )
+        if status == 400:
+            return UploadOutcome(
+                status=UPLOAD_INVALID_SNAPSHOT,
+                error_code=ERROR_INVALID_SNAPSHOT,
+                message=_response_message(
+                    response, "The server rejected the snapshot schema or payload."
+                ),
+                response=response,
+            )
+        if status == 413:
+            return UploadOutcome(
+                status=UPLOAD_PAYLOAD_TOO_LARGE,
+                error_code=ERROR_PAYLOAD_TOO_LARGE,
+                message=_response_message(
+                    response, "The hosted upload exceeds the server's payload-size limit."
+                ),
+                response=response,
+            )
+        return UploadOutcome(
+            status=UPLOAD_ERROR,
+            error_code=ERROR_SERVER,
+            message=_response_message(response, f"Server returned {status}."),
+            response=response,
+        )
 
     def get_account(self) -> dict | None:
         """GET /auth/me — {accountId, steamId?, displayName?} or None."""
@@ -170,3 +295,43 @@ def _parse_retry_after(value: str | None) -> int | None:
         return int(value)
     except ValueError:
         return None  # HTTP-date form not needed for this prototype
+
+
+def _parse_response(text: str) -> UploadResponseV1 | None:
+    if not text.strip():
+        return None
+    try:
+        parsed = json.loads(text)
+    except ValueError:
+        return None
+    if not isinstance(parsed, dict):
+        return None
+    summary = parsed.get("summary")
+    return UploadResponseV1(
+        schema_version=_optional_text(parsed.get("schemaVersion")),
+        summary=summary if isinstance(summary, dict) else None,
+        warning=_optional_text(parsed.get("warning")),
+        error=_optional_text(parsed.get("error")),
+        plan=_optional_text(parsed.get("plan")),
+        retry_after_seconds=_optional_int(parsed.get("retryAfterSeconds")),
+        max_devices=_optional_int(parsed.get("maxDevices")),
+        hint=_optional_text(parsed.get("hint")),
+    )
+
+
+def _response_message(response: UploadResponseV1 | None, fallback: str) -> str:
+    if response is None:
+        return fallback
+    error = response.error
+    hint = response.hint
+    if error and hint:
+        return f"{error} {hint}"
+    return error or hint or fallback
+
+
+def _optional_text(value: object) -> str | None:
+    return value if isinstance(value, str) and value.strip() else None
+
+
+def _optional_int(value: object) -> int | None:
+    return value if isinstance(value, int) and not isinstance(value, bool) else None

@@ -1,0 +1,34 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Shelfbound.Tray.UploadPreviewWindow"
+        Title="What will be uploaded"
+        Width="820" Height="720"
+        MinWidth="640" MinHeight="520"
+        WindowStartupLocation="CenterOwner"
+        Background="#0b1020">
+  <Grid RowDefinitions="Auto,Auto,*,Auto" Margin="20" RowSpacing="12">
+    <StackPanel Grid.Row="0" Spacing="6">
+      <TextBlock Text="What will be uploaded" FontSize="20" FontWeight="Bold" Foreground="#f1f5f9"/>
+      <TextBlock x:Name="SummaryText" Foreground="#cbd5e1" TextWrapping="Wrap"/>
+      <TextBlock Foreground="#94a3b8" TextWrapping="Wrap"
+                 Text="Steam account ids, login/persona names, the machine hostname, full paths, credentials, serials, and exact OS builds are excluded. The compact JSON below is the exact body that Sync sends."/>
+    </StackPanel>
+
+    <Border Grid.Row="1" x:Name="WarningsBorder" IsVisible="False"
+            Background="#2a1f12" BorderBrush="#a16207" BorderThickness="1" CornerRadius="8" Padding="10">
+      <TextBlock x:Name="WarningsText" Foreground="#fde68a" TextWrapping="Wrap"/>
+    </Border>
+
+    <TextBox Grid.Row="2" x:Name="UploadJson" IsReadOnly="True" AcceptsReturn="True"
+             TextWrapping="Wrap" FontFamily="Cascadia Mono,Consolas,monospace" FontSize="11"
+             Background="#10182e" Foreground="#dbeafe" BorderBrush="#26324d"
+             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+             ScrollViewer.VerticalScrollBarVisibility="Auto"/>
+
+    <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
+      <Button x:Name="CancelButton" Content="Cancel" Padding="18,9"/>
+      <Button x:Name="ConfirmButton" Content="Confirm and sync" Padding="18,9"
+              Background="#6366f1" Foreground="White"/>
+    </StackPanel>
+  </Grid>
+</Window>

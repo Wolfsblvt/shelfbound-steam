@@ -3,13 +3,13 @@
 The device id is a random GUID persisted under the user's config directory — the SAME
 file the C# CLI/agent uses (~/.config/Shelfbound/device-id), so a Deck that has synced
 from desktop mode and from Gaming Mode stays ONE device. Never derived from hardware
-or account data; see docs/project/privacy-and-data.md.
+or account data. The display-name fallback is neutral, never the hostname; see
+docs/project/privacy-and-data.md.
 """
 
 from __future__ import annotations
 
 import os
-import socket
 import sys
 import uuid
 from pathlib import Path
@@ -18,6 +18,7 @@ from pathlib import Path
 # ($XDG_CONFIG_HOME, else ~/.config) and the C# DeviceIdentity/ShelfboundPaths constants.
 SHELFBOUND_CONFIG_DIRNAME = "Shelfbound"
 DEVICE_ID_FILENAME = "device-id"
+DEFAULT_DEVICE_NAME = "Shelfbound device"
 
 
 def shelfbound_config_dir() -> Path:
@@ -75,7 +76,7 @@ def resolve_device(name_override: str | None = None, type_override: str | None =
     """Builds the snapshot `device` object (contract field order, nulls omitted)."""
     device: dict = {
         "id": get_or_create_device_id(),
-        "name": name_override or socket.gethostname(),
+        "name": name_override.strip() if name_override and name_override.strip() else DEFAULT_DEVICE_NAME,
         "type": type_override or detect_device_type(),
         "os": detect_os(),
     }

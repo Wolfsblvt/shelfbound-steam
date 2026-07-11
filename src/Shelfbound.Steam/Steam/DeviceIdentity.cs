@@ -6,10 +6,14 @@ namespace Shelfbound.Steam.Steam;
 /// <summary>
 /// Resolves the local device identity for a snapshot. The device id is a random GUID persisted
 /// under the user's config directory so it stays stable across runs without being derived from
-/// hardware or account data. See docs/project/privacy-and-data.md.
+/// hardware or account data. The display-name fallback is deliberately neutral, never the hostname.
+/// See docs/project/privacy-and-data.md.
 /// </summary>
 public static class DeviceIdentity
 {
+    /// <summary>Neutral fallback used until the user chooses a friendly device label.</summary>
+    public const string DefaultDeviceName = "Shelfbound device";
+
     public static SnapshotDevice Resolve(string? nameOverride, DeviceType? typeOverride) => new()
     {
         Id = GetOrCreateDeviceId(),
@@ -27,7 +31,7 @@ public static class DeviceIdentity
     public static string NormalizeName(string? nameOverride)
     {
         string candidate = string.IsNullOrWhiteSpace(nameOverride)
-            ? Environment.MachineName
+            ? DefaultDeviceName
             : nameOverride;
         string name = candidate.Trim();
 

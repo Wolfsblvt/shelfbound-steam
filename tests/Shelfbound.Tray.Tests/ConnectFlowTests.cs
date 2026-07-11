@@ -139,7 +139,7 @@ public sealed class ConnectFlowTests
     public void DeviceNameNormalizationIsSharedByConnectAndSnapshotIdentity()
     {
         DeviceIdentity.NormalizeName($"  {DeviceName}\t").ShouldBe(DeviceName);
-        DeviceIdentity.NormalizeName(" \t ").ShouldBe(Environment.MachineName.Trim());
+        DeviceIdentity.NormalizeName(" \t ").ShouldBe(DeviceIdentity.DefaultDeviceName);
 
         Should.Throw<ArgumentException>(() => DeviceIdentity.NormalizeName(new string('x', 201)));
         Should.Throw<ArgumentException>(() => DeviceIdentity.NormalizeName("Deck\0"));

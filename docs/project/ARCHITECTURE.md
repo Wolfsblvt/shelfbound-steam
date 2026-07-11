@@ -19,9 +19,9 @@ talks through one **versioned, language-neutral snapshot**, never through each o
 
 ```
 Steam local files ─┐
-Steam Web API ─────┼─► scanner/exporter ─► Shelfbound snapshot (versioned JSON) ─┬─► local MCP server
-device/env ────────┘                                                            ├─► export / upload
-                                                                                └─► future clients (Decky, …)
+Steam Web API ─────┼─► scanner/exporter ─► complete Shelfbound snapshot ─┬─► local MCP server
+device/env ────────┘                                                     ├─► explicit local export
+                                                                         └─► HostedProjection ─► minimized upload
 ```
 
 Consequences:
@@ -31,6 +31,9 @@ Consequences:
   A non-.NET client can emit a valid snapshot without referencing our assemblies.
 - Schema is **semver-versioned**; `schemaVersion` travels in every document. See
   [snapshot-schema.md](./snapshot-schema.md).
+- The complete contract remains useful locally. Official hosted transport passes through a separate,
+  whitelist-only projection in `Shelfbound.Client`; local model growth never expands the uploaded
+  field set implicitly. Decky's platform-required Python mirror shares the same golden fixture.
 
 ## Repository boundary (public core vs private product)
 
@@ -56,8 +59,8 @@ src/
                        the tray, and the hosted layer.
   Shelfbound.Storage   Local config (API key), the identity seam, and the user-data store
                        (statuses/ratings/completion/aspects, scoped memories, category meanings).
-  Shelfbound.Client    Shared scan-to-snapshot builder + Shelfbound-server client, reused by the CLI
-                       and the tray.
+  Shelfbound.Client    Shared scan-to-snapshot builder + whitelist-only hosted projection +
+                       Shelfbound-server client, reused by the CLI and tray.
   Shelfbound.Cli       `shelfbound` CLI — setup, scan (+ enrichment), profile, upload.
   Shelfbound.Tray      Cross-platform tray agent (Avalonia): background sync, status, one-time-code
                        connect, and upload-only device-token storage.
@@ -126,18 +129,24 @@ Non-fatal problems become `warnings` on the result rather than aborting the scan
 
 - **Local mode:** scanner → snapshot on disk → local MCP server reads it (plus a local user-data
   store for notes/profile). Nothing leaves the machine. Open source, auditable.
-- **External consumers** (a separate hosted product, a future Decky plugin, anything else): receive
-  the same snapshot and interoperate **only through the contract**. Their internals are out of scope
-  here.
+- **Explicit local export / general consumers:** may receive the complete personal snapshot when the
+  user chooses to share it.
+- **Official hosted transport:** receives only `HostedProjection` v1. Steam account identity is
+  dropped, automatic hostnames are neutralized, and exact OS builds are coarsened. Preview and HTTP
+  reuse one prepared serialized body.
+- **Decky:** emits the same complete snapshot contract locally, then mirrors the hosted whitelist in
+  Python because the platform cannot consume the C# client assembly.
 
-The snapshot contract is the single boundary; the open core makes no assumptions about who consumes it.
+The snapshot remains the interoperability seam; the hosted projection is the privacy boundary for
+network transport. See [privacy-and-data.md](./privacy-and-data.md).
 
 ## Data model concepts (core/local)
 
 Keep four data categories **separate and traceable** — never one untraceable blob:
 
 1. **Raw local data** read from the machine (snapshot inputs).
-2. **Uploaded/exported snapshot data** (what the user chose to share).
+2. **Uploaded/exported data** (the minimized hosted projection, or a complete snapshot the user
+   explicitly exported — these are deliberately not assumed to be identical).
 3. **External metadata** (Steam API, completion times, tags) — clearly third-party.
 4. **Derived / AI-generated data** (taste signals, summaries) — carries source/evidence/confidence.
 

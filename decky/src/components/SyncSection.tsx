@@ -3,11 +3,6 @@ import { useState } from "react";
 import { getPrivacyPreview, PrivacySummary, syncNow } from "../api";
 import { formatBytes } from "../format";
 
-// Rendering a full multi-hundred-KB snapshot in the quick-access panel would crawl;
-// the modal shows the real upload body up to this many characters. The summary above
-// it is complete either way.
-const PREVIEW_JSON_MAX_CHARS = 6000;
-
 /**
  * Manual "sync now" gated behind the privacy preview: the modal shows exactly what
  * would leave the device (the real upload body) before anything is sent. No
@@ -23,12 +18,13 @@ export function SyncSection({
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<string | null>(null);
 
-  const runSync = async () => {
+  const runSync = async (uploadId: string) => {
     setBusy(true);
-    const outcome = await syncNow();
+    const outcome = await syncNow(uploadId);
     setBusy(false);
     if (outcome.ok) {
-      setResult(`Synced ${outcome.gameCount ?? 0} games.`);
+      const warning = outcome.warning ? ` Warning: ${outcome.warning}` : "";
+      setResult(`Synced ${outcome.gameCount ?? 0} games.${warning}`);
     } else {
       setResult(outcome.message ?? outcome.error ?? "Sync failed.");
     }
@@ -39,16 +35,17 @@ export function SyncSection({
     setBusy(true);
     const preview = await getPrivacyPreview();
     setBusy(false);
-    if (!preview.ok || !preview.summary) {
+    if (!preview.ok || !preview.summary || !preview.uploadId) {
       setResult(preview.error ?? "Could not build the privacy preview.");
       return;
     }
+    const uploadId = preview.uploadId;
     showModal(
       <PreviewModal
         summary={preview.summary}
         snapshotJson={preview.snapshotJson ?? ""}
         connected={connected}
-        onConfirm={() => void runSync()}
+        onConfirm={() => void runSync(uploadId)}
       />
     );
   };
@@ -82,9 +79,6 @@ function PreviewModal({
   onConfirm: () => void;
   closeModal?: () => void;
 }) {
-  const truncated = snapshotJson.length > PREVIEW_JSON_MAX_CHARS;
-  const shownJson = truncated ? snapshotJson.slice(0, PREVIEW_JSON_MAX_CHARS) : snapshotJson;
-
   return (
     <ConfirmModal
       strTitle="What will be uploaded"
@@ -102,14 +96,6 @@ function PreviewModal({
           <b>{summary.deviceName}</b> · {summary.gameCount} games (
           {summary.installedGameCount} installed) · {summary.libraryCount} libraries ·{" "}
           {summary.categoryCount} categories · {formatBytes(summary.totalSizeOnDiskBytes)}
-        </div>
-        <div style={{ marginTop: "6px" }}>
-          Accounts:{" "}
-          {summary.accounts.length === 0
-            ? "none"
-            : summary.accounts
-                .map((account) => account.personaName ?? account.steamId64 ?? "?")
-                .join(", ")}
         </div>
         <div style={{ marginTop: "8px" }}>
           <b>Included:</b> {summary.included.join("; ")}
@@ -129,8 +115,7 @@ function PreviewModal({
             wordBreak: "break-all",
           }}
         >
-          {shownJson}
-          {truncated && "\n… display truncated — the actual upload is this full document, nothing more."}
+          {snapshotJson}
         </pre>
       </div>
     </ConfirmModal>

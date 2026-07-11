@@ -22,10 +22,17 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Shelfbound.Core\Shelfbound.Core.csproj" />
+    <ProjectReference Include="..\..\src\Shelfbound.Client\Shelfbound.Client.csproj" />
     <ProjectReference Include="..\..\src\Shelfbound.Steam\Shelfbound.Steam.csproj" />
     <ProjectReference Include="..\..\src\Shelfbound.Query\Shelfbound.Query.csproj" />
     <ProjectReference Include="..\..\src\Shelfbound.Storage\Shelfbound.Storage.csproj" />
     <ProjectReference Include="..\..\src\Shelfbound.Mcp\Shelfbound.Mcp.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\Fixtures\hosted-snapshot.golden.json"
+          Link="Fixtures\hosted-snapshot.golden.json"
+          CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

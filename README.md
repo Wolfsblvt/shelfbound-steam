@@ -34,10 +34,11 @@ Early but already useful, all local:
   (finished/paused/dropped), ratings, completion, category meanings, and freeform memories — stored
   locally and shared with the CLI.
 
-Also built: a cross-platform **tray app** (background sync + account connect) and **`shelfbound upload`**
-(send a snapshot to a Shelfbound server). Still to come locally: dynamic (rule-based) collections,
-Windows-registry install discovery, and a Steam Deck Decky plugin. The hosted service lives in a
-separate private repo. See [docs/project/PROJECT.md](docs/project/PROJECT.md) for the roadmap.
+Also built: a cross-platform **tray app** (privacy preview, consent-gated background sync + account
+connect) and **`shelfbound upload`** (send a minimized hosted projection to a Shelfbound server).
+Still to come locally: dynamic (rule-based) collections, Windows-registry install discovery, and
+real-hardware validation/distribution of the Decky prototype. The hosted service lives in a separate
+private repo. See [docs/project/PROJECT.md](docs/project/PROJECT.md) for the roadmap.
 
 ## Quick start
 
@@ -71,15 +72,25 @@ games + playtime via the Steam Web API. Run `shelfbound --help`.
 
 ### Upload to a Shelfbound server (optional)
 
-`shelfbound upload` scans and uploads your snapshot to a Shelfbound server so the hosted MCP/dashboard can
-read it without your machine online. Sign in there, create an API token, then:
+`shelfbound upload` scans locally, derives a whitelist-only hosted projection, and sends that minimized
+body so the hosted MCP/dashboard can read your library without your machine online. Preview the exact
+compact body first (no server or token required), then upload:
 
 ```bash
+shelfbound upload --dry-run                            # prints exact body; sends nothing
 shelfbound upload --server <url> --token <token>     # or SHELFBOUND_SERVER / SHELFBOUND_TOKEN
 ```
 
+A hosted body includes the user-chosen/neutral device label, random device id, coarse OS/specs,
+libraries, games, collections, and stats. It drops the complete Steam-account array (login, persona,
+and Steam ids), never auto-uploads the machine hostname, and omits exact OS builds. Game and collection
+names remain personal; a game name can reveal a private/non-Steam title from another producer.
+Official clients also preserve successful server warnings and distinguish throttling, token scope,
+device-cap, invalid-snapshot, and payload-size failures instead of collapsing them to a status number.
+
 A one-shot upload is free. Continuous `--watch` sync is a paid (Pro/Lifetime) feature, enforced by the
-server. The uploader is cross-platform; OS-specific packaging (e.g. a Steam Deck Decky plugin) comes later.
+server. See [the privacy contract](docs/project/privacy-and-data.md) for the exact field boundary and
+preview behavior.
 
 ### Local MCP server
 

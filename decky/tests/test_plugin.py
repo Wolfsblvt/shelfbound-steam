@@ -13,9 +13,21 @@ ACCOUNT = {"accountId": "acc-1", "displayName": "Wolf"}
 DEVICE = {"id": "device-1", "name": "testdeck", "type": "steamDeck", "os": "linux"}
 SNAPSHOT = {
     "schemaVersion": "0.5.0",
+    "snapshotId": "77777777-7777-7777-7777-777777777777",
+    "createdAt": "2026-07-11T12:00:00+00:00",
     "source": {"tool": "shelfbound-decky", "toolVersion": "0.1.0-test", "platform": "linux"},
+    "device": DEVICE,
+    "steamAccounts": [
+        {
+            "steamId64": "76561198000000001",
+            "accountName": "synthetic-login",
+            "personaName": "Synthetic Persona",
+            "mostRecent": True,
+        }
+    ],
     "libraries": [],
     "games": [],
+    "categories": [],
     "stats": {"libraryCount": 0, "installedGameCount": 0, "totalSizeOnDiskBytes": 0, "scope": "installedOnly"},
 }
 
@@ -37,6 +49,7 @@ class FakeShelfboundServer:
         "expiresInSeconds": 600,
     }
     pairing_poll_results: list[dict] = []
+    uploaded_bodies: list[str] = []
 
     def __init__(self, _base_url, token=None, timeout_seconds=15.0):
         self.token = token
@@ -45,13 +58,18 @@ class FakeShelfboundServer:
     def get_account(self):
         return ACCOUNT
 
-    def upload_snapshot(self, _snapshot):
+    def upload_prepared(self, upload):
+        type(self).uploaded_bodies.append(upload.body)
         return SimpleNamespace(
             ok=True,
             status="success",
             message=None,
+            warning="Synthetic switch warning.",
+            error_code="none",
             game_count=0,
             retry_after_seconds=None,
+            plan=None,
+            max_devices=None,
         )
 
     def pairing_start(self, _device_name, _device_type, _device_id):
@@ -75,6 +93,7 @@ def fake_server(decky_plugin_module, monkeypatch):
         "expiresInSeconds": 600,
     }
     FakeShelfboundServer.pairing_poll_results = []
+    FakeShelfboundServer.uploaded_bodies = []
     monkeypatch.setattr(decky_plugin_module, "ShelfboundServer", FakeShelfboundServer)
     return FakeShelfboundServer
 
@@ -108,11 +127,12 @@ def test_frontend_callable_methods_never_return_device_tokens(plugin, fake_serve
     plugin._token_store.save(STORED_TOKEN)
     fake_server.pairing_poll_results = [{"status": "claimed", "token": CLAIMED_TOKEN}]
 
+    preview = asyncio.run(plugin.get_privacy_preview())
     responses = [
         asyncio.run(plugin.get_status()),
         asyncio.run(plugin.get_storage_overview()),
-        asyncio.run(plugin.get_privacy_preview()),
-        asyncio.run(plugin.sync_now()),
+        preview,
+        asyncio.run(plugin.sync_now(preview["uploadId"])),
         asyncio.run(plugin.get_settings()),
         asyncio.run(plugin.update_settings(server_url=" https://shelfbound.test ", device_name=" Deck ")),
         asyncio.run(plugin.pairing_cancel()),
@@ -125,6 +145,25 @@ def test_frontend_callable_methods_never_return_device_tokens(plugin, fake_serve
     for response in responses:
         assert_tokens_absent(response, STORED_TOKEN, CLAIMED_TOKEN)
     assert plugin._token_store.load() is None
+
+
+def test_preview_body_is_the_exact_one_time_body_uploaded(plugin, fake_server):
+    plugin._token_store.save(STORED_TOKEN)
+
+    preview = asyncio.run(plugin.get_privacy_preview())
+    synced = asyncio.run(plugin.sync_now(preview["uploadId"]))
+    reused = asyncio.run(plugin.sync_now(preview["uploadId"]))
+
+    assert preview["ok"] is True
+    assert "steamAccounts" not in preview["snapshotJson"]
+    assert fake_server.uploaded_bodies == [preview["snapshotJson"]]
+    assert synced["ok"] is True
+    assert synced["warning"] == "Synthetic switch warning."
+    assert reused == {
+        "ok": False,
+        "status": "previewRequired",
+        "error": "Preview this upload again before syncing.",
+    }
 
 
 def test_pairing_claimed_flow_persists_token_and_clears_session(plugin, fake_server):

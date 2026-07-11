@@ -4,6 +4,9 @@ using Shelfbound.Steam.Steam;
 
 namespace Shelfbound.Tray;
 
+/// <summary>A locally built upload whose exact JSON can be previewed and then sent without rebuilding.</summary>
+public sealed record PreparedSync(HostedUpload Upload, IReadOnlyList<string> Warnings);
+
 /// <summary>
 /// The non-UI heart of the agent: holds settings, runs syncs (scan + upload via the shared client),
 /// schedules auto-sync, and keeps a short activity log. Raises <see cref="Changed"/> on any state change
@@ -18,6 +21,7 @@ public sealed class SyncAgent : IDisposable
 
     public AppSettings Settings { get; }
     public DeviceSpecs Specs { get; }
+    public string? HostedOsDescription { get; }
     public bool IsConnected => !string.IsNullOrEmpty(_token);
     public DateTimeOffset? LastSync { get; private set; }
     public string StatusLine { get; private set; } = "Starting…";
@@ -32,12 +36,14 @@ public sealed class SyncAgent : IDisposable
     {
         Settings = AppSettings.Load();
         _token = TokenStore.Load();
-        Specs = HardwareInfo.Collect();
+        SnapshotDevice device = DeviceIdentity.Resolve(Settings.DeviceName, null);
+        Specs = device.Specs ?? new DeviceSpecs();
+        HostedOsDescription = HostedProjection.CoarsenOsDescription(device.Os, Specs.OsDescription);
     }
 
     public void Start()
     {
-        Reschedule(syncImmediately: true);
+        Reschedule(startImmediately: true);
     }
 
     /// <summary>Applies a settings change, persists it, updates auto-start, and reschedules.</summary>
@@ -49,15 +55,19 @@ public sealed class SyncAgent : IDisposable
         Reschedule();
     }
 
-    public async Task SyncNowAsync()
+    /// <summary>Builds the one exact hosted body that the tray must show before a manual sync.</summary>
+    public Task<PreparedSync?> PrepareSyncAsync() => BuildPreparedSyncAsync(logPreview: true);
+
+    private async Task<PreparedSync?> BuildPreparedSyncAsync(bool logPreview)
     {
         if (!IsConnected)
         {
             Log("Not connected — connect your account first.");
-            return;
+            return null;
         }
 
-        Log("Syncing…");
+        if (logPreview)
+            Log("Preparing upload preview…");
         try
         {
             string deviceName = DeviceIdentity.NormalizeName(Settings.DeviceName);
@@ -66,24 +76,26 @@ public sealed class SyncAgent : IDisposable
                 ToolVersion = AppInfo.Version,
                 DeviceName = deviceName,
             });
-            using var client = new ShelfboundClient(Settings.ServerUrl, _token!);
-            UploadResult result = await client.UploadAsync(build.Snapshot);
-            Log(result.Status switch
-            {
-                UploadStatus.Success => $"Synced {result.GameCount} games.",
-                UploadStatus.Throttled => $"Skipped — {result.Message}",
-                UploadStatus.Unauthorized => "Token rejected — reconnect your account.",
-                UploadStatus.DeviceNameMismatch => "Device name mismatch — reconnect this device.",
-                _ => $"Failed — {result.Message}",
-            });
-            if (result.Ok)
-                LastSync = DateTimeOffset.Now;
+            return new PreparedSync(HostedProjection.Prepare(build.Snapshot), build.Warnings);
         }
         catch (Exception ex)
         {
-            Log($"Error — {ex.Message}");
+            Log($"Preview failed — {ex.Message}");
+            return null;
         }
-        UpdateStatus();
+    }
+
+    /// <summary>Sends a user-confirmed prepared body. No scan or re-serialization happens here.</summary>
+    public async Task SyncNowAsync(PreparedSync prepared)
+    {
+        ArgumentNullException.ThrowIfNull(prepared);
+        UploadResult result = await UploadPreparedAsync(prepared);
+        if (result.Ok)
+        {
+            Settings.HostedUploadConsentVersion = HostedProjection.ProjectionVersion;
+            Settings.Save();
+            Reschedule(startImmediately: false);
+        }
     }
 
     public async Task ConnectAsync()
@@ -123,8 +135,9 @@ public sealed class SyncAgent : IDisposable
             }
 
             Log("Device connected (upload-only).");
-            await SyncNowAsync();
             Reschedule();
+            if (!HasUploadConsent)
+                Log("Review and confirm 'Sync now' before background sync can start.");
         }
         catch (Exception ex)
         {
@@ -146,22 +159,62 @@ public sealed class SyncAgent : IDisposable
         return Task.CompletedTask;
     }
 
-    private void Reschedule(bool syncImmediately = false)
+    private bool HasUploadConsent =>
+        Settings.HostedUploadConsentVersion == HostedProjection.ProjectionVersion;
+
+    private void Reschedule(bool startImmediately = true)
     {
         _timer?.Dispose();
         _timer = null;
-        if (Settings.AutoSync && IsConnected)
+        if (Settings.AutoSync && IsConnected && HasUploadConsent)
         {
             var interval = TimeSpan.FromMinutes(Math.Max(1, Settings.IntervalMinutes));
-            TimeSpan dueTime = syncImmediately ? TimeSpan.Zero : interval;
-            _timer = new Timer(_ => _ = SyncNowAsync(), null, dueTime, interval);
+            TimeSpan dueTime = startImmediately ? TimeSpan.Zero : interval;
+            _timer = new Timer(_ => _ = SyncAutomaticallyAsync(), null, dueTime, interval);
         }
         UpdateStatus();
+    }
+
+    private async Task SyncAutomaticallyAsync()
+    {
+        PreparedSync? prepared = await BuildPreparedSyncAsync(logPreview: false);
+        if (prepared is not null)
+            await UploadPreparedAsync(prepared);
+    }
+
+    private async Task<UploadResult> UploadPreparedAsync(PreparedSync prepared)
+    {
+        if (!IsConnected)
+        {
+            Log("Not connected — connect your account first.");
+            return new UploadResult
+            {
+                Status = UploadStatus.Unauthorized,
+                ErrorCode = UploadErrorCode.Unauthorized,
+                Message = "Not connected.",
+            };
+        }
+
+        Log("Syncing approved hosted body…");
+        using var client = new ShelfboundClient(Settings.ServerUrl, _token!);
+        UploadResult result = await client.UploadAsync(prepared.Upload);
+        Log(Describe(result));
+        if (!string.IsNullOrWhiteSpace(result.Warning))
+            Log($"Server warning — {result.Warning}");
+        foreach (string warning in prepared.Warnings.Take(3))
+            Log($"Scan warning — {warning}");
+        if (prepared.Warnings.Count > 3)
+            Log($"Scan warning — … and {prepared.Warnings.Count - 3} more.");
+        if (result.Ok)
+            LastSync = DateTimeOffset.Now;
+        UpdateStatus();
+        return result;
     }
 
     private void UpdateStatus()
     {
         StatusLine = !IsConnected ? "Not connected"
+            : Settings.AutoSync && !HasUploadConsent ? "Connected — review an upload to enable auto-sync"
             : LastSync is null ? "Connected — not synced yet"
             : $"Last synced {Friendly(LastSync.Value)}";
         Changed?.Invoke();
@@ -186,6 +239,18 @@ public sealed class SyncAgent : IDisposable
         if (span.TotalHours < 24) return $"{(int)span.TotalHours} h ago";
         return when.ToString("yyyy-MM-dd HH:mm");
     }
+
+    private static string Describe(UploadResult result) => result.Status switch
+    {
+        UploadStatus.Success => $"Synced {result.GameCount} games.",
+        UploadStatus.Throttled => $"Skipped ({result.ErrorCode}) — {result.Message}",
+        UploadStatus.Unauthorized => "Token rejected — reconnect your account.",
+        UploadStatus.Forbidden => $"Forbidden ({result.ErrorCode}) — {result.Message}",
+        UploadStatus.DeviceLimited => $"Device limit reached — {result.Message}",
+        UploadStatus.InvalidSnapshot => $"Invalid hosted snapshot — {result.Message}",
+        UploadStatus.PayloadTooLarge => $"Hosted snapshot too large — {result.Message}",
+        _ => $"Failed ({result.ErrorCode}) — {result.Message}",
+    };
 
     public void Dispose() => _timer?.Dispose();
 }

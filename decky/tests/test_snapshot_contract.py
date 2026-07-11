@@ -10,6 +10,7 @@ import pytest
 from jsonschema import Draft202012Validator, FormatChecker
 
 from shelfbound_decky import SCHEMA_VERSION
+from shelfbound_decky.hosted_projection import prepare_hosted_upload
 from shelfbound_decky.snapshot import build_snapshot
 from shelfbound_decky.storage import MountEntry
 from steamroot_fixture import MISSING_MANIFEST_APP_ID, make_steam_root
@@ -133,6 +134,18 @@ def test_accounts_and_categories(scan):
         {"name": "Deck", "gameCount": 2},
         {"name": "Directly Choice", "gameCount": 1},
     ]
+
+
+def test_hosted_upload_omits_every_local_steam_account_field(scan):
+    output, _ = scan
+
+    upload = prepare_hosted_upload(output.snapshot)
+
+    assert "steamAccounts" not in upload.snapshot
+    assert "accountName" not in upload.body
+    assert "personaName" not in upload.body
+    assert "steamId64" not in upload.body
+    assert "wolftest" not in upload.body
 
 
 def test_no_null_values_anywhere(scan):
