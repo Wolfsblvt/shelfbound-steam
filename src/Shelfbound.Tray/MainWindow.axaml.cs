@@ -120,13 +120,9 @@ public partial class MainWindow : Window
             return;
         }
 
-        AccountName.Text = _agent.Account?.DisplayName
-            ?? (_agent.Account is { } a ? ShortId(a.AccountId) : "Signed in");
-        AccountPlan.Text = _agent.Entitlements is { } e
-            ? $"{e.Plan} plan · up to {e.MaxDevices} {(e.MaxDevices == 1 ? "device" : "devices")}"
-            : _agent.Account is null ? "Account details unavailable" : "Loading plan…";
-
         string deviceName = _agent.Settings.DeviceName ?? Environment.MachineName;
+        AccountName.Text = deviceName;
+        AccountPlan.Text = "Connected (upload-only)";
         ThisDeviceText.Text = $"This device: {deviceName}";
         // TODO(dashboard): link directly to the device-management page once the dashboard UI ships.
         DevicesSection.IsVisible = true;
@@ -169,10 +165,6 @@ public partial class MainWindow : Window
         CheckUpdateButton.IsEnabled = _update.State is not (UpdateState.Checking or UpdateState.Downloading);
         LastCheckedText.Text = _update.LastChecked is { } t ? $"Checked {Ago(t)}" : "";
     }
-
-    // A short, human-friendly stand-in when no display name is available (opaque account ids can be long).
-    private static string ShortId(string accountId) =>
-        accountId.Length <= 12 ? accountId : $"Account {accountId[..8]}";
 
     private static string Ago(DateTimeOffset when)
     {

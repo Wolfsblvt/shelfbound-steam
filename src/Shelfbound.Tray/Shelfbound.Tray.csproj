@@ -26,4 +26,8 @@
     <ProjectReference Include="..\Shelfbound.Client\Shelfbound.Client.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Shelfbound.Tray.Tests" />
+  </ItemGroup>
+
 </Project>

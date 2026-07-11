@@ -190,30 +190,35 @@ no business or scoring value → public; the product's judgement, server economi
 
 ---
 
-## Tray — M-4 consequence: device management degrades to dashboard link (2026-07-02)
+## Tray — one-time-code connect and upload-only authority (2026-07-11)
 
-### Token-management endpoints require cookie session after M-4 — tray degrades gracefully
+### Browser onboarding never carries a bearer; the connected tray cannot read account data
 
-Cloud security fix **M-4** made `/auth/tokens*` (list devices, revoke, mint) reject **Bearer (API token)**
-principals and require an interactive cookie session instead. The tray authenticates with a stored Bearer token,
-so its `GET /auth/tokens` (device list) and `DELETE /auth/tokens/{id}` (revoke) calls would 403. These endpoints
-are **only** the device-management ones — `GET /auth/me`, `GET /auth/entitlements`, and `POST /ingest` still
-accept Bearer and are unaffected.
+The earlier M-4 hardening moved token inventory and revocation behind an interactive cookie session. SEC-01
+then removed the broader flaw in native onboarding: the dashboard must not place a 90-day bearer in loopback
+browser navigation. The tray is an uploader, so retaining account/library read authority merely to populate a
+richer card would violate least privilege.
 
 **Decision (implemented):**
-- **Drop the server device list from the tray** — `GetDevicesAsync` and `RevokeDeviceAsync` removed from
-  `ShelfboundClient`; `RefreshAccountAsync` only fetches account + entitlements. No 403s in the normal flow.
-- **DEVICES panel → static + dashboard link** — shows this device's local name and a "Manage devices in dashboard"
-  button (`WebAppUrl` from settings). Account/plan/sync display and the browser connect/mint onboarding flow are
-  unchanged and still work over Bearer.
-- **Sign-out is local-only** — clears the stored token immediately and stops auto-sync. Server-side revoke is not
-  attempted (it would 403). Tokens expire naturally at 90 days or can be revoked from the web dashboard.
-- **Dashboard device-management page is a follow-up** — the "Manage devices in dashboard" button currently links
-  to the dashboard root (`WebAppUrl`). A direct `/devices` page waits on the deferred dashboard build
-  (`TODO(dashboard)` in `MainWindow.axaml.cs`).
+- **One-time-code handshake** — the tray opens the dashboard with an exact numeric-loopback redirect, an explicit
+  trimmed device name, and cryptographically random state. The callback contains only `code` + exact `state`.
+  The tray redeems that code once, out of band and without Authorization/cookies, then stores the returned token.
+  Literal callback spelling is validated before URL parsing; parser-normalized aliases are never trusted.
+- **Upload-only, device-bound token** — redemption accepts only the exact `device:upload` scope and bound device
+  name. The same normalized name is emitted in the first and every later snapshot upload. Browser URLs, callback
+  records, and logs never contain the bearer.
+- **Account card deliberately degrades** — it shows the bound device name and `Connected (upload-only)`. The tray
+  no longer calls `/auth/me`, `/auth/entitlements`, `/library`, MCP, or token-management endpoints with this token,
+  avoiding expected 401/403 noise and any temptation to widen its authority for presentation data.
+- **Device management stays in the dashboard** — the tray keeps the static "Manage devices in dashboard" link.
+  Sign-out remains local-only: it clears the stored token and stops auto-sync; expiry/revocation is server-side.
+- **Existing token store retained** — DPAPI protects the token on Windows and a mode-0600 file is used elsewhere.
+  Keychain/libsecret integration remains a follow-up; the residual non-Windows weakness is materially constrained
+  now that the stored credential can only upload for one bound device.
 
-*Considered:* keeping a best-effort revoke call on sign-out (would swallow the 403 silently). Rejected — cleaner
-to be explicit about local-only rather than pretend the revoke might succeed.
+*Considered and rejected:* retaining or minting a broad Bearer so the tray could continue showing display name,
+plan, and allowance. That trades a cosmetic account card for account/library authority on a background uploader.
+A future richer account view needs a separate interactive read session, not broader device-token scope.
 
 ---
 

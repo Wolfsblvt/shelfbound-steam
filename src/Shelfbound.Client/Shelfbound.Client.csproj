@@ -13,4 +13,8 @@
     <ProjectReference Include="..\Shelfbound.Storage\Shelfbound.Storage.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Shelfbound.Tray.Tests" />
+  </ItemGroup>
+
 </Project>

@@ -17,9 +17,16 @@ section up to date as you work — the release step promotes it to a new version
 
 ### Changed
 - Redesigned the window as a two-column dashboard so everything fits without a scrollbar.
+- The Account card now shows this device and `Connected (upload-only)`; account and plan details stay in
+  the web dashboard because the tray token can only upload this device's snapshots.
 
 ### Fixed
 - The sync interval is greyed out when automatic background sync is off.
+
+### Security
+- Replaced browser-returned long-lived tokens with a short-lived one-time code. The tray validates an exact
+  numeric-loopback callback, redeems the code directly, and stores a device-bound upload-only token; a bearer
+  never enters browser URLs, history, or callback records.
 
 ## [0.6.0] - 2026-07-02
 ### Added

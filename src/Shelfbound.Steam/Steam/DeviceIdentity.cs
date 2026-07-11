@@ -13,11 +13,33 @@ public static class DeviceIdentity
     public static SnapshotDevice Resolve(string? nameOverride, DeviceType? typeOverride) => new()
     {
         Id = GetOrCreateDeviceId(),
-        Name = nameOverride ?? Environment.MachineName,
+        Name = NormalizeName(nameOverride),
         Type = typeOverride ?? DetectType(),
         Os = DetectOs(),
         Specs = HardwareInfo.Collect(),
     };
+
+    /// <summary>
+    /// Resolves and validates the snapshot device name. The same normalized value is used by native
+    /// connect-code binding and snapshot uploads, so surrounding whitespace can never create two
+    /// different device identities.
+    /// </summary>
+    public static string NormalizeName(string? nameOverride)
+    {
+        string candidate = string.IsNullOrWhiteSpace(nameOverride)
+            ? Environment.MachineName
+            : nameOverride;
+        string name = candidate.Trim();
+
+        if (name.Length == 0)
+            throw new ArgumentException("The device name cannot be empty.", nameof(nameOverride));
+        if (name.Length > 200)
+            throw new ArgumentException("The device name cannot exceed 200 characters.", nameof(nameOverride));
+        if (name.Any(char.IsControl))
+            throw new ArgumentException("The device name cannot contain control characters.", nameof(nameOverride));
+
+        return name;
+    }
 
     private static OsPlatform DetectOs()
     {

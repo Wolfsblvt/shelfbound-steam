@@ -1,7 +1,7 @@
 # Shelfbound.Tray
 
 The cross-platform Shelfbound tray agent (Avalonia). It keeps your Steam library synced to a Shelfbound
-server in the background, shows a quick status and your account, and lets you connect without copy-pasting a
+server in the background, shows a quick status for this device, and lets you connect without copy-pasting a
 token.
 
 ## Install
@@ -29,21 +29,21 @@ token.
 
 ## What it does
 
-- **Connect account** (tray menu or window button) opens the dashboard in your browser to sign in; the
-  device token is handed back to the app over a localhost callback and saved locally.
-- The **Account** card shows who's signed in, your plan and device allowance, and this device's name. A
-  **"Manage devices in dashboard"** button opens the web dashboard for the full device list and revocation.
-  **Sign out** clears the local token and stops auto-sync immediately; the server-side token expires at 90 days
-  or can be revoked from the dashboard. Plan limits are enforced by the server — the tray only displays them,
-  it never gates features client-side.
+- **Connect account** (tray menu or window button) opens the dashboard in your browser to sign in. The browser
+  returns a short-lived one-time code to an exact numeric-loopback callback; the tray redeems it directly for
+  a device-bound, upload-only token. A bearer never enters browser navigation, history, or callback URLs.
+- The **Account** card intentionally shows only this device's bound name and **"Connected (upload-only)"**.
+  The device token cannot read account, plan, library, or MCP data. A **"Manage devices in dashboard"** button
+  opens the web dashboard for the full device list and revocation. **Sign out** clears the local token and stops
+  auto-sync immediately; the server-side token expires at 90 days or can be revoked from the dashboard.
 - **Sync now** uploads immediately; auto-sync runs on an interval when enabled.
 - Closing the window hides it to the tray. Auto-start on login and background auto-sync are optional and on
   by default.
 
 ## Storage
 
-- Settings live in `…/AppData/shelfbound/tray.json` (server URLs default to localhost for now); the API
-  token is stored separately in `token.bin` — DPAPI-encrypted on Windows, a 0600 file elsewhere.
+- Settings live in `…/AppData/shelfbound/tray.json` (server URLs default to localhost for now); the upload-only
+  device token is stored separately in `token.bin` — DPAPI-encrypted on Windows, a 0600 file elsewhere.
 - Login auto-start is wired for Windows (Run key), Linux (`~/.config/autostart`), and macOS (LaunchAgent).
 
 ## Auto-update

@@ -26,11 +26,6 @@ public sealed class SyncAgent : IDisposable
         get { lock (_lock) { return _history.ToList(); } }
     }
 
-    // Signed-in account context, refreshed from the server via the connected token. All optional: the tray
-    // works offline / pre-deploy, so these stay null/empty until a successful RefreshAccountAsync.
-    public AccountInfo? Account { get; private set; }
-    public Entitlements? Entitlements { get; private set; }
-
     public event Action? Changed;
 
     public SyncAgent()
@@ -42,9 +37,7 @@ public sealed class SyncAgent : IDisposable
 
     public void Start()
     {
-        Reschedule();
-        if (IsConnected)
-            _ = RefreshAccountAsync();
+        Reschedule(syncImmediately: true);
     }
 
     /// <summary>Applies a settings change, persists it, updates auto-start, and reschedules.</summary>
@@ -67,10 +60,11 @@ public sealed class SyncAgent : IDisposable
         Log("Syncing…");
         try
         {
+            string deviceName = DeviceIdentity.NormalizeName(Settings.DeviceName);
             SnapshotBuildResult build = await SnapshotBuilder.BuildAsync(new SnapshotBuildOptions
             {
                 ToolVersion = AppInfo.Version,
-                DeviceName = Settings.DeviceName,
+                DeviceName = deviceName,
             });
             using var client = new ShelfboundClient(Settings.ServerUrl, _token!);
             UploadResult result = await client.UploadAsync(build.Snapshot);
@@ -79,6 +73,7 @@ public sealed class SyncAgent : IDisposable
                 UploadStatus.Success => $"Synced {result.GameCount} games.",
                 UploadStatus.Throttled => $"Skipped — {result.Message}",
                 UploadStatus.Unauthorized => "Token rejected — reconnect your account.",
+                UploadStatus.DeviceNameMismatch => "Device name mismatch — reconnect this device.",
                 _ => $"Failed — {result.Message}",
             });
             if (result.Ok)
@@ -96,54 +91,45 @@ public sealed class SyncAgent : IDisposable
         Log("Opening browser to connect…");
         try
         {
-            string device = string.IsNullOrWhiteSpace(Settings.DeviceName) ? Environment.MachineName : Settings.DeviceName!;
-            string? token = await ConnectFlow.RunAsync(Settings.WebAppUrl, device);
-            if (token is null)
+            string deviceName = DeviceIdentity.NormalizeName(Settings.DeviceName);
+            ConnectFlowResult? connection = await ConnectFlow.RunAsync(
+                Settings.WebAppUrl,
+                Settings.ServerUrl,
+                deviceName);
+            if (connection is null)
             {
                 Log("Connect cancelled or timed out.");
                 return;
             }
-            _token = token;
-            TokenStore.Save(token);
-            Settings.DeviceName ??= device;
-            Settings.Save();
-            Log("Account connected.");
-            Reschedule();
+
+            _token = TokenStore.Load();
+            if (string.IsNullOrEmpty(_token))
+            {
+                TokenStore.Clear();
+                Log("Connect failed — the device token could not be loaded from secure storage.");
+                return;
+            }
+
+            try
+            {
+                Settings.DeviceName = connection.DeviceName;
+                Settings.Save();
+            }
+            catch
+            {
+                TokenStore.Clear();
+                _token = null;
+                throw;
+            }
+
+            Log("Device connected (upload-only).");
             await SyncNowAsync();
-            await RefreshAccountAsync();
+            Reschedule();
         }
         catch (Exception ex)
         {
             Log($"Connect failed — {ex.Message}");
         }
-    }
-
-    /// <summary>Pulls the signed-in account and plan entitlements for the account card.</summary>
-    public async Task RefreshAccountAsync(CancellationToken ct = default)
-    {
-        if (!IsConnected)
-        {
-            Account = null;
-            Entitlements = null;
-            Changed?.Invoke();
-            return;
-        }
-
-        try
-        {
-            using var client = new ShelfboundClient(Settings.ServerUrl, _token!);
-            // Independent reads — run them together; each swallows its own failure and returns null.
-            Task<AccountInfo?> account = client.GetAccountAsync(ct);
-            Task<Entitlements?> entitlements = client.GetEntitlementsAsync(ct);
-            await Task.WhenAll(account, entitlements);
-            Account = account.Result;
-            Entitlements = entitlements.Result;
-        }
-        catch (Exception ex)
-        {
-            Log($"Couldn't load account — {ex.Message}");
-        }
-        Changed?.Invoke();
     }
 
     /// <summary>
@@ -155,21 +141,20 @@ public sealed class SyncAgent : IDisposable
     {
         TokenStore.Clear();
         _token = null;
-        Account = null;
-        Entitlements = null;
         Log("Signed out.");
         Reschedule(); // IsConnected is now false → auto-sync timer is torn down.
         return Task.CompletedTask;
     }
 
-    private void Reschedule()
+    private void Reschedule(bool syncImmediately = false)
     {
         _timer?.Dispose();
         _timer = null;
         if (Settings.AutoSync && IsConnected)
         {
             var interval = TimeSpan.FromMinutes(Math.Max(1, Settings.IntervalMinutes));
-            _timer = new Timer(_ => _ = SyncNowAsync(), null, TimeSpan.Zero, interval);
+            TimeSpan dueTime = syncImmediately ? TimeSpan.Zero : interval;
+            _timer = new Timer(_ => _ = SyncNowAsync(), null, dueTime, interval);
         }
         UpdateStatus();
     }
