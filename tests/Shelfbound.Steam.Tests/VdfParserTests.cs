@@ -61,4 +61,25 @@ public class VdfParserTests
     {
         Should.Throw<FormatException>(() => VdfParser.Parse("\"root\" { \"k\" \"v\" "));
     }
+
+    [Fact]
+    public void Rejects_oversized_input()
+    {
+        string oversized = new('x', SteamInputLimits.MaxVdfTextChars + 1);
+
+        FormatException error = Should.Throw<FormatException>(() => VdfParser.Parse(oversized));
+
+        error.Message.ShouldContain("character limit");
+    }
+
+    [Fact]
+    public void Rejects_pathological_nesting()
+    {
+        string nested = string.Concat(Enumerable.Repeat("\"k\" { ", SteamInputLimits.MaxVdfDepth + 1)) +
+            string.Concat(Enumerable.Repeat(" }", SteamInputLimits.MaxVdfDepth + 1));
+
+        FormatException error = Should.Throw<FormatException>(() => VdfParser.Parse(nested));
+
+        error.Message.ShouldContain("depth limit");
+    }
 }

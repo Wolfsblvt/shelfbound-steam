@@ -1,6 +1,6 @@
 import pytest
 
-from shelfbound_decky import vdf
+from shelfbound_decky import limits, vdf
 from shelfbound_decky.vdf import VdfFormatError
 
 
@@ -67,3 +67,18 @@ def test_missing_close_brace_raises():
 def test_value_where_key_expected_raises():
     with pytest.raises(VdfFormatError, match="Expected a value"):
         vdf.parse('"r" }')
+
+
+def test_oversized_input_is_rejected():
+    oversized = "x" * (limits.MAX_VDF_TEXT_CHARS + 1)
+
+    with pytest.raises(VdfFormatError, match="character limit"):
+        vdf.parse(oversized)
+
+
+def test_pathological_nesting_is_rejected_before_python_recursion_limit():
+    depth = limits.MAX_VDF_DEPTH + 1
+    nested = '"k" { ' * depth + " }" * depth
+
+    with pytest.raises(VdfFormatError, match="depth limit"):
+        vdf.parse(nested)

@@ -101,7 +101,7 @@ it. Keeping query logic out of the MCP layer lets the dashboard/hosted layer reu
 Owned-but-not-installed games + playtime come from the Steam Web API behind `ISteamWebApiClient`
 (swappable/mockable). A **pure** `SteamWebEnricher` merges the fetched data into the local snapshot, so
 the network call and the merge logic stay separable and testable. Requires a user-provided key
-(`--steam-api-key` / `STEAM_WEB_API_KEY`); the key is never stored.
+(`STEAM_WEB_API_KEY` or the saved local config); secret values are never accepted in argv.
 
 ### User-data storage + identity/auth seam
 Durable user/derived data (per-game status/rating/completion/aspects, scoped memories, category
@@ -114,9 +114,11 @@ interface. Kept separate from the raw snapshot (the derived-data category).
 
 ### Config + the Steam Web API key
 Config (API key, active profile) is stored in the user's config dir via `shelfbound setup`, read by
-both the CLI and the MCP server (key precedence: flag > env > config). The key is the user's own
-read-only, rate-limited credential, stored plaintext in the protected config dir for now (OS-keystore
-encryption — DPAPI / libsecret — is a planned hardening). Never in the repo, never logged.
+both the CLI and the MCP server (key precedence: env > config). Setup reads the key from stdin or the
+environment, never argv. The key is the user's own read-only, rate-limited credential, stored plaintext
+for now; config and personal-profile writes are atomic and mode 0600 on Unix, while Windows files
+inherit the current user's profile-directory ACL. OS-keystore encryption (DPAPI / libsecret) remains a
+planned hardening. Never in the repo, never logged.
 
 ### Surfacing user data — shared logic, per-surface presentation
 "What Shelfbound remembers" appears in several places: the CLI (`shelfbound profile`), the local MCP

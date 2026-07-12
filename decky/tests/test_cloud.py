@@ -261,3 +261,57 @@ def test_pairing_reports_unavailable_on_todays_server(server):
         client.pairing_start("testdeck", "steamDeck", "device-1")
     with pytest.raises(PairingUnavailableError):
         client.pairing_poll("poll-token")
+
+
+def test_rejects_plain_http_for_non_literal_loopback_hosts():
+    with pytest.raises(ValueError, match="must use HTTPS"):
+        ShelfboundServer("http://localhost:5080", token="synthetic-token")
+    with pytest.raises(ValueError, match="must use HTTPS"):
+        ShelfboundServer("http://192.0.2.1", token="synthetic-token")
+
+
+def test_cross_origin_redirect_is_not_followed_and_never_receives_bearer():
+    class SinkHandler(BaseHTTPRequestHandler):
+        seen_authorization: list[str | None] = []
+
+        def do_GET(self):
+            type(self).seen_authorization.append(self.headers.get("Authorization"))
+            self.send_response(200)
+            self.end_headers()
+
+        def log_message(self, *_args):
+            pass
+
+    sink = HTTPServer(("127.0.0.1", 0), SinkHandler)
+    sink_thread = threading.Thread(target=sink.serve_forever, daemon=True)
+    sink_thread.start()
+
+    class RedirectHandler(BaseHTTPRequestHandler):
+        seen_authorization: list[str | None] = []
+
+        def do_POST(self):
+            type(self).seen_authorization.append(self.headers.get("Authorization"))
+            target = f"http://127.0.0.1:{sink.server_address[1]}/stolen"
+            self.send_response(302)
+            self.send_header("Location", target)
+            self.end_headers()
+
+        def log_message(self, *_args):
+            pass
+
+    source = HTTPServer(("127.0.0.1", 0), RedirectHandler)
+    source_thread = threading.Thread(target=source.serve_forever, daemon=True)
+    source_thread.start()
+
+    try:
+        base_url = f"http://127.0.0.1:{source.server_address[1]}"
+        outcome = ShelfboundServer(base_url, token="synthetic-token").upload_snapshot(SNAPSHOT)
+
+        assert outcome.status == "error"
+        assert RedirectHandler.seen_authorization == ["Bearer synthetic-token"]
+        assert SinkHandler.seen_authorization == []
+    finally:
+        source.shutdown()
+        source_thread.join(timeout=5)
+        sink.shutdown()
+        sink_thread.join(timeout=5)

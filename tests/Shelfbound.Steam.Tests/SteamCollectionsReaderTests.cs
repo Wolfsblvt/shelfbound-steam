@@ -56,4 +56,15 @@ public class SteamCollectionsReaderTests
         result.ShouldNotBeNull();
         result[7].ShouldBe(["Done"]);
     }
+
+    [Fact]
+    public void Rejects_oversized_namespace_before_json_parsing()
+    {
+        string oversized = new(' ', SteamInputLimits.MaxNamespaceJsonChars + 1);
+
+        InvalidDataException error = Should.Throw<InvalidDataException>(
+            () => SteamCollectionsReader.ParseNamespaceJson(oversized));
+
+        error.Message.ShouldContain("character limit");
+    }
 }

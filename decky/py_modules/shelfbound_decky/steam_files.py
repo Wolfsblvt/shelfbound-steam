@@ -8,11 +8,12 @@ identically. Pure text-in/data-out; no filesystem access here.
 from __future__ import annotations
 
 import json
+import ntpath
 import posixpath
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-from . import vdf
+from . import limits, vdf
 from .vdf import VdfFormatError
 
 # steamId64 = STEAM_ID64_BASE + 32-bit account id (the userdata/<id> folder name).
@@ -116,7 +117,7 @@ def parse_app_manifest(vdf_text: str) -> AppManifest:
         app_id=app_id,
         name=state.get_value("name") or f"App {app_id}",
         state_flags=_parse_int(state.get_value("StateFlags")) or 0,
-        install_dir=state.get_value("installdir"),
+        install_dir=_normalize_install_directory(state.get_value("installdir")),
         size_on_disk=_parse_int(state.get_value("SizeOnDisk")),
         last_updated=_parse_unix_seconds(state.get_value("LastUpdated")),
         last_played=_parse_unix_seconds(state.get_value("LastPlayed")),
@@ -189,13 +190,20 @@ def parse_collections_namespace(json_text: str) -> dict[int, list[str]] | None:
     Raises on a genuinely corrupt top-level value — the caller treats that as "fall back
     to legacy", exactly like the C# reader.
     """
+    if len(json_text) > limits.MAX_NAMESPACE_JSON_CHARS:
+        raise ValueError(
+            f"Steam collections JSON exceeds the {limits.MAX_NAMESPACE_JSON_CHARS}-character limit."
+        )
     root = json.loads(json_text)
     if not isinstance(root, list):
         return None
 
     # Preserve the order collections appear in (Steam's own ordering) for each game.
     by_app: dict[int, list[str]] = {}
-    for pair in root:
+    memberships = 0
+    for entry_index, pair in enumerate(root, start=1):
+        if entry_index > limits.MAX_COLLECTION_ENTRIES:
+            raise ValueError("Steam collections entry count exceeds the supported limit.")
         if not isinstance(pair, list) or len(pair) != 2:
             continue
         entry_key, entry = pair
@@ -203,38 +211,63 @@ def parse_collections_namespace(json_text: str) -> dict[int, list[str]] | None:
             continue
         if not isinstance(entry, dict) or not isinstance(entry.get("value"), str):
             continue
-        _add_collection(entry["value"], by_app)
+        memberships = _add_collection(entry["value"], by_app, memberships)
 
     return by_app or None
 
 
-def _add_collection(collection_json: str, by_app: dict[int, list[str]]) -> None:
+def _add_collection(
+    collection_json: str,
+    by_app: dict[int, list[str]],
+    memberships: int,
+) -> int:
     try:
         collection = json.loads(collection_json)
     except ValueError:
-        return  # a single malformed collection shouldn't sink the rest
+        return memberships  # a single malformed collection shouldn't sink the rest
     if not isinstance(collection, dict):
-        return
+        return memberships
 
     # Skip dynamic collections — their membership is rule-based, not the stored 'added' list.
     if collection.get("filterSpec") is not None:
-        return
+        return memberships
 
     name = collection.get("name")
-    if not isinstance(name, str) or not name.strip():
-        return
+    if not isinstance(name, str) or not name.strip() or len(name) > limits.MAX_CATEGORY_NAME_CHARS:
+        return memberships
 
     added = collection.get("added")
     if not isinstance(added, list):
-        return
+        return memberships
 
     for app_id in added:
+        memberships += 1
+        if memberships > limits.MAX_COLLECTION_MEMBERSHIPS:
+            raise ValueError("Steam collection membership count exceeds the supported limit.")
         # bool is an int subclass in Python; exclude it and non-integers (e.g. floats).
         if not isinstance(app_id, int) or isinstance(app_id, bool):
             continue
         names = by_app.setdefault(app_id, [])
         if name not in names:
             names.append(name)
+    return memberships
+
+
+def _normalize_install_directory(value: str | None) -> str | None:
+    if (
+        not value
+        or not value.strip()
+        or len(value) > limits.MAX_INSTALL_DIRECTORY_NAME_CHARS
+        or value in (".", "..")
+        or "/" in value
+        or "\\" in value
+        or "\0" in value
+        or posixpath.isabs(value)
+        or ntpath.isabs(value)
+        or ntpath.splitdrive(value)[0]
+    ):
+        return None
+    return value
 
 
 def _parse_int(text: str | None) -> int | None:

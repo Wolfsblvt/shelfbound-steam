@@ -14,7 +14,7 @@ import json
 
 import pytest
 
-from shelfbound_decky import steam_collections, steam_localstorage
+from shelfbound_decky import limits, steam_collections, steam_localstorage
 from shelfbound_decky.steam_collections import parse_collections_namespace
 
 # The cloud-storage-namespace-1 value: an array of [entryKey, {value:"<collection-json>"}].
@@ -199,3 +199,11 @@ def test_try_read_returns_none_when_key_absent(tmp_path):
 
 def test_try_read_returns_none_when_dir_missing(tmp_path):
     assert steam_collections.try_read(ACCOUNT_ID, leveldb_dir=str(tmp_path / "nope")) is None
+
+
+def test_try_read_skips_oversized_cache_file(tmp_path):
+    path = tmp_path / "000003.log"
+    with path.open("wb") as handle:
+        handle.truncate(limits.MAX_LEVELDB_FILE_BYTES + 1)
+
+    assert steam_collections.try_read(ACCOUNT_ID, leveldb_dir=str(tmp_path)) is None

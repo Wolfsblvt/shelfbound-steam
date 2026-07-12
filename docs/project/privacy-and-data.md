@@ -33,6 +33,20 @@ separate hosted service has its own privacy policy, retention rules, and account
 
 Nothing else. The scanner does not traverse saves, unrelated user files, or arbitrary directories.
 
+## Local input and storage hardening
+
+- Steam VDF and Chromium LevelDB inputs have explicit file, nesting, decoded-output, entry-count, and
+  offset/length bounds. Malformed cache fragments fail closed and the scanner falls back or reports a
+  warning instead of allocating from attacker-controlled lengths.
+- Manifest `installdir` is emitted only when it is one relative folder name. Absolute paths, traversal
+  segments, separators, drive-qualified names, and oversized values are omitted before snapshot or
+  upload construction.
+- The Steam API config and personal profile JSON are atomically created as mode 0600 on Unix. Windows
+  relies on the current user's profile-directory ACL; the tray bearer token additionally uses DPAPI.
+  Decky settings, device id, and token files are mode 0600 on SteamOS.
+- Steam API keys and Shelfbound bearer tokens are accepted through environment, stdin, or protected
+  files—not command-line values that leak through shell history and process argument inspection.
+
 ## The complete local snapshot is personal
 
 The portable snapshot contract contains the complete local data needed by local consumers:

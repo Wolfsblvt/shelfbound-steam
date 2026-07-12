@@ -12,6 +12,10 @@ keys. Keep the two in sync if either grows.
 
 from __future__ import annotations
 
+import os
+
+from . import limits
+
 
 class VdfFormatError(ValueError):
     """Raised when VDF text is structurally malformed."""
@@ -65,6 +69,10 @@ _OPEN, _CLOSE, _STRING, _EOF = "{", "}", "string", "eof"
 
 def parse(text: str) -> VdfObject:
     """Parse VDF text into a root object; raises VdfFormatError on malformed input."""
+    if len(text) > limits.MAX_VDF_TEXT_CHARS:
+        raise VdfFormatError(
+            f"VDF input exceeds the {limits.MAX_VDF_TEXT_CHARS}-character limit."
+        )
     lexer = _Lexer(text)
     root = VdfObject()
     while True:
@@ -73,27 +81,32 @@ def parse(text: str) -> VdfObject:
             return root
         if kind != _STRING:
             raise VdfFormatError(f"Unexpected token '{token}' at top level (position {position}).")
-        _read_key_value(lexer, root, token)
+        _read_key_value(lexer, root, token, depth=0)
 
 
 def parse_file(path: str) -> VdfObject:
     # utf-8-sig strips a BOM if present; errors are replaced rather than fatal,
     # matching the lenient way the C# core reads these files.
+    if os.path.getsize(path) > limits.MAX_VDF_FILE_BYTES:
+        raise VdfFormatError(f"VDF file exceeds the {limits.MAX_VDF_FILE_BYTES}-byte limit.")
     with open(path, "r", encoding="utf-8-sig", errors="replace") as handle:
         return parse(handle.read())
 
 
-def _read_key_value(lexer: "_Lexer", target: VdfObject, key: str) -> None:
+def _read_key_value(lexer: "_Lexer", target: VdfObject, key: str, depth: int) -> None:
     kind, token, position = lexer.next()
     if kind == _OPEN:
-        target._set_object(key, _read_object(lexer))
+        child_depth = depth + 1
+        if child_depth > limits.MAX_VDF_DEPTH:
+            raise VdfFormatError(f"VDF nesting exceeds the depth limit of {limits.MAX_VDF_DEPTH}.")
+        target._set_object(key, _read_object(lexer, child_depth))
     elif kind == _STRING:
         target._set_value(key, token)
     else:
         raise VdfFormatError(f"Expected a value or '{{' after key '{key}' (position {position}).")
 
 
-def _read_object(lexer: "_Lexer") -> VdfObject:
+def _read_object(lexer: "_Lexer", depth: int) -> VdfObject:
     obj = VdfObject()
     while True:
         kind, token, position = lexer.next()
@@ -103,7 +116,7 @@ def _read_object(lexer: "_Lexer") -> VdfObject:
             raise VdfFormatError("Unexpected end of input inside object (missing '}').")
         if kind != _STRING:
             raise VdfFormatError(f"Expected a key or '}}' (position {position}).")
-        _read_key_value(lexer, obj, token)
+        _read_key_value(lexer, obj, token, depth)
 
 
 _ESCAPES = {"n": "\n", "t": "\t", "r": "\r", "\\": "\\", '"': '"'}

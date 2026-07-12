@@ -3,7 +3,9 @@ tests/Shelfbound.Steam.Tests/SnappyTests.cs. Streams are hand-built from the for
 a varint uncompressed length, then literals/copies.
 """
 
-from shelfbound_decky import snappy
+import pytest
+
+from shelfbound_decky import limits, snappy
 
 
 def test_decompresses_literal_only():
@@ -31,3 +33,20 @@ def test_decompresses_long_literal_with_length_prefix():
     output = snappy.decompress(data)
     assert len(output) == 100
     assert all(b == 0x41 for b in output)
+
+
+def test_rejects_declared_output_above_resource_limit_before_allocating():
+    remaining = limits.MAX_LEVELDB_BLOCK_BYTES + 1
+    prefix = bytearray()
+    while remaining >= 0x80:
+        prefix.append((remaining & 0x7F) | 0x80)
+        remaining >>= 7
+    prefix.append(remaining)
+
+    with pytest.raises(ValueError, match="output exceeds"):
+        snappy.decompress(bytes(prefix))
+
+
+def test_rejects_copy_that_points_before_decoded_output():
+    with pytest.raises(ValueError, match="copy offset"):
+        snappy.decompress(bytes([0x04, 0x01, 0x01]))

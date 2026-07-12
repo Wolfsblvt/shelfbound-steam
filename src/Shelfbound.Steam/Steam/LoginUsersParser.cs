@@ -8,7 +8,14 @@ public static class LoginUsersParser
 {
     public static IReadOnlyList<SteamAccount> Parse(string vdfText)
     {
-        var users = VdfParser.Parse(vdfText).GetObject("users");
+        return Parse(VdfParser.Parse(vdfText));
+    }
+
+    public static IReadOnlyList<SteamAccount> ParseFile(string path) => Parse(VdfParser.ParseFile(path));
+
+    private static IReadOnlyList<SteamAccount> Parse(VdfObject root)
+    {
+        var users = root.GetObject("users");
         if (users is null)
             return [];
 
@@ -25,6 +32,4 @@ public static class LoginUsersParser
         }
         return accounts;
     }
-
-    public static IReadOnlyList<SteamAccount> ParseFile(string path) => Parse(File.ReadAllText(path));
 }

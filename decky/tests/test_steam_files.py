@@ -70,6 +70,24 @@ def test_app_manifest_partial_install_and_fallback_name():
     assert manifest.size_on_disk is None
 
 
+def test_app_manifest_omits_non_relative_install_directory():
+    unsafe_values = (
+        "../secret",
+        "games/secret",
+        r"games\secret",
+        "/home/deck/game",
+        r"C:\Games\Game",
+        "C:relative",
+    )
+    for unsafe_value in unsafe_values:
+        escaped = unsafe_value.replace("\\", "\\\\")
+        manifest = parse_app_manifest(
+            f'"AppState" {{ "appid" "1" "name" "X" "installdir" "{escaped}" }}'
+        )
+
+        assert manifest.install_dir is None
+
+
 def test_login_users_order_most_recent_and_account_id():
     accounts = parse_login_users('''"users"
 {

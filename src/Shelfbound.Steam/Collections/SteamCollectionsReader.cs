@@ -40,6 +40,11 @@ internal static class SteamCollectionsReader
     /// </summary>
     public static IReadOnlyDictionary<int, IReadOnlyList<string>>? ParseNamespaceJson(string json)
     {
+        ArgumentNullException.ThrowIfNull(json);
+        if (json.Length > SteamInputLimits.MaxNamespaceJsonChars)
+            throw new InvalidDataException(
+                $"Steam collections JSON exceeds the {SteamInputLimits.MaxNamespaceJsonChars}-character limit.");
+
         using var document = JsonDocument.Parse(json);
         if (document.RootElement.ValueKind != JsonValueKind.Array)
             return null;
@@ -47,8 +52,12 @@ internal static class SteamCollectionsReader
         // Preserve the order collections appear in (Steam's own ordering) for each game's category list.
         var byApp = new Dictionary<int, List<string>>();
 
+        int collectionEntries = 0;
+        int memberships = 0;
         foreach (JsonElement pair in document.RootElement.EnumerateArray())
         {
+            if (++collectionEntries > SteamInputLimits.MaxCollectionEntries)
+                throw new InvalidDataException("Steam collections entry count exceeds the supported limit.");
             if (pair.ValueKind != JsonValueKind.Array || pair.GetArrayLength() != 2)
                 continue;
             if (pair[0].ValueKind != JsonValueKind.String ||
@@ -58,7 +67,7 @@ internal static class SteamCollectionsReader
                 valueProp.ValueKind != JsonValueKind.String)
                 continue;
 
-            AddCollection(valueProp.GetString()!, byApp);
+            AddCollection(valueProp.GetString()!, byApp, ref memberships);
         }
 
         return byApp.Count == 0
@@ -66,7 +75,10 @@ internal static class SteamCollectionsReader
             : byApp.ToDictionary(kv => kv.Key, kv => (IReadOnlyList<string>)kv.Value);
     }
 
-    private static void AddCollection(string collectionJson, Dictionary<int, List<string>> byApp)
+    private static void AddCollection(
+        string collectionJson,
+        Dictionary<int, List<string>> byApp,
+        ref int memberships)
     {
         JsonElement collection;
         try
@@ -88,7 +100,7 @@ internal static class SteamCollectionsReader
             nameProp.ValueKind != JsonValueKind.String)
             return;
         string name = nameProp.GetString()!;
-        if (string.IsNullOrWhiteSpace(name))
+        if (string.IsNullOrWhiteSpace(name) || name.Length > SteamInputLimits.MaxCategoryNameChars)
             return;
 
         if (!collection.TryGetProperty("added", out JsonElement added) || added.ValueKind != JsonValueKind.Array)
@@ -96,6 +108,8 @@ internal static class SteamCollectionsReader
 
         foreach (JsonElement app in added.EnumerateArray())
         {
+            if (++memberships > SteamInputLimits.MaxCollectionMemberships)
+                throw new InvalidDataException("Steam collection membership count exceeds the supported limit.");
             if (app.ValueKind != JsonValueKind.Number || !app.TryGetInt32(out int appId))
                 continue;
             if (!byApp.TryGetValue(appId, out List<string>? names))

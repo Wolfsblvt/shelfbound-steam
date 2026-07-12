@@ -11,9 +11,17 @@ public static class SharedConfigParser
 {
     public static IReadOnlyDictionary<int, IReadOnlyList<string>> Parse(string vdfText)
     {
+        return Parse(VdfParser.Parse(vdfText));
+    }
+
+    public static IReadOnlyDictionary<int, IReadOnlyList<string>> ParseFile(string path) =>
+        Parse(VdfParser.ParseFile(path));
+
+    private static IReadOnlyDictionary<int, IReadOnlyList<string>> Parse(VdfObject root)
+    {
         var result = new Dictionary<int, IReadOnlyList<string>>();
 
-        VdfObject? apps = VdfParser.Parse(vdfText)
+        VdfObject? apps = root
             .GetObject("UserRoamingConfigStore")
             ?.GetObject("Software")
             ?.GetObject("Valve")
@@ -44,7 +52,4 @@ public static class SharedConfigParser
 
         return result;
     }
-
-    public static IReadOnlyDictionary<int, IReadOnlyList<string>> ParseFile(string path) =>
-        Parse(File.ReadAllText(path));
 }

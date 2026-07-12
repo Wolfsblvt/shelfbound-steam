@@ -113,7 +113,7 @@ The scanner emits **installed Steam games per library**, plus accounts, device i
   membership) are covered; **dynamic, rule-based (`filterSpec`) collections** are not read yet — see
   [steam-collections.md](./steam-collections.md).
 - **Owned-not-installed games + playtime** — populated only when a Steam Web API key is provided
-  (`--steam-api-key` / `STEAM_WEB_API_KEY`). Without a key, only installed games are listed and
+  (`STEAM_WEB_API_KEY` or the saved local config). Without a key, only installed games are listed and
   `stats.scope` stays `installedOnly`; with a key it becomes `fullLibrary`.
 - **Non-Steam shortcuts** and deeper per-device install nuance beyond the per-library `storage` kind +
   free/total already in the contract (added additively in v0.5.0; classified per OS by the desktop

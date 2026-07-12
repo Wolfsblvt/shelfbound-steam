@@ -51,12 +51,35 @@ internal static class ChromiumLevelDb
     private static IEnumerable<Entry> EnumerateEntries(string dir)
     {
         // SSTables hold compacted data; the WAL holds the newest writes not yet compacted.
-        foreach (string path in Directory.EnumerateFiles(dir, "*.ldb"))
-            foreach (Entry e in SafeRead(path, ReadTable))
+        int fileCount = 0;
+        long totalBytes = 0;
+        foreach (string path in Directory.EnumerateFiles(dir)
+                     .Where(path => Path.GetExtension(path) is ".ldb" or ".log")
+                     .OrderBy(path => path, StringComparer.Ordinal))
+        {
+            if (++fileCount > SteamInputLimits.MaxLevelDbFiles)
+                yield break;
+
+            long fileBytes;
+            try
+            {
+                fileBytes = new FileInfo(path).Length;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                continue;
+            }
+
+            if (fileBytes < 0 || fileBytes > SteamInputLimits.MaxLevelDbFileBytes)
+                continue;
+            totalBytes = checked(totalBytes + fileBytes);
+            if (totalBytes > SteamInputLimits.MaxLevelDbTotalBytes)
+                yield break;
+
+            Func<string, IEnumerable<Entry>> reader = Path.GetExtension(path) == ".ldb" ? ReadTable : ReadLog;
+            foreach (Entry e in SafeRead(path, reader))
                 yield return e;
-        foreach (string path in Directory.EnumerateFiles(dir, "*.log"))
-            foreach (Entry e in SafeRead(path, ReadLog))
-                yield return e;
+        }
     }
 
     /// <summary>A malformed/locked file must never break the scan; it just yields nothing.</summary>
@@ -65,7 +88,13 @@ internal static class ChromiumLevelDb
         List<Entry> entries;
         try
         {
-            entries = reader(path).ToList();
+            entries = [];
+            foreach (Entry entry in reader(path))
+            {
+                if (entries.Count >= SteamInputLimits.MaxLevelDbEntriesPerFile)
+                    throw new InvalidDataException("LevelDB entry count exceeds the per-file limit.");
+                entries.Add(entry);
+            }
         }
         catch
         {
@@ -88,19 +117,19 @@ internal static class ChromiumLevelDb
         int fp = data.Length - FooterSize;
         ReadVarint(data, ref fp); // metaindex offset (unused)
         ReadVarint(data, ref fp); // metaindex size  (unused)
-        long indexOffset = ReadVarint(data, ref fp);
-        long indexSize = ReadVarint(data, ref fp);
+        int indexOffset = ReadBoundedLength(data, ref fp, data.Length);
+        int indexSize = ReadBoundedLength(data, ref fp, SteamInputLimits.MaxLevelDbBlockBytes);
 
-        foreach ((byte[] _, byte[] handle) in ParseBlock(ReadBlock(data, (int)indexOffset, (int)indexSize)))
+        foreach ((byte[] _, byte[] handle) in ParseBlock(ReadBlock(data, indexOffset, indexSize)))
         {
             int hp = 0;
-            long blockOffset = ReadVarint(handle, ref hp);
-            long blockSize = ReadVarint(handle, ref hp);
+            int blockOffset = ReadBoundedLength(handle, ref hp, data.Length);
+            int blockSize = ReadBoundedLength(handle, ref hp, SteamInputLimits.MaxLevelDbBlockBytes);
 
             byte[] block;
             try
             {
-                block = ReadBlock(data, (int)blockOffset, (int)blockSize);
+                block = ReadBlock(data, blockOffset, blockSize);
             }
             catch
             {
@@ -121,30 +150,56 @@ internal static class ChromiumLevelDb
     /// <summary>Reads a block by handle, undoing the 1-byte compression-type trailer (snappy or none).</summary>
     private static byte[] ReadBlock(byte[] data, int offset, int size)
     {
+        if (offset < 0 || size < 0 || size > SteamInputLimits.MaxLevelDbBlockBytes ||
+            offset > data.Length - size - 5)
+        {
+            throw new InvalidDataException("LevelDB block handle points outside the file or exceeds the block limit.");
+        }
+
         ReadOnlySpan<byte> content = data.AsSpan(offset, size);
         byte compression = data[offset + size]; // trailer: 1 type byte + 4 CRC bytes (CRC unchecked)
-        return compression == 1 ? Snappy.Decompress(content) : content.ToArray();
+        return compression switch
+        {
+            0 => content.ToArray(),
+            1 => Snappy.Decompress(content),
+            _ => throw new InvalidDataException($"Unsupported LevelDB block compression type {compression}."),
+        };
     }
 
     /// <summary>Parses a LevelDB data/index block: prefix-compressed entries then a restart array.</summary>
     private static IEnumerable<(byte[] Key, byte[] Value)> ParseBlock(byte[] block)
     {
+        if (block.Length < 4)
+            throw new InvalidDataException("LevelDB block is truncated.");
+
         int numRestarts = BinaryPrimitives.ReadInt32LittleEndian(block.AsSpan(block.Length - 4));
-        int restartArray = block.Length - 4 - numRestarts * 4;
+        if (numRestarts < 0)
+            throw new InvalidDataException("LevelDB block has an invalid restart count.");
+        int restartBytes = checked(numRestarts * 4);
+        int restartArray = block.Length - 4 - restartBytes;
+        if (restartArray < 0)
+            throw new InvalidDataException("LevelDB restart array points outside the block.");
 
         int pos = 0;
         byte[] lastKey = [];
         while (pos < restartArray)
         {
-            int shared = (int)ReadVarint(block, ref pos);
-            int nonShared = (int)ReadVarint(block, ref pos);
-            int valueLength = (int)ReadVarint(block, ref pos);
+            int shared = ReadBoundedLength(block, ref pos, SteamInputLimits.MaxLevelDbKeyBytes);
+            int nonShared = ReadBoundedLength(block, ref pos, SteamInputLimits.MaxLevelDbKeyBytes);
+            int valueLength = ReadBoundedLength(block, ref pos, SteamInputLimits.MaxLevelDbValueBytes);
+            if (shared > lastKey.Length || nonShared > restartArray - pos)
+                throw new InvalidDataException("LevelDB key length points outside the block.");
 
-            var key = new byte[shared + nonShared];
+            int keyLength = checked(shared + nonShared);
+            if (keyLength > SteamInputLimits.MaxLevelDbKeyBytes)
+                throw new InvalidDataException("LevelDB key exceeds the key-size limit.");
+            var key = new byte[keyLength];
             Array.Copy(lastKey, 0, key, 0, shared);
             Array.Copy(block, pos, key, shared, nonShared);
             pos += nonShared;
 
+            if (valueLength > restartArray - pos)
+                throw new InvalidDataException("LevelDB value length points outside the block.");
             var value = new byte[valueLength];
             Array.Copy(block, pos, value, 0, valueLength);
             pos += valueLength;
@@ -190,10 +245,11 @@ internal static class ChromiumLevelDb
                         fragment = chunk;
                         break;
                     case 3:
-                        fragment = Concat(fragment, chunk);
+                        fragment = Concat(fragment, chunk, SteamInputLimits.MaxLevelDbBlockBytes);
                         break;
                     case 4:
-                        foreach (Entry e in ParseBatch(Concat(fragment, chunk))) yield return e;
+                        foreach (Entry e in ParseBatch(Concat(fragment, chunk, SteamInputLimits.MaxLevelDbBlockBytes)))
+                            yield return e;
                         fragment = [];
                         break;
                 }
@@ -210,34 +266,43 @@ internal static class ChromiumLevelDb
 
         ulong sequence = BinaryPrimitives.ReadUInt64LittleEndian(batch.AsSpan(0, 8));
         int count = BinaryPrimitives.ReadInt32LittleEndian(batch.AsSpan(8, 4));
+        if (count < 0 || count > SteamInputLimits.MaxLevelDbEntriesPerFile)
+            throw new InvalidDataException("LevelDB batch entry count exceeds the limit.");
 
         int pos = 12;
-        for (int i = 0; i < count && pos < batch.Length; i++)
+        int recordIndex = 0;
+        for (; recordIndex < count && pos < batch.Length; recordIndex++)
         {
             byte recordType = batch[pos++];
             if (recordType == TypeValue)
             {
-                int keyLength = (int)ReadVarint(batch, ref pos);
+                int keyLength = ReadBoundedLength(batch, ref pos, SteamInputLimits.MaxLevelDbKeyBytes);
+                EnsureAvailable(batch, pos, keyLength);
                 byte[] key = batch[pos..(pos + keyLength)];
                 pos += keyLength;
-                int valueLength = (int)ReadVarint(batch, ref pos);
+                int valueLength = ReadBoundedLength(batch, ref pos, SteamInputLimits.MaxLevelDbValueBytes);
+                EnsureAvailable(batch, pos, valueLength);
                 byte[] value = batch[pos..(pos + valueLength)];
                 pos += valueLength;
                 // In the WAL the stored key is the user-key directly; the sequence is per-record.
-                yield return new Entry(key, sequence + (ulong)i, TypeValue, value);
+                yield return new Entry(key, sequence + (ulong)recordIndex, TypeValue, value);
             }
             else if (recordType == 0) // deletion
             {
-                int keyLength = (int)ReadVarint(batch, ref pos);
+                int keyLength = ReadBoundedLength(batch, ref pos, SteamInputLimits.MaxLevelDbKeyBytes);
+                EnsureAvailable(batch, pos, keyLength);
                 byte[] key = batch[pos..(pos + keyLength)];
                 pos += keyLength;
-                yield return new Entry(key, sequence + (ulong)i, 0, []);
+                yield return new Entry(key, sequence + (ulong)recordIndex, 0, []);
             }
             else
             {
-                yield break; // unknown record type — stop parsing this batch
+                throw new InvalidDataException($"Unsupported LevelDB batch record type {recordType}.");
             }
         }
+
+        if (recordIndex != count)
+            throw new InvalidDataException("LevelDB batch is truncated.");
     }
 
     // --- helpers ----------------------------------------------------------------------------------
@@ -248,6 +313,8 @@ internal static class ChromiumLevelDb
         int shift = 0;
         while (true)
         {
+            if (pos >= data.Length || shift > 63)
+                throw new InvalidDataException("Invalid or truncated LevelDB varint.");
             byte b = data[pos++];
             result |= (long)(b & 0x7f) << shift;
             if ((b & 0x80) == 0)
@@ -256,10 +323,27 @@ internal static class ChromiumLevelDb
         }
     }
 
-    private static byte[] Concat(byte[] a, byte[] b)
+    private static int ReadBoundedLength(byte[] data, ref int pos, int maximum)
+    {
+        long value = ReadVarint(data, ref pos);
+        if (value < 0 || value > maximum)
+            throw new InvalidDataException($"LevelDB length exceeds the {maximum}-byte limit.");
+        return (int)value;
+    }
+
+    private static void EnsureAvailable(byte[] data, int position, int count)
+    {
+        if (count < 0 || position < 0 || position > data.Length - count)
+            throw new InvalidDataException("LevelDB record length points outside the available data.");
+    }
+
+    private static byte[] Concat(byte[] a, byte[] b, int maximum)
     {
         if (a.Length == 0) return b;
-        var result = new byte[a.Length + b.Length];
+        int length = checked(a.Length + b.Length);
+        if (length > maximum)
+            throw new InvalidDataException($"Fragmented LevelDB record exceeds the {maximum}-byte limit.");
+        var result = new byte[length];
         Array.Copy(a, result, a.Length);
         Array.Copy(b, 0, result, a.Length, b.Length);
         return result;

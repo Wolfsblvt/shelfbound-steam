@@ -41,4 +41,19 @@ public class AppManifestParserTests
 
         m.IsFullyInstalled.ShouldBeFalse();
     }
+
+    [Fact]
+    public void Omits_install_directory_that_is_not_a_single_relative_folder()
+    {
+        string[] unsafeValues = ["../secret", @"games\\secret", "/home/deck/game", @"C:\\Games\\Game", "C:relative"];
+
+        foreach (string unsafeValue in unsafeValues)
+        {
+            AppManifest manifest = AppManifestParser.Parse($$"""
+                "AppState" { "appid" "1" "name" "X" "installdir" "{{unsafeValue.Replace("\\", "\\\\")}}" }
+                """);
+
+            manifest.InstallDir.ShouldBeNull($"'{unsafeValue}' must not cross the snapshot privacy boundary.");
+        }
+    }
 }

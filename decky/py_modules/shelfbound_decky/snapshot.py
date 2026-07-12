@@ -28,6 +28,7 @@ from datetime import datetime, timezone
 from typing import Callable
 
 from . import SCHEMA_VERSION, TOOL_NAME, steam_collections, storage
+from . import limits
 from .storage import MountEntry
 from .steam_files import (
     SteamAccount,
@@ -248,5 +249,7 @@ def _summarize_categories(categories_by_app: dict[int, list[str]]) -> list[dict]
 
 
 def _read_text(path: str) -> str:
+    if os.path.getsize(path) > limits.MAX_VDF_FILE_BYTES:
+        raise ValueError(f"Steam text file exceeds the {limits.MAX_VDF_FILE_BYTES}-byte limit.")
     with open(path, "r", encoding="utf-8-sig", errors="replace") as handle:
         return handle.read()

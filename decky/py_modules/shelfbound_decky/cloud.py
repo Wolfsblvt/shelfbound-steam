@@ -25,8 +25,10 @@ not-available — honest failure, no faked success. Revocation stays in the dash
 
 from __future__ import annotations
 
+import ipaddress
 import json
 import urllib.error
+import urllib.parse
 import urllib.request
 from dataclasses import dataclass
 
@@ -68,6 +70,24 @@ class ServerError(Exception):
         self.status = status
 
 
+class _SameOriginRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """Allows redirects only when the authenticated request origin is unchanged."""
+
+    def redirect_request(self, request, file_pointer, code, message, headers, new_url):
+        resolved_url = urllib.parse.urljoin(request.full_url, new_url)
+        if _origin(request.full_url) != _origin(resolved_url):
+            raise urllib.error.HTTPError(
+                request.full_url,
+                code,
+                "Shelfbound refused a cross-origin or scheme-changing redirect.",
+                headers,
+                file_pointer,
+            )
+        return super().redirect_request(
+            request, file_pointer, code, message, headers, resolved_url
+        )
+
+
 @dataclass(frozen=True)
 class UploadResponseV1:
     """Version 1 of the tolerant success/error body returned by ``POST /ingest``."""
@@ -101,9 +121,10 @@ class UploadOutcome:
 
 class ShelfboundServer:
     def __init__(self, base_url: str, token: str | None = None, timeout_seconds: float = 15.0) -> None:
-        self._base = base_url.rstrip("/")
+        self._base = _validate_base_url(base_url)
         self._token = token
         self._timeout = timeout_seconds
+        self._opener = urllib.request.build_opener(_SameOriginRedirectHandler())
 
     def upload_snapshot(self, snapshot: dict) -> UploadOutcome:
         """Projects a complete local snapshot before POSTing; invalid projection never sends."""
@@ -272,7 +293,7 @@ class ShelfboundServer:
             method=method,
         )
         try:
-            with urllib.request.urlopen(request, timeout=self._timeout) as response:
+            with self._opener.open(request, timeout=self._timeout) as response:
                 return (
                     response.status,
                     {key.lower(): value for key, value in response.headers.items()},
@@ -286,6 +307,44 @@ class ShelfboundServer:
                     {key.lower(): value for key, value in error.headers.items()},
                     error.read().decode("utf-8", errors="replace"),
                 )
+
+
+def _validate_base_url(base_url: str) -> str:
+    if not isinstance(base_url, str) or not base_url.strip():
+        raise ValueError("Shelfbound server URL is required.")
+    parsed = urllib.parse.urlsplit(base_url.strip())
+    if parsed.scheme not in ("http", "https") or not parsed.hostname:
+        raise ValueError("Shelfbound server URL must be an absolute HTTP(S) URL.")
+    if parsed.username is not None or parsed.password is not None:
+        raise ValueError("Shelfbound server URL must not contain credentials.")
+    if parsed.query or parsed.fragment:
+        raise ValueError("Shelfbound server URL must not contain a query or fragment.")
+    try:
+        parsed.port
+    except ValueError as error:
+        raise ValueError("Shelfbound server URL has an invalid port.") from error
+
+    if parsed.scheme == "http" and not _is_literal_loopback(parsed.hostname):
+        raise ValueError("Shelfbound server URL must use HTTPS except for a literal loopback address.")
+    return urllib.parse.urlunsplit(parsed).rstrip("/")
+
+
+def _is_literal_loopback(host: str) -> bool:
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
+
+
+def _origin(url: str) -> tuple[str, str, int]:
+    parsed = urllib.parse.urlsplit(url)
+    if parsed.scheme not in ("http", "https") or not parsed.hostname:
+        raise ValueError("Redirect target must be an absolute HTTP(S) URL.")
+    try:
+        port = parsed.port
+    except ValueError as error:
+        raise ValueError("Redirect target has an invalid port.") from error
+    return parsed.scheme, parsed.hostname.casefold(), port or (443 if parsed.scheme == "https" else 80)
 
 
 def _parse_retry_after(value: str | None) -> int | None:

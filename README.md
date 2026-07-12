@@ -62,13 +62,15 @@ dotnet run --project src/Shelfbound.Cli -- profile      # what Shelfbound rememb
 
 **Steam Web API key (optional — for owned-but-not-installed games + playtime):** get one at
 <https://steamcommunity.com/dev/apikey> (sign in, register any domain — `localhost` is fine), then
-`shelfbound setup --steam-api-key <key>`. Also set your Steam profile **Game details → Public**, or the
-API returns nothing. Both the CLI and the MCP server then use the saved key.
+run `shelfbound setup --steam-api-key-stdin` and provide the key as one line on standard input, or set
+`STEAM_WEB_API_KEY` and run `shelfbound setup --steam-api-key-env`. Also set your Steam profile
+**Game details → Public**, or the API returns nothing. Both the CLI and the MCP server then use the
+saved key. Secrets are deliberately not accepted as command-line arguments.
 
 This writes `shelfbound-snapshot.json` (git-ignored — it lists your games, so treat it as personal).
 Useful options: `--output <file>`, `--stdout`, `--steam-path <dir>`, `--device-name <name>`,
-`--device-type …`, and `--steam-api-key <key>` (or `STEAM_WEB_API_KEY`) to add owned-but-not-installed
-games + playtime via the Steam Web API. Run `shelfbound --help`.
+and `--device-type …`. Set `STEAM_WEB_API_KEY` or use the saved configuration to add
+owned-but-not-installed games + playtime via the Steam Web API. Run `shelfbound --help`.
 
 ### Upload to a Shelfbound server (optional)
 
@@ -78,8 +80,12 @@ compact body first (no server or token required), then upload:
 
 ```bash
 shelfbound upload --dry-run                            # prints exact body; sends nothing
-shelfbound upload --server <url> --token <token>     # or SHELFBOUND_SERVER / SHELFBOUND_TOKEN
+shelfbound upload --server <url>                       # token comes from SHELFBOUND_TOKEN
 ```
+
+Set `SHELFBOUND_TOKEN` in the process environment before uploading; bearer tokens are not accepted
+in argv, where shell history and process inspection could expose them. `SHELFBOUND_SERVER` can replace
+the non-secret `--server` option.
 
 A hosted body includes the user-chosen/neutral device label, random device id, coarse OS/specs,
 libraries, games, collections, and stats. It drops the complete Steam-account array (login, persona,
