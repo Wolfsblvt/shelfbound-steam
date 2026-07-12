@@ -108,7 +108,7 @@ def test_get_settings_returns_success_envelope(plugin):
     response = asyncio.run(plugin.get_settings())
 
     assert response["ok"] is True
-    assert response["serverUrl"] == "http://localhost:5080"
+    assert response["serverUrl"] == "http://127.0.0.1:5080"
     assert response["deviceName"] is None
 
 

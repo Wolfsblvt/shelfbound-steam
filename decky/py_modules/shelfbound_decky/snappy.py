@@ -8,11 +8,17 @@ https://github.com/google/snappy/blob/main/format_description.txt
 
 from __future__ import annotations
 
+from . import limits
+
 
 def decompress(data: bytes) -> bytes:
     """Decompresses a raw Snappy block into its original bytes."""
     pos = 0
     length, pos = _read_uncompressed_length(data, pos)
+    if length > limits.MAX_LEVELDB_BLOCK_BYTES:
+        raise ValueError(
+            f"Snappy output exceeds the {limits.MAX_LEVELDB_BLOCK_BYTES}-byte limit."
+        )
     output = bytearray(length)
     out_pos = 0
 
@@ -27,21 +33,27 @@ def decompress(data: bytes) -> bytes:
                 lit_len += 1
             else:
                 extra = lit_len - 59  # 1..4 trailing length bytes
+                _ensure_available(data, pos, extra)
                 lit_len = _read_little_endian(data, pos, extra) + 1
                 pos += extra
+            _ensure_available(data, pos, lit_len)
+            _ensure_output_capacity(output, out_pos, lit_len)
             output[out_pos:out_pos + lit_len] = data[pos:pos + lit_len]
             pos += lit_len
             out_pos += lit_len
         else:  # copy
             if tag_type == 1:  # 1-byte offset
+                _ensure_available(data, pos, 1)
                 copy_len = ((tag >> 2) & 0x07) + 4
                 offset = ((tag >> 5) << 8) | data[pos]
                 pos += 1
             elif tag_type == 2:  # 2-byte offset
+                _ensure_available(data, pos, 2)
                 copy_len = (tag >> 2) + 1
                 offset = data[pos] | (data[pos + 1] << 8)
                 pos += 2
             else:  # tag_type == 3, 4-byte offset
+                _ensure_available(data, pos, 4)
                 copy_len = (tag >> 2) + 1
                 offset = (data[pos] | (data[pos + 1] << 8)
                           | (data[pos + 2] << 16) | (data[pos + 3] << 24))
@@ -49,11 +61,16 @@ def decompress(data: bytes) -> bytes:
 
             # Copies may overlap the output written so far (offset < copy_len), so
             # copy byte-by-byte rather than slicing.
+            if offset <= 0 or offset > out_pos:
+                raise ValueError("Snappy copy offset points outside the decoded output.")
+            _ensure_output_capacity(output, out_pos, copy_len)
             start = out_pos - offset
             for i in range(copy_len):
                 output[out_pos + i] = output[start + i]
             out_pos += copy_len
 
+    if out_pos != length:
+        raise ValueError("Snappy stream did not produce its declared output length.")
     return bytes(output)
 
 
@@ -61,6 +78,8 @@ def _read_uncompressed_length(data: bytes, pos: int) -> tuple[int, int]:
     result = 0
     shift = 0
     while True:
+        if pos >= len(data) or shift > 28:
+            raise ValueError("Invalid Snappy length prefix.")
         b = data[pos]
         pos += 1
         result |= (b & 0x7F) << shift
@@ -74,3 +93,13 @@ def _read_little_endian(data: bytes, pos: int, count: int) -> int:
     for i in range(count):
         value |= data[pos + i] << (8 * i)
     return value
+
+
+def _ensure_available(data: bytes, position: int, count: int) -> None:
+    if count < 0 or position < 0 or position > len(data) - count:
+        raise ValueError("Snappy stream is truncated.")
+
+
+def _ensure_output_capacity(output: bytearray, position: int, count: int) -> None:
+    if count < 0 or position < 0 or position > len(output) - count:
+        raise ValueError("Snappy stream exceeds its declared output length.")

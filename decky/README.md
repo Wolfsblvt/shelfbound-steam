@@ -82,6 +82,8 @@ the plugin reports "pairing not available" honestly instead of faking success. T
 0600 in the Decky settings dir, never crosses to the frontend, and is only used as a Bearer for the
 *live* endpoints (`/ingest`, `/auth/me`, `/auth/entitlements`). Disconnect is local-only; server-side
 tokens expire at 90 days or are revoked from the dashboard (the post-M-4 posture, same as the tray).
+Authenticated requests require HTTPS except for a literal loopback address. Redirects are followed
+only within the exact same origin, so a bearer is never resent after a scheme, host, or port change.
 
 ## What is verified vs what is theory
 

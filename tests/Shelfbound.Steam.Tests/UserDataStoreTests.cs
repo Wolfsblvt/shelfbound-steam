@@ -63,4 +63,17 @@ public sealed class UserDataStoreTests : IDisposable
         profile.Games[1].Status.ShouldBe(GameStatus.Playing);
         profile.Games[2].Status.ShouldBe(GameStatus.Paused);
     }
+
+    [Fact]
+    public void Persists_personal_data_with_owner_only_permissions_on_unix()
+    {
+        if (OperatingSystem.IsWindows())
+            return;
+
+        const string owner = "local";
+        _store.Save(new UserProfile { OwnerId = owner });
+        string path = Path.Combine(_dir, owner, "userdata.json");
+
+        File.GetUnixFileMode(path).ShouldBe(UnixFileMode.UserRead | UnixFileMode.UserWrite);
+    }
 }

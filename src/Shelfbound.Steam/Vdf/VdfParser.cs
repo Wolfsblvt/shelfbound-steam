@@ -12,6 +12,10 @@ public static class VdfParser
 {
     public static VdfObject Parse(string text)
     {
+        ArgumentNullException.ThrowIfNull(text);
+        if (text.Length > SteamInputLimits.MaxVdfTextChars)
+            throw new FormatException($"VDF input exceeds the {SteamInputLimits.MaxVdfTextChars}-character limit.");
+
         var lexer = new Lexer(text);
         var root = new VdfObject();
         while (true)
@@ -22,20 +26,29 @@ public static class VdfParser
             if (token.Type != TokenType.String)
                 throw new FormatException($"Unexpected token '{token.Type}' at top level (position {token.Position}).");
 
-            ReadKeyValue(lexer, root, token.Text);
+            ReadKeyValue(lexer, root, token.Text, depth: 0);
         }
         return root;
     }
 
-    public static VdfObject ParseFile(string path) => Parse(File.ReadAllText(path));
+    public static VdfObject ParseFile(string path)
+    {
+        var file = new FileInfo(path);
+        if (file.Length > SteamInputLimits.MaxVdfFileBytes)
+            throw new FormatException($"VDF file exceeds the {SteamInputLimits.MaxVdfFileBytes}-byte limit.");
+        return Parse(File.ReadAllText(path));
+    }
 
-    private static void ReadKeyValue(Lexer lexer, VdfObject target, string key)
+    private static void ReadKeyValue(Lexer lexer, VdfObject target, string key, int depth)
     {
         var next = lexer.Next();
         switch (next.Type)
         {
             case TokenType.OpenBrace:
-                target.SetObject(key, ReadObject(lexer));
+                int childDepth = checked(depth + 1);
+                if (childDepth > SteamInputLimits.MaxVdfDepth)
+                    throw new FormatException($"VDF nesting exceeds the depth limit of {SteamInputLimits.MaxVdfDepth}.");
+                target.SetObject(key, ReadObject(lexer, childDepth));
                 break;
             case TokenType.String:
                 target.SetValue(key, next.Text);
@@ -45,7 +58,7 @@ public static class VdfParser
         }
     }
 
-    private static VdfObject ReadObject(Lexer lexer)
+    private static VdfObject ReadObject(Lexer lexer, int depth)
     {
         var obj = new VdfObject();
         while (true)
@@ -58,7 +71,7 @@ public static class VdfParser
             if (token.Type != TokenType.String)
                 throw new FormatException($"Expected a key or '}}' (position {token.Position}).");
 
-            ReadKeyValue(lexer, obj, token.Text);
+            ReadKeyValue(lexer, obj, token.Text, depth);
         }
     }
 

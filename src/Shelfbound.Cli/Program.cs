@@ -39,7 +39,7 @@ switch (args[0])
 
 static async Task<int> RunScanAsync(string[] args, string version)
 {
-    string? steamPath = null, output = null, deviceName = null, steamApiKey = null;
+    string? steamPath = null, output = null, deviceName = null;
     DeviceType? deviceType = null;
     bool pretty = false, toStdout = false;
 
@@ -60,9 +60,6 @@ static async Task<int> RunScanAsync(string[] args, string version)
             case "--device-type":
                 if (!TryParseDeviceType(args, ref i, out deviceType)) return 2;
                 break;
-            case "--steam-api-key":
-                if (!TryTakeValue(args, ref i, a, out steamApiKey)) return 2;
-                break;
             case "--pretty":
                 pretty = true;
                 break;
@@ -79,7 +76,7 @@ static async Task<int> RunScanAsync(string[] args, string version)
     SnapshotBuildResult build;
     try
     {
-        build = await SnapshotBuilder.BuildAsync(BuildOptions(steamPath, deviceName, deviceType, steamApiKey, version));
+        build = await SnapshotBuilder.BuildAsync(BuildOptions(steamPath, deviceName, deviceType, version));
     }
     catch (Exception ex)
     {
@@ -104,12 +101,11 @@ static async Task<int> RunScanAsync(string[] args, string version)
 }
 
 static SnapshotBuildOptions BuildOptions(string? steamPath, string? deviceName, DeviceType? deviceType,
-    string? steamApiKey, string version) => new()
+    string version) => new()
 {
     SteamPath = steamPath,
     DeviceName = deviceName,
     DeviceType = deviceType,
-    SteamApiKey = steamApiKey,
     ToolVersion = version,
 };
 
@@ -117,7 +113,7 @@ static async Task<int> RunUploadAsync(string[] args, string version)
 {
     string? server = Environment.GetEnvironmentVariable("SHELFBOUND_SERVER");
     string? token = Environment.GetEnvironmentVariable("SHELFBOUND_TOKEN");
-    string? steamPath = null, deviceName = null, steamApiKey = null;
+    string? steamPath = null, deviceName = null;
     DeviceType? deviceType = null;
     bool watch = false, dryRun = false;
     int intervalSeconds = 0;
@@ -129,9 +125,6 @@ static async Task<int> RunUploadAsync(string[] args, string version)
         {
             case "--server":
                 if (!TryTakeValue(args, ref i, a, out server)) return 2;
-                break;
-            case "--token":
-                if (!TryTakeValue(args, ref i, a, out token)) return 2;
                 break;
             case "--watch":
                 watch = true;
@@ -156,9 +149,6 @@ static async Task<int> RunUploadAsync(string[] args, string version)
             case "--device-type":
                 if (!TryParseDeviceType(args, ref i, out deviceType)) return 2;
                 break;
-            case "--steam-api-key":
-                if (!TryTakeValue(args, ref i, a, out steamApiKey)) return 2;
-                break;
             default:
                 Console.Error.WriteLine($"Unknown option '{a}'.");
                 PrintUsage();
@@ -179,12 +169,12 @@ static async Task<int> RunUploadAsync(string[] args, string version)
     }
     if (!dryRun && string.IsNullOrWhiteSpace(token))
     {
-        Console.Error.WriteLine("Set an API token with --token <token> or the SHELFBOUND_TOKEN environment variable.");
+        Console.Error.WriteLine("Set an API token with the SHELFBOUND_TOKEN environment variable.");
         Console.Error.WriteLine("Create a token in the Shelfbound web app after signing in through Steam.");
         return 2;
     }
 
-    SnapshotBuildOptions options = BuildOptions(steamPath, deviceName, deviceType, steamApiKey, version);
+    SnapshotBuildOptions options = BuildOptions(steamPath, deviceName, deviceType, version);
     if (dryRun)
         return await PreviewUploadAsync(options);
 
@@ -384,7 +374,7 @@ static void PrintScopeNotice(SnapshotDocument s)
         return;
     Console.WriteLine("Note: this snapshot includes only installed games. Owned-but-not-installed games");
     Console.WriteLine("are missing. Add them with a free Steam Web API key:");
-    Console.WriteLine("  shelfbound setup --steam-api-key <key>   (then re-run)   https://steamcommunity.com/dev/apikey");
+    Console.WriteLine("  shelfbound setup --steam-api-key-stdin   (then re-run)   https://steamcommunity.com/dev/apikey");
     Console.WriteLine();
 }
 
@@ -392,14 +382,19 @@ static int RunSetup(string[] args)
 {
     var config = ShelfboundConfig.Load();
     string? newKey = null;
+    bool keyFromEnvironment = false;
+    bool keyFromStdin = false;
     bool show = false;
 
     for (int i = 1; i < args.Length; i++)
     {
         switch (args[i])
         {
-            case "--steam-api-key":
-                if (!TryTakeValue(args, ref i, "--steam-api-key", out newKey)) return 2;
+            case "--steam-api-key-env":
+                keyFromEnvironment = true;
+                break;
+            case "--steam-api-key-stdin":
+                keyFromStdin = true;
                 break;
             case "--show":
                 show = true;
@@ -408,6 +403,24 @@ static int RunSetup(string[] args)
                 Console.Error.WriteLine($"Unknown setup option '{args[i]}'.");
                 return 2;
         }
+    }
+
+    if (keyFromEnvironment && keyFromStdin)
+    {
+        Console.Error.WriteLine("Choose either --steam-api-key-env or --steam-api-key-stdin.");
+        return 2;
+    }
+
+    if (keyFromEnvironment)
+        newKey = Environment.GetEnvironmentVariable("STEAM_WEB_API_KEY");
+    else if (keyFromStdin)
+        newKey = Console.In.ReadLine();
+
+    if ((keyFromEnvironment || keyFromStdin) && !TryNormalizeSecret(newKey, out newKey))
+    {
+        string source = keyFromEnvironment ? "STEAM_WEB_API_KEY" : "standard input";
+        Console.Error.WriteLine($"No valid Steam Web API key was provided through {source}.");
+        return 2;
     }
 
     if (newKey is not null)
@@ -425,13 +438,25 @@ static int RunSetup(string[] args)
         Console.WriteLine($"  steam api key : {(string.IsNullOrEmpty(config.SteamApiKey) ? "(not set)" : Mask(config.SteamApiKey))}");
         Console.WriteLine();
         Console.WriteLine("Get a Steam Web API key at https://steamcommunity.com/dev/apikey, then:");
-        Console.WriteLine("  shelfbound setup --steam-api-key <key>");
+        Console.WriteLine("  shelfbound setup --steam-api-key-stdin   # reads one line from standard input");
+        Console.WriteLine("  shelfbound setup --steam-api-key-env     # saves STEAM_WEB_API_KEY");
         Console.WriteLine("For owned-but-not-installed games, set your Steam profile 'Game details' to Public.");
     }
     return 0;
 }
 
 static string Mask(string value) => value.Length <= 4 ? "****" : new string('*', value.Length - 4) + value[^4..];
+
+static bool TryNormalizeSecret(string? value, out string? normalized)
+{
+    normalized = value?.Trim();
+    if (string.IsNullOrEmpty(normalized) || normalized.Length > 1024 || normalized.Any(char.IsControl))
+    {
+        normalized = null;
+        return false;
+    }
+    return true;
+}
 
 static int RunProfile(string[] args)
 {
@@ -556,10 +581,10 @@ static void PrintUsage()
         shelfbound - local Steam library scanner + uploader (Shelfbound)
 
         USAGE:
-          shelfbound setup [--steam-api-key <key>] [--show]
+          shelfbound setup [--steam-api-key-stdin | --steam-api-key-env] [--show]
           shelfbound profile [--reset-recency]
           shelfbound scan [options]
-          shelfbound upload [scan options] [--server <url>] [--token <tok>] [--dry-run] [--watch] [--interval <sec>]
+          shelfbound upload [scan options] [--server <url>] [--dry-run] [--watch] [--interval <sec>]
 
         PROFILE OPTIONS:
           --reset-recency        Clear the "recently added" baseline; the next scan re-establishes it
@@ -572,12 +597,11 @@ static void PrintUsage()
           --pretty               Indent the JSON output file
           --device-name <name>   Friendly device label (default: "Shelfbound device")
           --device-type <type>   desktop | laptop | steamDeck | server | unknown
-          --steam-api-key <key>  Add owned (not installed) games + playtime via the Steam Web API
-                                 (or set STEAM_WEB_API_KEY)
+          Set STEAM_WEB_API_KEY or save it with `shelfbound setup`; secrets are not accepted in argv
 
         UPLOAD OPTIONS (also accepts the scan options above):
           --server <url>         Shelfbound server (or set SHELFBOUND_SERVER)
-          --token <token>        API token from the web app (or set SHELFBOUND_TOKEN)
+          Set the API token from the web app with SHELFBOUND_TOKEN; secrets are not accepted in argv
           --dry-run              Print the exact privacy-minimized upload body; sends nothing
           --watch                Keep syncing on an interval (requires a Pro/Lifetime plan)
           --interval <seconds>   Watch interval (clamped to your plan's minimum)

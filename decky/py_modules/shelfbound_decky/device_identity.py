@@ -14,6 +14,8 @@ import sys
 import uuid
 from pathlib import Path
 
+from .private_file import write_private_text
+
 # Mirrors .NET's Environment.SpecialFolder.ApplicationData resolution on Linux
 # ($XDG_CONFIG_HOME, else ~/.config) and the C# DeviceIdentity/ShelfboundPaths constants.
 SHELFBOUND_CONFIG_DIRNAME = "Shelfbound"
@@ -36,9 +38,8 @@ def get_or_create_device_id() -> str:
             if _is_guid(existing):
                 return existing
 
-        file.parent.mkdir(parents=True, exist_ok=True)
         new_id = str(uuid.uuid4())
-        file.write_text(new_id, encoding="utf-8")
+        write_private_text(file, new_id)
         return new_id
     except OSError:
         # If we cannot persist, fall back to an ephemeral id rather than failing the scan.

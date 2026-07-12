@@ -64,10 +64,7 @@ public sealed class JsonUserDataStore : IUserDataStore
     {
         UserProfile stamped = profile with { UpdatedAt = DateTimeOffset.UtcNow };
         string file = FileFor(stamped.OwnerId);
-        Directory.CreateDirectory(Path.GetDirectoryName(file)!);
-        string tmp = file + ".tmp";
-        File.WriteAllText(tmp, JsonSerializer.Serialize(stamped, Options));
-        File.Move(tmp, file, overwrite: true);
+        PrivateFile.WriteAllTextAtomically(file, JsonSerializer.Serialize(stamped, Options));
     }
 
     private string FileFor(string ownerId)

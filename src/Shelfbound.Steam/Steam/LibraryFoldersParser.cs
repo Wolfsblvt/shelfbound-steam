@@ -7,7 +7,13 @@ public static class LibraryFoldersParser
 {
     public static IReadOnlyList<SteamLibraryFolder> Parse(string vdfText)
     {
-        var root = VdfParser.Parse(vdfText);
+        return Parse(VdfParser.Parse(vdfText));
+    }
+
+    public static IReadOnlyList<SteamLibraryFolder> ParseFile(string path) => Parse(VdfParser.ParseFile(path));
+
+    private static IReadOnlyList<SteamLibraryFolder> Parse(VdfObject root)
+    {
         var container = root.GetObject("libraryfolders")
             ?? throw new FormatException("libraryfolders.vdf is missing its 'libraryfolders' root object.");
 
@@ -44,6 +50,4 @@ public static class LibraryFoldersParser
 
         return folders.OrderBy(f => f.Index).ToList();
     }
-
-    public static IReadOnlyList<SteamLibraryFolder> ParseFile(string path) => Parse(File.ReadAllText(path));
 }

@@ -42,4 +42,30 @@ public class SnappyTests
         output.Length.ShouldBe(100);
         output.ShouldAllBe(b => b == 0x41);
     }
+
+    [Fact]
+    public void Rejects_declared_output_above_resource_limit_before_allocating()
+    {
+        int oversized = SteamInputLimits.MaxLevelDbBlockBytes + 1;
+        var input = new List<byte>();
+        uint remaining = (uint)oversized;
+        while (remaining >= 0x80)
+        {
+            input.Add((byte)(remaining | 0x80));
+            remaining >>= 7;
+        }
+        input.Add((byte)remaining);
+
+        InvalidDataException error = Should.Throw<InvalidDataException>(() => Snappy.Decompress(input.ToArray()));
+
+        error.Message.ShouldContain("output exceeds");
+    }
+
+    [Fact]
+    public void Rejects_copy_that_points_before_decoded_output()
+    {
+        byte[] input = [0x04, 0x01, 0x01];
+
+        Should.Throw<InvalidDataException>(() => Snappy.Decompress(input));
+    }
 }

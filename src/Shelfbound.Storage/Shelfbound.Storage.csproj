@@ -12,4 +12,8 @@
     <Description>Shelfbound local persistence: config, the identity seam, and the user-data store (per-game state, scoped memories, category definitions) shared by the CLI and the MCP server.</Description>
   </PropertyGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Shelfbound.Steam.Tests" />
+  </ItemGroup>
+
 </Project>

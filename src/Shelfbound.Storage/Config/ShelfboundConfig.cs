@@ -38,9 +38,9 @@ public sealed record ShelfboundConfig
 
     public void Save()
     {
-        Directory.CreateDirectory(ShelfboundPaths.ConfigDirectory);
-        string tmp = ShelfboundPaths.ConfigFile + ".tmp";
-        File.WriteAllText(tmp, JsonSerializer.Serialize(this, Options));
-        File.Move(tmp, ShelfboundPaths.ConfigFile, overwrite: true);
+        Save(ShelfboundPaths.ConfigFile);
     }
+
+    internal void Save(string path) =>
+        PrivateFile.WriteAllTextAtomically(path, JsonSerializer.Serialize(this, Options));
 }

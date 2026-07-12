@@ -33,7 +33,7 @@ builder.Services
         - Mind the library scope: get_library_summary returns 'scope'. If it is 'installedOnly', only
           installed games are present — never tell the user they don't own a game just because a search
           returned nothing; say it isn't installed, and that the full owned library needs a Steam Web
-          API key (shelfbound setup --steam-api-key).
+          API key (shelfbound setup --steam-api-key-stdin).
         """)
     .WithStdioServerTransport()
     .WithToolsFromAssembly();

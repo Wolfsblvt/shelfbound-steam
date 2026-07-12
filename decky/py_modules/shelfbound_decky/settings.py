@@ -8,13 +8,14 @@ frontend bridge either; it stays backend-side.
 from __future__ import annotations
 
 import json
-import os
 from dataclasses import dataclass
 from pathlib import Path
 
+from .private_file import write_private_text
+
 # Matches the tray's dev default (src/Shelfbound.Tray/AppSettings.cs). Production URLs
 # are deliberately not committed yet — a known pre-public task in docs/project/PROJECT.md.
-DEFAULT_SERVER_URL = "http://localhost:5080"
+DEFAULT_SERVER_URL = "http://127.0.0.1:5080"
 
 SETTINGS_FILENAME = "settings.json"
 TOKEN_FILENAME = "token"
@@ -53,8 +54,7 @@ class SettingsStore:
         if settings.last_sync is not None:
             payload["lastSync"] = settings.last_sync
 
-        self._path.parent.mkdir(parents=True, exist_ok=True)
-        self._path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        write_private_text(self._path, json.dumps(payload, indent=2))
 
 
 class TokenStore:
@@ -64,12 +64,7 @@ class TokenStore:
         self._path = Path(directory) / TOKEN_FILENAME
 
     def save(self, token: str) -> None:
-        self._path.parent.mkdir(parents=True, exist_ok=True)
-        self._path.write_text(token, encoding="utf-8")
-        try:
-            os.chmod(self._path, 0o600)
-        except OSError:
-            pass  # permission tightening is best-effort (and a no-op on Windows dev machines)
+        write_private_text(self._path, token)
 
     def load(self) -> str | None:
         try:
