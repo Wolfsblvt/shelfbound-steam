@@ -147,14 +147,17 @@ only within the exact same origin, so a bearer is never resent after a scheme, h
 ## Build, test, deploy (dev)
 
 ```bash
-# Frontend (Node ≥ 16.14, pnpm 9 via corepack)
+# Frontend (Node 22, pnpm 9 pinned in package.json via Corepack)
 cd decky
-pnpm i
-pnpm build          # → dist/index.js
+corepack pnpm install --frozen-lockfile
+corepack pnpm build          # → dist/index.js
+corepack pnpm lint
+corepack pnpm format:check
 
 # Backend tests (any OS, no Deck needed)
-python -m venv .venv && .venv/bin/pip install -r requirements-dev.txt   # .venv\Scripts\pip on Windows
-.venv/bin/pytest tests
+python -m venv .venv
+.venv/bin/python -m pip install -r requirements-dev.txt   # .venv\Scripts\python on Windows
+.venv/bin/python -m pytest tests                          # use the Windows path there too
 ```
 
 Deploying to a Deck is manual/dev-only for now (no store submission): the [Decky CLI /
