@@ -40,25 +40,18 @@ export function StatusSection({ status }: { status: StatusResponse | null }) {
       <PanelSectionRow>
         <Field
           label="This device"
-          description={
-            device
-              ? `${device.name} · ${DEVICE_TYPE_LABELS[device.type] ?? device.type}`
-              : "Unknown"
-          }
+          description={device ? `${device.name} · ${DEVICE_TYPE_LABELS[device.type] ?? device.type}` : "Unknown"}
         />
       </PanelSectionRow>
       <PanelSectionRow>
-        <Field
-          label="Steam"
-          description={status.steam?.found ? "Library found" : "No Steam installation found"}
-        />
+        <Field label="Steam" description={status.steam?.found ? "Library found" : "No Steam installation found"} />
       </PanelSectionRow>
       <PanelSectionRow>
         <Field
           label="Account"
           description={
             connection?.connected
-              ? connection.account?.displayName ?? "Connected (account unreachable right now)"
+              ? (connection.account?.displayName ?? "Connected (account unreachable right now)")
               : "Not connected"
           }
         />

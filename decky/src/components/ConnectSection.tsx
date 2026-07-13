@@ -1,13 +1,6 @@
 import { ButtonItem, Field, PanelSection, PanelSectionRow } from "@decky/ui";
 import { useState } from "react";
-import {
-  disconnect,
-  pairingCancel,
-  pairingPoll,
-  pairingStart,
-  PairingStartResponse,
-  StatusResponse,
-} from "../api";
+import { disconnect, pairingCancel, pairingPoll, pairingStart, PairingStartResponse, StatusResponse } from "../api";
 
 /**
  * Account claim via pairing code — deliberately NOT the tray's loopback-callback
@@ -22,13 +15,7 @@ import {
  * The server endpoints behind this are a PROPOSAL (see py_modules/shelfbound_decky/cloud.py);
  * against today's server this reports "pairing not available" — honestly, not fake-success.
  */
-export function ConnectSection({
-  status,
-  onChanged,
-}: {
-  status: StatusResponse | null;
-  onChanged: () => void;
-}) {
+export function ConnectSection({ status, onChanged }: { status: StatusResponse | null; onChanged: () => void }) {
   const [session, setSession] = useState<PairingStartResponse | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -57,11 +44,7 @@ export function ConnectSection({
     }
     if (result.status === "claimed") {
       setSession(null);
-      setMessage(
-        result.account?.displayName
-          ? `Connected as ${result.account.displayName}.`
-          : "Connected."
-      );
+      setMessage(result.account?.displayName ? `Connected as ${result.account.displayName}.` : "Connected.");
       onChanged();
     } else if (result.status === "expired" || result.status === "denied") {
       setSession(null);
@@ -91,13 +74,8 @@ export function ConnectSection({
       {session ? (
         <>
           <PanelSectionRow>
-            <Field
-              label="Pairing code"
-              description="Enter this code at the claim page using any signed-in browser."
-            >
-              <div style={{ fontSize: "22px", fontWeight: 700, letterSpacing: "2px" }}>
-                {session.code ?? "—"}
-              </div>
+            <Field label="Pairing code" description="Enter this code at the claim page using any signed-in browser.">
+              <div style={{ fontSize: "22px", fontWeight: 700, letterSpacing: "2px" }}>{session.code ?? "—"}</div>
             </Field>
           </PanelSectionRow>
           <PanelSectionRow>
@@ -125,10 +103,7 @@ export function ConnectSection({
         // session (started before the user grabbed their phone) is the normal path.
         <>
           <PanelSectionRow>
-            <Field
-              label="Pairing in progress"
-              description="Finish entering the code from earlier, then check below."
-            />
+            <Field label="Pairing in progress" description="Finish entering the code from earlier, then check below." />
           </PanelSectionRow>
           <PanelSectionRow>
             <ButtonItem layout="below" disabled={busy} onClick={() => void checkClaimed()}>
