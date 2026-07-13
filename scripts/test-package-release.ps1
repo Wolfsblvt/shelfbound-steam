@@ -45,7 +45,8 @@ function Get-GitFile {
         [switch]$Optional
     )
 
-    $content = (& git -C $root show "$($Ref):$Path" 2>$null) -join [Environment]::NewLine
+    $gitPath = ConvertTo-GitPath -Path $Path
+    $content = (& git -C $root show "$($Ref):$gitPath" 2>$null) -join [Environment]::NewLine
     if ($LASTEXITCODE -ne 0) {
         if ($Optional) { return $null }
         throw "Could not read '$Path' at '$Ref'."
@@ -215,9 +216,9 @@ $baselineProps = Get-GitFile -Ref $baselineTag -Path 'Directory.Build.props'
 $baselinePackageVersion = Get-XmlProperty -XmlText $baselineProps -PropertyName 'Version'
 $baselineSchemaSource = Get-GitFile -Ref $baselineTag -Path 'src/Shelfbound.Core/SnapshotSchema.cs'
 $baselineSchemaVersion = Get-SnapshotSchemaVersion $baselineSchemaSource
-$baselineSchemaContract = (Get-GitFile -Ref $baselineTag -Path 'schema/snapshot.v0.schema.json').TrimEnd()
-$currentSchemaContract = (Get-Content -Raw -LiteralPath (Join-Path $root 'schema/snapshot.v0.schema.json')).TrimEnd()
-$schemaContractChanged = $currentSchemaContract -ne $baselineSchemaContract
+$baselineSchemaContract = Get-GitFile -Ref $baselineTag -Path 'schema/snapshot.v0.schema.json'
+$currentSchemaContract = Get-Content -Raw -LiteralPath (Join-Path $root 'schema/snapshot.v0.schema.json')
+$schemaContractChanged = Test-ContractContentChanged -Baseline $baselineSchemaContract -Current $currentSchemaContract
 
 $schemaArguments = @{
     BaselinePackageVersion = $baselinePackageVersion

@@ -62,4 +62,17 @@ Assert-SchemaReleasePolicy @schemaArguments
 Assert-BreakingChangeReleasePolicy -BaselinePackageVersion '0.6.0' -CurrentPackageVersion '0.7.0' -HasNewApiCompatSuppressions $true
 Assert-CloudPackagePin -ProducerPackageVersion '0.7.0' -CloudPackageVersion '0.7.0'
 
-Write-Host 'Package release gate rejection tests passed (4/4).' -ForegroundColor Green
+$lfContract = "{`n  `"version`": 1`n}`n"
+$crlfContract = $lfContract -replace "`n", "`r`n"
+if (Test-ContractContentChanged -Baseline $crlfContract -Current $lfContract) {
+    throw 'Equivalent LF and CRLF contracts must compare equal.'
+}
+if (-not (Test-ContractContentChanged -Baseline $lfContract -Current ($lfContract -replace '1', '2'))) {
+    throw 'A semantic contract edit must compare changed.'
+}
+if ((ConvertTo-GitPath -Path 'src\Shelfbound.Core\CompatibilitySuppressions.xml') -ne
+    'src/Shelfbound.Core/CompatibilitySuppressions.xml') {
+    throw 'Repository paths must use Git separators on every host OS.'
+}
+
+Write-Host 'Package release gate tests passed (4 rejection fixtures + platform controls).' -ForegroundColor Green
