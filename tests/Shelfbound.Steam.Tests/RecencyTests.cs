@@ -1,8 +1,8 @@
-using Shouldly;
 using Shelfbound.Core;
 using Shelfbound.Core.Model;
 using Shelfbound.Core.UserData;
 using Shelfbound.Query;
+using Shouldly;
 
 namespace Shelfbound.Steam.Tests;
 

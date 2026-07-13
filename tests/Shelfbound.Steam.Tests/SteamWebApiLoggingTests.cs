@@ -2,10 +2,10 @@ using System.Net;
 using System.Net.Http.Json;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Shouldly;
 using Shelfbound.Mcp;
 using Shelfbound.Mcp.Logging;
 using Shelfbound.Steam.Web;
+using Shouldly;
 
 namespace Shelfbound.Steam.Tests;
 
