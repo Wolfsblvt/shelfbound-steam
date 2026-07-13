@@ -1,6 +1,6 @@
-using Shouldly;
 using Shelfbound.Core;
 using Shelfbound.Core.Model;
+using Shouldly;
 
 namespace Shelfbound.Steam.Tests;
 

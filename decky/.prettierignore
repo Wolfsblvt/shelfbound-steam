@@ -1,0 +1,4 @@
+# Build output, dependencies, and generated lock data are not source formatting targets.
+node_modules/
+dist/
+pnpm-lock.yaml

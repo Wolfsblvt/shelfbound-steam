@@ -1,7 +1,10 @@
 # Shelfbound
 
-[![CI](https://github.com/Wolfsblvt/shelfbound-steam/actions/workflows/ci.yml/badge.svg)](https://github.com/Wolfsblvt/shelfbound-steam/actions/workflows/ci.yml)
+[![quality gates](https://img.shields.io/github/actions/workflow/status/Wolfsblvt/shelfbound-steam/ci.yml?branch=main&logo=githubactions&logoColor=white&label=quality%20gates)](https://github.com/Wolfsblvt/shelfbound-steam/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/Wolfsblvt/shelfbound-steam/graph/badge.svg)](https://codecov.io/gh/Wolfsblvt/shelfbound-steam)
+[![C# style](https://img.shields.io/badge/C%23%20style-report--only-6c757d?logo=dotnet&logoColor=white)](.editorconfig)
+[![Decky quality](https://img.shields.io/badge/Decky-ESLint%20%2B%20Prettier-5a45ff?logo=eslint&logoColor=white)](decky/package.json)
+[![Decky tests](https://img.shields.io/badge/Decky%20tests-pytest-0a9edc?logo=pytest&logoColor=white)](decky/tests)
 [![NuGet](https://img.shields.io/nuget/v/Shelfbound.Core?logo=nuget&label=NuGet&color=004880)](https://www.nuget.org/packages/Shelfbound.Core)
 [![license](https://img.shields.io/github/license/Wolfsblvt/shelfbound-steam?color=blue)](LICENSE)
 [![.NET 10](https://img.shields.io/badge/.NET-10-512bd4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com)

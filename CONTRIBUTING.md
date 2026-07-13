@@ -28,17 +28,39 @@ to also use/relicense it (including in the proprietary hosted service). You keep
 
 ## Development
 
-Requires the **.NET 10 SDK**.
+Requires the **.NET 10 SDK**. The aggregate suite also runs the Decky backend tests; install their
+Python dependencies once in an isolated environment:
+
+```bash
+python -m venv decky/.venv
+# Windows:
+decky/.venv/Scripts/python -m pip install -r decky/requirements-dev.txt
+# Linux/macOS:
+decky/.venv/bin/python -m pip install -r decky/requirements-dev.txt
+```
 
 ```bash
 dotnet build
-dotnet test
+pwsh scripts/test.ps1    # .NET + Decky pytest
+pwsh scripts/lint.ps1    # C# format report + Decky lint/format gates
 dotnet run --project src/Shelfbound.Cli -- scan --pretty
+```
+
+Decky frontend work additionally needs **Node.js 22**. Corepack reads the pinned pnpm version from
+`decky/package.json`:
+
+```bash
+cd decky
+corepack pnpm install --frozen-lockfile
+corepack pnpm build
+corepack pnpm lint
+corepack pnpm format:check
 ```
 
 ## Conventions
 
 - Match the existing style (file-scoped namespaces, nullable enabled, small focused types).
+- C# style is reported by `dotnet format` but remains non-blocking; Decky ESLint and Prettier are CI gates.
 - `Shelfbound.Core` stays pure (no file/network/environment access). Local-machine I/O lives in
   `Shelfbound.Steam` or `Shelfbound.Cli`.
 - Add tests (xUnit + Shouldly) for behavior changes; add a regression test for bug fixes.

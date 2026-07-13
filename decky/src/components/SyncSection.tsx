@@ -8,13 +8,7 @@ import { formatBytes } from "../format";
  * would leave the device (the real upload body) before anything is sent. No
  * background or automatic sync in this prototype — every upload is user-triggered.
  */
-export function SyncSection({
-  connected,
-  onSynced,
-}: {
-  connected: boolean;
-  onSynced: () => void;
-}) {
+export function SyncSection({ connected, onSynced }: { connected: boolean; onSynced: () => void }) {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<string | null>(null);
 
@@ -46,7 +40,7 @@ export function SyncSection({
         snapshotJson={preview.snapshotJson ?? ""}
         connected={connected}
         onConfirm={() => void runSync(uploadId)}
-      />
+      />,
     );
   };
 
@@ -93,9 +87,9 @@ function PreviewModal({
     >
       <div style={{ fontSize: "13px", lineHeight: 1.5 }}>
         <div>
-          <b>{summary.deviceName}</b> · {summary.gameCount} games (
-          {summary.installedGameCount} installed) · {summary.libraryCount} libraries ·{" "}
-          {summary.categoryCount} categories · {formatBytes(summary.totalSizeOnDiskBytes)}
+          <b>{summary.deviceName}</b> · {summary.gameCount} games ({summary.installedGameCount} installed) ·{" "}
+          {summary.libraryCount} libraries · {summary.categoryCount} categories ·{" "}
+          {formatBytes(summary.totalSizeOnDiskBytes)}
         </div>
         <div style={{ marginTop: "8px" }}>
           <b>Included:</b> {summary.included.join("; ")}

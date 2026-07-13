@@ -105,11 +105,32 @@ function Assert-CloudPackagePin {
     }
 }
 
+function Test-ContractContentChanged {
+    param(
+        [Parameter(Mandatory)][string]$Baseline,
+        [Parameter(Mandatory)][string]$Current
+    )
+
+    # PowerShell materializes native command output with the host OS newline. Compare repository text
+    # semantically so an LF checkout does not look changed when the gate runs on Windows.
+    $normalizedBaseline = ($Baseline -replace "`r`n?", "`n").TrimEnd()
+    $normalizedCurrent = ($Current -replace "`r`n?", "`n").TrimEnd()
+    return $normalizedBaseline -ne $normalizedCurrent
+}
+
+function ConvertTo-GitPath {
+    param([Parameter(Mandatory)][string]$Path)
+
+    return $Path.Replace('\', '/')
+}
+
 Export-ModuleMember -Function @(
     'ConvertTo-ReleaseVersion',
     'Compare-ReleaseVersion',
     'Assert-PackageVersionNotReused',
     'Assert-SchemaReleasePolicy',
     'Assert-BreakingChangeReleasePolicy',
-    'Assert-CloudPackagePin'
+    'Assert-CloudPackagePin',
+    'Test-ContractContentChanged',
+    'ConvertTo-GitPath'
 )

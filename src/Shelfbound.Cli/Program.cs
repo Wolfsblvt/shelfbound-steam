@@ -102,12 +102,12 @@ static async Task<int> RunScanAsync(string[] args, string version)
 
 static SnapshotBuildOptions BuildOptions(string? steamPath, string? deviceName, DeviceType? deviceType,
     string version) => new()
-{
-    SteamPath = steamPath,
-    DeviceName = deviceName,
-    DeviceType = deviceType,
-    ToolVersion = version,
-};
+    {
+        SteamPath = steamPath,
+        DeviceName = deviceName,
+        DeviceType = deviceType,
+        ToolVersion = version,
+    };
 
 static async Task<int> RunUploadAsync(string[] args, string version)
 {

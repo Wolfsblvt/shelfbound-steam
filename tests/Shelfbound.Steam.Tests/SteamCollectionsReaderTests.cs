@@ -1,5 +1,5 @@
-using Shouldly;
 using Shelfbound.Steam.Collections;
+using Shouldly;
 
 namespace Shelfbound.Steam.Tests;
 

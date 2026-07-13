@@ -1,8 +1,8 @@
-using Shouldly;
 using Shelfbound.Core;
 using Shelfbound.Core.Model;
 using Shelfbound.Steam.Enrichment;
 using Shelfbound.Steam.Web;
+using Shouldly;
 
 namespace Shelfbound.Steam.Tests;
 

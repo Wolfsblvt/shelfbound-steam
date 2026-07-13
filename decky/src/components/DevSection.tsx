@@ -1,12 +1,4 @@
-import {
-  ButtonItem,
-  ConfirmModal,
-  Field,
-  PanelSection,
-  PanelSectionRow,
-  showModal,
-  TextField,
-} from "@decky/ui";
+import { ButtonItem, ConfirmModal, Field, PanelSection, PanelSectionRow, showModal, TextField } from "@decky/ui";
 import { useState } from "react";
 import { updateSettings } from "../api";
 
@@ -18,13 +10,7 @@ import { updateSettings } from "../api";
  * [NEEDS-DECK] TextField + virtual keyboard behaviour inside a modal in Gaming Mode
  * is exactly the kind of thing that must be verified on hardware.
  */
-export function DevSection({
-  serverUrl,
-  onChanged,
-}: {
-  serverUrl: string | undefined;
-  onChanged: () => void;
-}) {
+export function DevSection({ serverUrl, onChanged }: { serverUrl: string | undefined; onChanged: () => void }) {
   const openEditor = () => {
     showModal(<ServerUrlModal initial={serverUrl ?? ""} onSaved={onChanged} />);
   };
@@ -64,11 +50,7 @@ function ServerUrlModal({
       }}
       onCancel={() => closeModal?.()}
     >
-      <TextField
-        label="Server URL"
-        value={value}
-        onChange={(event) => setValue(event.target.value)}
-      />
+      <TextField label="Server URL" value={value} onChange={(event) => setValue(event.target.value)} />
     </ConfirmModal>
   );
 }

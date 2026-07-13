@@ -161,7 +161,8 @@ internal sealed record ConnectFlowDependencies
 {
     public required Action<string> OpenBrowser { get; init; }
     public required Func<ConnectCodeRedemptionRequest, CancellationToken, Task<ConnectCodeRedemptionResponse>>
-        RedeemCodeAsync { get; init; }
+        RedeemCodeAsync
+    { get; init; }
     public required Action<string> StoreToken { get; init; }
     public required Func<int> GetFreePort { get; init; }
     public required Func<string> CreateState { get; init; }

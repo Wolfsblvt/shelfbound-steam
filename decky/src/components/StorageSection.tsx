@@ -38,9 +38,7 @@ function StorageRow({ group }: { group: StorageGroup }) {
     group.freeBytes != null && group.totalBytes != null
       ? ` · ${formatBytes(group.freeBytes)} free of ${formatBytes(group.totalBytes)}`
       : "";
-  const largest = group.largestGames
-    .map((game) => `${game.name} (${formatBytes(game.sizeOnDiskBytes)})`)
-    .join(", ");
+  const largest = group.largestGames.map((game) => `${game.name} (${formatBytes(game.sizeOnDiskBytes)})`).join(", ");
 
   return (
     <PanelSectionRow>

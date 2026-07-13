@@ -1,9 +1,9 @@
 using System.Net;
 using System.Text;
-using Shouldly;
 using Shelfbound.Client;
 using Shelfbound.Core;
 using Shelfbound.Core.Model;
+using Shouldly;
 
 namespace Shelfbound.Steam.Tests;
 

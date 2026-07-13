@@ -156,7 +156,6 @@ export const pairingPoll = callable<[], PairingPollResponse>("pairing_poll");
 export const pairingCancel = callable<[], { ok: boolean }>("pairing_cancel");
 export const disconnect = callable<[], { ok: boolean; error?: string }>("disconnect");
 export const getSettings = callable<[], SettingsResponse>("get_settings");
-export const updateSettings = callable<
-  [serverUrl: string | null, deviceName: string | null],
-  SettingsResponse
->("update_settings");
+export const updateSettings = callable<[serverUrl: string | null, deviceName: string | null], SettingsResponse>(
+  "update_settings",
+);
