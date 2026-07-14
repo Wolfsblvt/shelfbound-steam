@@ -1,3 +1,4 @@
+using Shelfbound.Core;
 using Shelfbound.Core.Model;
 using Shelfbound.Steam.Web;
 
@@ -65,12 +66,17 @@ public static class SteamWebEnricher
         // response has no completeness contract, so absence from the enriched result proves nothing.
         return snapshot with
         {
+            // observedSubset first exists in schema 0.6.0. Enriching an older in-memory document is an
+            // explicit upgrade to the current additive shape, never a new enum smuggled under an old identity.
+            SchemaVersion = SnapshotSchema.Version,
             Games = games,
             Stats = snapshot.Stats with
             {
-                Scope = LibraryScopeSemantics.BroaderOf(
-                    LibraryScopeSemantics.GetOperationalScope(snapshot.SchemaVersion, snapshot.Stats.Scope),
-                    LibraryScope.ObservedSubset),
+                InstalledGameCount = games.Count(game => game.Installed),
+                TotalSizeOnDiskBytes = games.Sum(game => game.SizeOnDiskBytes ?? 0),
+                // This path composed visibility-gated evidence into the output. Without per-row source
+                // provenance, it cannot carry a document-level completeness claim from any prior source.
+                Scope = LibraryScope.ObservedSubset,
             },
         };
     }

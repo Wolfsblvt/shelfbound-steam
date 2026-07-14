@@ -161,7 +161,7 @@ public static class HostedProjection
         new("stats.libraryCount", "Provides a consistency and summary aggregate."),
         new("stats.installedGameCount", "Provides a consistency and summary aggregate."),
         new("stats.totalSizeOnDiskBytes", "Provides a device storage summary."),
-        new("stats.scope", "States whether observations are installed-only, a non-complete observed subset, or complete under an explicit source contract."),
+        new("stats.scope", "Carries the producer-reported coverage marker; current observedSubset means partial evidence, while consumers normalize legacy false-full reports operationally."),
     ];
 
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -172,7 +172,7 @@ public static class HostedProjection
         Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) },
     };
 
-    /// <summary>Projects a complete local snapshot into the explicit hosted field whitelist.</summary>
+    /// <summary>Projects a local snapshot into the explicit hosted field whitelist.</summary>
     public static HostedSnapshot Create(SnapshotDocument snapshot) =>
         Create(snapshot, Environment.MachineName);
 
@@ -219,7 +219,7 @@ public static class HostedProjection
                 LibraryCount = stats.LibraryCount,
                 InstalledGameCount = stats.InstalledGameCount,
                 TotalSizeOnDiskBytes = stats.TotalSizeOnDiskBytes,
-                Scope = LibraryScopeSemantics.GetOperationalScope(snapshot.SchemaVersion, stats.Scope),
+                Scope = stats.Scope,
             },
         };
     }

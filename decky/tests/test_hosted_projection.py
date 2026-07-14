@@ -51,7 +51,7 @@ def test_legacy_machine_hostname_is_neutralized(monkeypatch):
 def test_coverage_semantics_use_projection_consent_version_two():
     assert PROJECTION_VERSION == "2"
     purpose = next(purpose for path, purpose in FIELD_PURPOSES if path == "stats.scope")
-    assert "non-complete observed subset" in purpose
+    assert "legacy false-full" in purpose
 
 
 def test_purpose_manifest_covers_every_surviving_golden_leaf():

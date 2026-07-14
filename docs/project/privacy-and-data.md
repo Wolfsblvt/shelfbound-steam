@@ -103,7 +103,8 @@ uploading.
   confirmation. New installs default background sync off. Background sync cannot start until a user
   has previewed and successfully sent the current projection version; a future field-set expansion or
   material field-purpose change invalidates that consent. Projection v2 renews consent for the changed
-  `stats.scope` purpose without adding a new uploaded field.
+  `stats.scope` purpose without adding a new uploaded field. Legacy documents retain their published
+  scope label and schema identity in the preview/body; consumers apply the compatibility normalization.
 - Decky returns one prepared body plus a one-use upload id. Confirming sends those exact bytes; a
   stale/reused id is rejected and requires a fresh preview.
 

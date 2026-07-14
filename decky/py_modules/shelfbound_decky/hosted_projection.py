@@ -55,7 +55,7 @@ FIELD_PURPOSES: tuple[tuple[str, str], ...] = (
     ("stats.libraryCount", "Provides a consistency and summary aggregate."),
     ("stats.installedGameCount", "Provides a consistency and summary aggregate."),
     ("stats.totalSizeOnDiskBytes", "Provides a device storage summary."),
-    ("stats.scope", "States whether observations are installed-only, a non-complete observed subset, or complete under an explicit source contract."),
+    ("stats.scope", "Carries the producer-reported coverage marker; current observedSubset means partial evidence, while consumers normalize legacy false-full reports operationally."),
 )
 
 

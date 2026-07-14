@@ -54,7 +54,10 @@ an automatic hostname label, coarsens exact OS builds, and retains product-justi
 game/category/stats fields with a leaf-by-leaf purpose manifest. Preview and transport share one
 prepared compact JSON body; tray background consent is versioned. Projection v2 does not add a field,
 but renews consent because the purpose of `stats.scope` now includes the materially different
-`observedSubset` meaning. Decky's Python mirror is pinned to the same byte-exact golden fixture.
+`observedSubset` meaning and legacy compatibility handling. Projection preserves a legacy document's
+published scope label/version as one immutable wire identity; query/cloud consumers normalize the label
+operationally instead of emitting a new enum value under an old schema. Decky's Python mirror is pinned
+to the same byte-exact golden fixture.
 *Rejected:* bypassing renewed consent because the JSON field name is unchanged; redacting at the receiver
 (the data has already crossed the trust boundary), serializing the local model with ignored properties (new nested fields could leak),
 or maintaining separate CLI/tray payload builders (drift). See [privacy-and-data.md](./privacy-and-data.md).
@@ -111,7 +114,11 @@ Positive visible game/playtime observations come from the Steam Web API behind `
 missing, empty, and malformed responses; the latter three warn and leave the scan installed-only rather
 than laundering an empty response into completeness. A **pure** `SteamWebEnricher` merges usable rows,
 consolidating duplicate appids deterministically (maximum playtime/latest last-played, stable name and
-local-row selection) so one appid produces one output row. Requires a user-provided key
+local-row selection) so one appid produces one output row and recomputed unique installed/size totals.
+Any output composed through this Web API path is `observedSubset`; it never carries a document-level
+completeness claim from its input. Because that state first exists in schema `0.6.0`, enriching an older
+in-memory document explicitly upgrades the returned document to the current schema rather than emitting
+a new enum under an old identity. Requires a user-provided key
 (`STEAM_WEB_API_KEY` or the saved local config); secret values are never accepted in argv or retained in
 surfaced request exceptions.
 

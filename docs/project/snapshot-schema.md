@@ -75,7 +75,9 @@ The C# package preserves the already-published `FullLibrary = 1` ordinal and add
 `LibraryScopeSemantics` defines installed-only → observed subset → complete wherever coverage is
 compared. Its operational-scope helper also downgrades legacy schema `0.4.x`/`0.5.x` `fullLibrary`
 reports to `observedSubset` without changing the raw serialized document: those published producers
-used the same visibility-gated Web API path and did not have a completeness contract.
+used the same visibility-gated Web API path and did not have a completeness contract. Hosted projection
+also preserves that version-matched raw label; emitting `observedSubset` under an old schema would create
+a new payload with a previously published identity.
 
 ## Privacy rules baked into the local contract
 

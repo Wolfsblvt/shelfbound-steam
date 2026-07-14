@@ -14,7 +14,7 @@ public class SteamWebApiClientTests
     public async Task Returns_positive_observations_with_response_freshness()
     {
         const string json =
-            """{"response":{"games":[{"appid":20,"name":"Observed","playtime_forever":30,"rtime_last_played":1720000000}]}}""";
+            """{"response":{"games":[null,{"appid":0,"name":"Invalid"},{"appid":20,"name":"Observed","playtime_forever":30,"rtime_last_played":1720000000}]}}""";
         var client = CreateClient(_ => Response(json));
 
         OwnedGamesResult result = await client.GetOwnedGamesAsync("steam-id", "api-key");
@@ -48,6 +48,7 @@ public class SteamWebApiClientTests
     [Theory]
     [InlineData("{\"response\":{}}", OwnedGamesResultStatus.MissingGameList)]
     [InlineData("{\"response\":{\"games\":[]}}", OwnedGamesResultStatus.EmptyGameList)]
+    [InlineData("{\"response\":{\"games\":[null]}}", OwnedGamesResultStatus.MalformedResponse)]
     [InlineData("{\"response\":{\"games\":{}}}", OwnedGamesResultStatus.MalformedResponse)]
     [InlineData("not-json", OwnedGamesResultStatus.MalformedResponse)]
     public async Task Preserves_unavailable_empty_and_malformed_response_states(

@@ -59,20 +59,21 @@ public sealed class SteamWebApiClient : ISteamWebApiClient
                 "Steam Web API request failed. Check network access and Steam game-details visibility, then try again.");
         }
 
-        List<ApiGame>? games = payload?.Response?.Games;
+        List<ApiGame?>? games = payload?.Response?.Games;
         if (games is null)
             return Unavailable(OwnedGamesResultStatus.MissingGameList, observedAt);
         if (games.Count == 0)
             return Unavailable(OwnedGamesResultStatus.EmptyGameList, observedAt);
 
         OwnedGame[] observations = games
+            .OfType<ApiGame>()
             .Where(game => game.AppId > 0)
-            .Select(g => new OwnedGame
+            .Select(game => new OwnedGame
             {
-                AppId = g.AppId,
-                Name = string.IsNullOrWhiteSpace(g.Name) ? $"App {g.AppId}" : g.Name,
-                PlaytimeForeverMinutes = Math.Max(0, g.PlaytimeForever),
-                LastPlayed = ParseLastPlayed(g.RtimeLastPlayed),
+                AppId = game.AppId,
+                Name = string.IsNullOrWhiteSpace(game.Name) ? $"App {game.AppId}" : game.Name,
+                PlaytimeForeverMinutes = Math.Max(0, game.PlaytimeForever),
+                LastPlayed = ParseLastPlayed(game.RtimeLastPlayed),
             })
             .GroupBy(game => game.AppId)
             .Select(group => OwnedGame.Merge(group.Key, group))
@@ -112,7 +113,7 @@ public sealed class SteamWebApiClient : ISteamWebApiClient
 
     private sealed record Envelope([property: JsonPropertyName("response")] Payload? Response);
 
-    private sealed record Payload([property: JsonPropertyName("games")] List<ApiGame>? Games);
+    private sealed record Payload([property: JsonPropertyName("games")] List<ApiGame?>? Games);
 
     private sealed record ApiGame(
         [property: JsonPropertyName("appid")] int AppId,

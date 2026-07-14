@@ -29,7 +29,7 @@ public class SteamWebEnricherTests
         var owned = new List<OwnedGame>
         {
             new() { AppId = 10, Name = "Installed Game", PlaytimeForeverMinutes = 120 },
-            new() { AppId = 20, Name = "Owned Not Installed", PlaytimeForeverMinutes = 30 },
+            new() { AppId = 20, Name = "Visible Not Installed", PlaytimeForeverMinutes = 30 },
         };
 
         // A scan is installed-only until enriched.
@@ -67,6 +67,31 @@ public class SteamWebEnricherTests
     }
 
     [Fact]
+    public void Web_api_enrichment_upgrades_legacy_input_and_never_emits_complete_coverage()
+    {
+        SnapshotDocument snapshot = Snapshot(
+            new SnapshotGame { AppId = 10, Name = "Installed Game", Installed = true, LibraryIndex = 0 }) with
+        {
+            SchemaVersion = "0.5.0",
+            Stats = new SnapshotStats
+            {
+                LibraryCount = 1,
+                InstalledGameCount = 1,
+                TotalSizeOnDiskBytes = 0,
+                Scope = LibraryScope.FullLibrary,
+            },
+        };
+
+        SnapshotDocument enriched = SteamWebEnricher.Enrich(
+            snapshot,
+            new Dictionary<int, IReadOnlyList<string>>(),
+            [new OwnedGame { AppId = 10, Name = "Installed Game", PlaytimeForeverMinutes = 120 }]);
+
+        enriched.SchemaVersion.ShouldBe(SnapshotSchema.Version);
+        enriched.Stats.Scope.ShouldBe(LibraryScope.ObservedSubset);
+    }
+
+    [Fact]
     public void Duplicate_appids_merge_to_one_deterministic_row_with_strongest_observations()
     {
         DateTimeOffset older = DateTimeOffset.Parse("2026-07-01T10:00:00+00:00");
@@ -79,6 +104,7 @@ public class SteamWebEnricherTests
                 Installed = true,
                 LibraryIndex = 1,
                 InstallDir = "z-folder",
+                SizeOnDiskBytes = 20,
                 Categories = ["Zeta", "Action"],
             },
             new SnapshotGame
@@ -88,8 +114,17 @@ public class SteamWebEnricherTests
                 Installed = true,
                 LibraryIndex = 0,
                 InstallDir = "a-folder",
+                SizeOnDiskBytes = 10,
                 Categories = ["Alpha", "action"],
-            });
+            }) with
+        {
+            Stats = new SnapshotStats
+            {
+                LibraryCount = 1,
+                InstalledGameCount = 2,
+                TotalSizeOnDiskBytes = 30,
+            },
+        };
         var observations = new List<OwnedGame>
         {
             new() { AppId = 10, Name = "Installed Game", PlaytimeForeverMinutes = 20, LastPlayed = newer },
@@ -119,6 +154,8 @@ public class SteamWebEnricherTests
         installed.PlaytimeMinutes.ShouldBe(90);
         installed.LastPlayed.ShouldBe(newer);
         installed.Categories.ShouldBe(["Action", "Alpha", "Zeta"]);
+        forward.Stats.InstalledGameCount.ShouldBe(1);
+        forward.Stats.TotalSizeOnDiskBytes.ShouldBe(20);
 
         SnapshotGame observed = forward.Games.Single(game => game.AppId == 20);
         observed.Name.ShouldBe("Alpha");

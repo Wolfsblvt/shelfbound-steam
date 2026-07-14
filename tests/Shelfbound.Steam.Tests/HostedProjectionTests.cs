@@ -14,7 +14,7 @@ public class HostedProjectionTests
     {
         HostedProjection.ProjectionVersion.ShouldBe("2");
         HostedProjection.FieldPurposes.Single(field => field.Path == "stats.scope").Purpose
-            .ShouldContain("non-complete observed subset");
+            .ShouldContain("legacy false-full");
     }
 
     [Fact]
@@ -54,7 +54,7 @@ public class HostedProjectionTests
     }
 
     [Fact]
-    public void Projects_a_legacy_false_full_library_report_as_an_observed_subset()
+    public void Preserves_a_legacy_scope_label_to_keep_its_schema_identity_immutable()
     {
         SnapshotDocument local = FullLocalSnapshot("Legacy device");
         SnapshotDocument legacy = local with
@@ -65,7 +65,10 @@ public class HostedProjectionTests
 
         HostedUpload upload = HostedProjection.Prepare(legacy);
 
-        upload.Snapshot.Stats.Scope.ShouldBe(LibraryScope.ObservedSubset);
+        upload.Snapshot.SchemaVersion.ShouldBe("0.5.0");
+        upload.Snapshot.Stats.Scope.ShouldBe(LibraryScope.FullLibrary);
+        upload.Json.ShouldContain("\"schemaVersion\":\"0.5.0\"");
+        upload.Json.ShouldContain("\"scope\":\"fullLibrary\"");
         legacy.Stats.Scope.ShouldBe(LibraryScope.FullLibrary);
     }
 
