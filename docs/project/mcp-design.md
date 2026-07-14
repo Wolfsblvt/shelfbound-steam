@@ -14,7 +14,12 @@ MCP stdout remains protocol-only; diagnostic output goes to stderr. The named St
 its framework HTTP logging to `Warning`, preventing its request URI from being emitted at Information.
 The stderr logging boundary additionally redacts common secret query values (`key`, `api_key`, `token`,
 `client_secret`, and `access_token`) from messages, scopes, and exception text; it suppresses an event if
-redaction cannot be applied. Steam still receives its API-mandated `key` query parameter.
+redaction cannot be applied. Surfaced request exceptions are credential-free rather than retaining an
+inner exception whose URI may contain the key. Steam still receives its API-mandated `key` query parameter.
+
+The owned-games result distinguishes usable positive observations from missing, empty, and malformed
+responses and records when the response was received. Unavailable evidence produces an actionable MCP
+warning and leaves scope installed-only; a usable response produces `observedSubset`, never completeness.
 
 ## Philosophy
 
@@ -66,20 +71,17 @@ played_elsewhere + platform, drop from Steam backlog recs.
 ## Recency
 
 Game results include recency as human phrases (`installedOrUpdatedAgo`, `lastPlayedAgo`, `addedAgo`)
-alongside raw dates — models weight "3 days ago" over "2026-06-24". Steam exposes no purchase date, so
-"added" is inferred from when Shelfbound first observed the game owned (relative to a baseline scan),
-becoming meaningful as the user keeps using Shelfbound. Last-played for owned-but-not-installed games
-comes from the Steam Web API (`rtime_last_played`).
+alongside raw dates. Steam exposes no purchase date, so `addedAgo` is available only when a stable,
+actually complete source supports first-observation as a conservative acquisition proxy. Last-played
+for a visible not-installed game observation may still come from the Steam Web API
+(`rtime_last_played`) without implying complete coverage.
 
-**Newly *visible* ≠ newly *added*.** First-observation is a good proxy for "added" only while the scan's
-coverage is stable. When it *widens* — an `installedOnly` baseline followed by a `fullLibrary` scan (a
-Steam Web API key added) — previously-owned games appear for the first time *after* the baseline, yet
-they were never newly acquired, only newly seen. So the profile records the **widest scan scope observed
-so far** (`UserProfile.WidestScanScope`, a high-water mark), and a scan broader than that **baselines**
-the games it reveals (stamps their first-seen at the baseline scan time) instead of dating them — they
-never read as "recently added". Only games first seen under a stable-or-narrower scope are treated as
-genuine acquisitions. Steam can't tell a purchase made *during* a scope change from a pure reveal, so
-this errs toward *not* crying "new" (a missed nudge beats a whole library falsely flagged). See
+**Newly *visible* ≠ newly *added*.** The profile records the widest coverage observed so far using the
+explicit order `installedOnly` → `observedSubset` → `fullLibrary`. Scope expansion baselines revealed
+apps. Stable installed/observed-subset evidence also baselines new apps because partial absence cannot
+prove a later acquisition. Only a new app under stable `fullLibrary` is dated after the baseline, and
+read views suppress `addedAgo` whenever current scope is partial. This errs toward not crying "new" (a
+missed nudge beats a false purchase claim). See
 [DECISIONS.md](./DECISIONS.md) → "Recency correctness — newly-visible ≠ newly-added".
 
 If a profile's baseline was skewed before this existed (a stale narrow baseline, then a full scan),

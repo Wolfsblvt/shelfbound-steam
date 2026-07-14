@@ -1,9 +1,10 @@
 namespace Shelfbound.Core.Model;
 
 /// <summary>
-/// A single game in the library. The local scan emits installed games; Steam Web API enrichment adds
-/// owned-but-not-installed games (<see cref="Installed"/> = false, <see cref="LibraryIndex"/> = null)
-/// and playtime. Every entry is a game the user owns. See docs/project/snapshot-schema.md.
+/// A single positive game observation. The local scan emits installed games; Steam Web API enrichment may add
+/// visible not-installed observations (<see cref="Installed"/> = false, <see cref="LibraryIndex"/> = null)
+/// and playtime. Presence does not by itself establish direct ownership or current access; interpret it with the
+/// snapshot's coverage scope. See docs/project/snapshot-schema.md.
 /// </summary>
 public sealed record SnapshotGame
 {

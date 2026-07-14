@@ -21,7 +21,7 @@ rationale.
 
 ## Why it exists (the differentiator)
 
-A plain Steam Web API wrapper is not interesting — anyone can expose owned games and playtime. The
+A plain Steam Web API wrapper is not interesting — anyone can expose visibility-gated game observations and playtime. The
 unique value is what the public API *cannot* give, read from the **local Steam client**:
 
 - local categories / collections and **what they personally mean** (`Soon`, `Deck`, `Paused`, …)
@@ -54,15 +54,17 @@ The local Steam data is the moat. AI reasoning is commodity; good structured fac
 ## Current status
 
 **Implemented (local core):**
-- Snapshot contract `v0.5.0` (`schema/snapshot.v0.schema.json`, models in `Shelfbound.Core`) — adds
-  optional per-library `storage` (medium kind + free/total, no path). The immutable library package
-  mapping is `0.7.0` → schema `0.5.0`; published `0.6.0` remains schema `0.4.0`.
+- Snapshot contract `v0.6.0` (`schema/snapshot.v0.schema.json`, models in `Shelfbound.Core`) — retains
+  optional per-library `storage` and adds honest `observedSubset` coverage. The immutable library
+  package mapping is `0.8.0` → schema `0.6.0`; published `0.7.0` remains schema `0.5.0` and `0.6.0`
+  remains schema `0.4.0`.
 - Local Steam scanner (`Shelfbound.Steam`): install discovery, `libraryfolders.vdf`,
   `appmanifest_*.acf`, `loginusers.vdf`, **local categories** — modern Steam collections (a hand-rolled
   Chromium-leveldb reader) with the legacy `sharedconfig.vdf` as fallback — and a minimal VDF parser.
-- **Steam Web API** client + enrichment: owned-but-not-installed games and playtime (with an API key).
-  The snapshot carries a **library scope** (`installedOnly` vs `fullLibrary`) so consumers never read
-  "not found" as "not owned" when no key was used; the CLI says so loudly.
+- **Steam Web API** client + enrichment: positive visible owned-game/playtime observations (with an
+  API key), including visible not-installed rows. The snapshot carries `installedOnly`,
+  `observedSubset`, or explicitly complete `fullLibrary` scope; current Web API output is always partial,
+  and CLI/MCP wording keeps absence from becoming a non-ownership claim.
 - **`Shelfbound.Query`**: deterministic filter/sort/summary over a **merged library view** (snapshot
   facts + user-data) — search by category, install state, playtime, **status, rating, and completion**;
   **recency** as human phrases (installed/last-played + "added N ago", inferred from first-seen).
@@ -73,7 +75,7 @@ The local Steam data is the moat. AI reasoning is commodity; good structured fac
   (`get_profile_status`), and **server instructions** that push the model to save context and onboard.
 - **`Shelfbound.Storage`**: local config (API key), the **identity seam** (owner/profile), and a
   user-data store — per-game status/rating/completion/aspects, scoped memories, category meanings, and
-  **first-seen** tracking (a "recently added/bought" proxy, since Steam exposes no purchase date) —
+  conservative **first-seen** tracking (`added` only under stable, actually complete coverage) —
   shared by the CLI and MCP server.
 - CLI (`Shelfbound.Cli`): `shelfbound setup` (API key), `shelfbound scan` (+ enrichment),
   `shelfbound profile` (a local "what Shelfbound remembers" view), and privacy-minimized hosted
@@ -90,9 +92,10 @@ The local Steam data is the moat. AI reasoning is commodity; good structured fac
   get_profile_status).
 - **Local only. Identity is the local machine owner; real auth slots in for the hosted layer.**
 
-**Local snapshot scope:** installed + (with an API key) owned-but-not-installed Steam games, playtime,
-Steam accounts, device info, and the user's **local categories** with per-game tags. Official hosted
-clients drop the account array and coarsen device identity through projection v1 before upload.
+**Local snapshot scope:** installed + (with an API key) positive visible owned-game observations and
+playtime, Steam accounts, device info, and the user's **local categories** with per-game tags. Web API
+coverage is explicitly non-complete. Official hosted clients drop the account array and coarsen device
+identity through projection v2 before upload.
 Categories are read from the **modern Steam collections** (Chromium leveldb), falling back to the
 legacy `sharedconfig.vdf` — the legacy file is stale for modern-UI users
 ([steam-collections.md](./steam-collections.md)).
@@ -113,8 +116,8 @@ Local-first — prove the data model locally before anything depends on it.
    collections (the modern-collections reader handles static ones today).
 4. **Snapshot/export polish:** validation, import/export ergonomics for other clients.
 
-Done: local scanner, local categories (modern collections + legacy fallback), owned-not-installed +
-playtime (Steam Web API), the query engine (merging facts + user-data), the local MCP server (read +
+Done: local scanner, local categories (modern collections + legacy fallback), visible not-installed +
+playtime observations (Steam Web API), the query engine (merging facts + user-data), the local MCP server (read +
 write tools), the user-data store + identity seam, the tray installer + self-update (Velopack), and the
 CLI/MCP packaged as .NET global tools.
 

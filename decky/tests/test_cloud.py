@@ -11,7 +11,7 @@ from shelfbound_decky.cloud import PairingUnavailableError, ShelfboundServer, Up
 from shelfbound_decky.hosted_projection import prepare_hosted_upload
 
 SNAPSHOT = {
-    "schemaVersion": "0.5.0",
+    "schemaVersion": "0.6.0",
     "snapshotId": "55555555-5555-5555-5555-555555555555",
     "createdAt": "2026-07-11T12:00:00+00:00",
     "source": {"tool": "test", "toolVersion": "1.0.0", "platform": "linux"},
@@ -39,7 +39,7 @@ SNAPSHOT = {
         "libraryCount": 0,
         "installedGameCount": 1,
         "totalSizeOnDiskBytes": 0,
-        "scope": "fullLibrary",
+        "scope": "observedSubset",
     },
 }
 
@@ -47,7 +47,7 @@ SNAPSHOT = {
 class _Handler(BaseHTTPRequestHandler):
     # Configured per-test via class attributes.
     ingest_status = 200
-    ingest_body = {"schemaVersion": "0.5.0", "summary": {}, "warning": None}
+    ingest_body = {"schemaVersion": "0.6.0", "summary": {}, "warning": None}
     retry_after = None
     seen: list[dict] = []
 
@@ -101,7 +101,7 @@ class _Handler(BaseHTTPRequestHandler):
 @pytest.fixture()
 def server():
     _Handler.ingest_status = 200
-    _Handler.ingest_body = {"schemaVersion": "0.5.0", "summary": {}, "warning": None}
+    _Handler.ingest_body = {"schemaVersion": "0.6.0", "summary": {}, "warning": None}
     _Handler.retry_after = None
     _Handler.seen = []
     httpd = HTTPServer(("127.0.0.1", 0), _Handler)
@@ -114,7 +114,7 @@ def server():
 
 def test_upload_success_counts_games_and_sends_bearer(server):
     _Handler.ingest_body = {
-        "schemaVersion": "0.5.0",
+        "schemaVersion": "0.6.0",
         "summary": {},
         "warning": "Switching devices deleted the previous Free snapshot.",
     }
@@ -126,7 +126,7 @@ def test_upload_success_counts_games_and_sends_bearer(server):
     assert outcome.game_count == 2
     assert outcome.warning == "Switching devices deleted the previous Free snapshot."
     assert isinstance(outcome.response, UploadResponseV1)
-    assert outcome.response.schema_version == "0.5.0"
+    assert outcome.response.schema_version == "0.6.0"
     request = _Handler.seen[0]
     assert request["authorization"] == "Bearer tok-123"
     assert request["body"] == prepare_hosted_upload(SNAPSHOT).body

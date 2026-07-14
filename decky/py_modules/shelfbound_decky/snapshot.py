@@ -1,4 +1,4 @@
-"""Builds a Shelfbound snapshot (contract v0.5.0) from a local Steam installation.
+"""Builds a Shelfbound snapshot (contract v0.6.0) from a local Steam installation.
 
 Mirrors the C# SteamScanner (src/Shelfbound.Steam/Steam/SteamScanner.cs): same file
 walk, same fallbacks, same warning texts, same output shape. The snapshot dict is
@@ -15,7 +15,7 @@ same prefer-modern/fallback-legacy behaviour as the C# scanner. The one hardware
 seam is the SteamOS Local Storage path (see steam_localstorage.py / A1).
 
 Known prototype divergences from the C# scanner (documented in the plugin README):
-- No Steam Web API enrichment (owned-but-not-installed + playtime), so `stats.scope`
+- No Steam Web API enrichment (visible not-installed observations + playtime), so `stats.scope`
   is always `installedOnly` and `playtimeMinutes` is never emitted.
 """
 

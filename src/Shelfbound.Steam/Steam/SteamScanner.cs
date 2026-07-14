@@ -7,7 +7,7 @@ namespace Shelfbound.Steam.Steam;
 /// <summary>
 /// Reads a local Steam installation and produces a versioned <see cref="SnapshotDocument"/>.
 /// Emits the installed games per library, the user's Steam accounts, and their local
-/// collections/categories. Owned-but-not-installed games require the Steam Web API and are out of
+/// collections/categories. Visible not-installed observations require the Steam Web API and are out of
 /// scope for the local scan.
 /// </summary>
 public sealed class SteamScanner

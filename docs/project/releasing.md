@@ -7,8 +7,9 @@ behind them: see the "Packaging & distribution" section of [DECISIONS.md](./DECI
 ## Open-core library packages
 
 `Directory.Build.props` binds the current library package version to its snapshot schema version.
-For this release, `Shelfbound.Core`, `Shelfbound.Query`, and `Shelfbound.Steam` are package `0.7.0`
-and produce schema `0.5.0`. `Shelfbound.Storage` is local persistence and remains non-packable; the
+For this release, `Shelfbound.Core`, `Shelfbound.Query`, and `Shelfbound.Steam` are package `0.8.0`
+and produce schema `0.6.0`. Published package `0.7.0` remains schema `0.5.0`, and `0.6.0` remains
+schema `0.4.0`. `Shelfbound.Storage` is local persistence and remains non-packable; the
 portable `SnapshotStorage` DTO is already in Core.
 
 The `v<version>` tag triggers `nuget-publish.yml`. The workflow:
@@ -39,13 +40,13 @@ pwsh scripts/test-package-release.ps1 -CloudRepo <path-to-shelfbound-cloud>
 Then create and push the immutable library tag (the implementation agent does not do this):
 
 ```pwsh
-git tag -a v0.7.0 -m "Shelfbound libraries 0.7.0 (snapshot schema 0.5.0)"
-git push origin v0.7.0
+git tag -a v0.8.0 -m "Shelfbound libraries 0.8.0 (snapshot schema 0.6.0)"
+git push origin v0.8.0
 ```
 
-The publish workflow requires `v0.7.0` to point at the commit whose `Directory.Build.props` says
-`0.7.0`, and requires all three package ids to be absent at that version. After the workflow succeeds,
-verify each nuget.org page reports `0.7.0`, schema `0.5.0` in release notes, the tagged repository commit,
+The publish workflow requires `v0.8.0` to point at the commit whose `Directory.Build.props` says
+`0.8.0`, and requires all three package ids to be absent at that version. After the workflow succeeds,
+verify each nuget.org page reports `0.8.0`, schema `0.6.0` in release notes, the tagged repository commit,
 and a symbol package.
 
 ## Releasing the tray

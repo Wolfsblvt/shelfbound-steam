@@ -49,33 +49,28 @@ public static class UserDataActions
     }
 
     /// <summary>
-    /// Records the first time each app id was observed owned, the proxy Shelfbound uses for "recently
-    /// added/bought" (Steam exposes no purchase date). The first call establishes the baseline scan
-    /// time; later calls only timestamp apps not seen before. A scan whose <paramref name="scanScope"/>
-    /// is broader than any prior scan (e.g. installedOnly → fullLibrary) makes previously-owned games
-    /// newly <em>visible</em>, not newly <em>added</em> — and Steam gives no way to tell a real purchase
-    /// from a scope reveal — so those newly-seen apps are stamped at the baseline (not "now"), keeping
-    /// them out of "recently added". Apps first seen under a stable-or-narrower scope are genuine
-    /// acquisitions and get the current timestamp. Pure — call inside a store transaction.
+    /// Records conservative first-observation timestamps. The first call establishes the baseline.
+    /// Later observations are dated at <paramref name="now"/> only under a stable
+    /// <see cref="LibraryScope.FullLibrary"/> source; partial installed/observed-subset scans cannot prove
+    /// acquisition, and a scope expansion only reveals games that may already have been present. Those
+    /// observations are stamped at the baseline so UI and MCP consumers do not call them newly added or bought.
+    /// Pure — call inside a store transaction.
     /// </summary>
     public static void RecordFirstSeen(UserProfile profile, IEnumerable<int> appIds, DateTimeOffset now, LibraryScope scanScope)
     {
         bool firstScan = profile.FirstScanAt is null;
         profile.FirstScanAt ??= now;
 
-        // Coverage that exceeds anything seen before reveals already-owned games as if brand new. We
-        // can't distinguish those from real purchases, so we conservatively baseline them (stamp at the
-        // baseline scan time) rather than risk a whole library reading "Added N days ago". LibraryScope
-        // is ordered by increasing coverage, so ">" means "strictly broader". Never on the first scan —
-        // that IS the baseline: everything is stamped at "now" and reads as pre-existing.
-        bool scopeExpanded = !firstScan && scanScope > profile.WidestScanScope;
-        DateTimeOffset firstSeenAt = scopeExpanded ? profile.FirstScanAt.Value : now;
+        bool scopeExpanded = !firstScan &&
+            LibraryScopeSemantics.IsBroaderThan(scanScope, profile.WidestScanScope);
+        bool canEstablishAcquisition = !firstScan && !scopeExpanded &&
+            LibraryScopeSemantics.IsComplete(scanScope);
+        DateTimeOffset firstSeenAt = canEstablishAcquisition ? now : profile.FirstScanAt.Value;
 
         foreach (int appId in appIds)
             profile.FirstSeen.TryAdd(appId, firstSeenAt);
 
-        if (scanScope > profile.WidestScanScope)
-            profile.WidestScanScope = scanScope;
+        profile.WidestScanScope = LibraryScopeSemantics.BroaderOf(profile.WidestScanScope, scanScope);
     }
 
     /// <summary>

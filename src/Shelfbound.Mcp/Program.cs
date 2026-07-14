@@ -22,7 +22,7 @@ builder.Services.AddSingleton<IUserDataStore>(_ => new JsonUserDataStore(Shelfbo
 builder.Services
     .AddMcpServer(options => options.ServerInstructions =
         """
-        Shelfbound exposes the user's real Steam library plus their saved taste and context.
+        Shelfbound exposes observed Steam library facts plus the user's saved taste and context.
         - Save what the user states: when they give an opinion, status, completion, played-elsewhere,
           or what a category means, immediately call the matching tool (record_game_opinion,
           record_game_status, set_game_completion, set_category_definition, remember). Save only what
@@ -30,10 +30,11 @@ builder.Services
         - Recall before recommending: call get_profile_status and get_remembered. If the profile is
           sparse, offer a short taste onboarding (ask about a few suggested games and general
           preferences), then save them. Ask what any undefined categories mean and save the meaning.
-        - Mind the library scope: get_library_summary returns 'scope'. If it is 'installedOnly', only
-          installed games are present — never tell the user they don't own a game just because a search
-          returned nothing; say it isn't installed, and that the full owned library needs a Steam Web
-          API key (shelfbound setup --steam-api-key-stdin).
+        - Mind the library scope: get_library_summary returns 'scope'. 'installedOnly' contains local
+          installed presence; 'observedSubset' also contains positive visibility-gated Web API observations,
+          but remains incomplete; only 'fullLibrary' has a completeness contract. Under either partial
+          scope, never turn a missing search result into a non-ownership or acquisition claim. A Steam Web
+          API key may add visible games and playtime, but cannot make the result complete.
         """)
     .WithStdioServerTransport()
     .WithToolsFromAssembly();

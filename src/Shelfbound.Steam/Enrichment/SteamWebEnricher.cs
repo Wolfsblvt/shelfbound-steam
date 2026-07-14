@@ -1,12 +1,13 @@
+using Shelfbound.Core;
 using Shelfbound.Core.Model;
 using Shelfbound.Steam.Web;
 
 namespace Shelfbound.Steam.Enrichment;
 
 /// <summary>
-/// Merges Steam Web API owned-games data into a locally scanned snapshot: sets playtime on installed
-/// games and adds owned-but-not-installed games (with their local categories). Pure and deterministic
-/// — the network fetch happens separately via <see cref="ISteamWebApiClient"/>, keeping this testable.
+/// Merges positive visibility-gated Steam Web API observations into a locally scanned snapshot: sets
+/// playtime on installed games and adds visible not-installed game observations (with local categories).
+/// Pure and deterministic — the network fetch happens separately via <see cref="ISteamWebApiClient"/>.
 ///
 /// The document-level category summary is already computed from the full local category map, so it
 /// is left unchanged here.
@@ -18,25 +19,35 @@ public static class SteamWebEnricher
         IReadOnlyDictionary<int, IReadOnlyList<string>> categoriesByApp,
         IReadOnlyList<OwnedGame> ownedGames)
     {
-        var installedAppIds = snapshot.Games.Select(g => g.AppId).ToHashSet();
         var ownedByApp = ownedGames
+            .Where(game => game.AppId > 0)
             .GroupBy(o => o.AppId)
-            .ToDictionary(g => g.Key, g => g.First());
+            .ToDictionary(group => group.Key, group => OwnedGame.Merge(group.Key, group));
 
-        var games = new List<SnapshotGame>(snapshot.Games.Count + ownedGames.Count);
+        if (ownedByApp.Count == 0)
+            return snapshot;
+
+        var localGames = snapshot.Games
+            .Select((game, index) => new IndexedGame(game, index))
+            .GroupBy(item => item.Game.AppId)
+            .OrderBy(group => group.Min(item => item.Index))
+            .Select(group => MergeLocalObservations(group.Select(item => item.Game)))
+            .ToList();
+        var localAppIds = localGames.Select(game => game.AppId).ToHashSet();
+        var games = new List<SnapshotGame>(localGames.Count + ownedByApp.Count);
 
         // Installed games: attach playtime and last-played where the API knows them.
-        foreach (var game in snapshot.Games)
+        foreach (SnapshotGame game in localGames)
         {
             games.Add(ownedByApp.TryGetValue(game.AppId, out OwnedGame? owned)
                 ? game with { PlaytimeMinutes = owned.PlaytimeForeverMinutes, LastPlayed = owned.LastPlayed ?? game.LastPlayed }
                 : game);
         }
 
-        // Owned-but-not-installed games: add them with categories, playtime, and last-played.
-        foreach (var owned in ownedGames)
+        // Visible not-installed observations: add them with categories and playtime.
+        foreach (OwnedGame owned in ownedByApp.Values.OrderBy(game => game.AppId))
         {
-            if (installedAppIds.Contains(owned.AppId))
+            if (localAppIds.Contains(owned.AppId))
                 continue;
 
             games.Add(new SnapshotGame
@@ -51,11 +62,54 @@ public static class SteamWebEnricher
             });
         }
 
-        // The library now includes owned-but-not-installed games, so it's the full owned library.
+        // GetOwnedGames is visibility-gated and supplies only positive observations. Even a successful
+        // response has no completeness contract, so absence from the enriched result proves nothing.
         return snapshot with
         {
+            // observedSubset first exists in schema 0.6.0. Enriching an older in-memory document is an
+            // explicit upgrade to the current additive shape, never a new enum smuggled under an old identity.
+            SchemaVersion = SnapshotSchema.Version,
             Games = games,
-            Stats = snapshot.Stats with { Scope = LibraryScope.FullLibrary },
+            Stats = snapshot.Stats with
+            {
+                InstalledGameCount = games.Count(game => game.Installed),
+                TotalSizeOnDiskBytes = games.Sum(game => game.SizeOnDiskBytes ?? 0),
+                // This path composed visibility-gated evidence into the output. Without per-row source
+                // provenance, it cannot carry a document-level completeness claim from any prior source.
+                Scope = LibraryScope.ObservedSubset,
+            },
         };
     }
+
+    private static SnapshotGame MergeLocalObservations(IEnumerable<SnapshotGame> observations)
+    {
+        SnapshotGame[] games = observations.ToArray();
+        SnapshotGame winner = games
+            .OrderByDescending(game => game.Installed)
+            .ThenBy(game => game.LibraryIndex ?? int.MaxValue)
+            .ThenBy(game => game.InstallDir ?? string.Empty, StringComparer.Ordinal)
+            .ThenBy(game => game.Name, StringComparer.Ordinal)
+            .First();
+        bool installed = games.Any(game => game.Installed);
+
+        return winner with
+        {
+            Installed = installed,
+            LibraryIndex = installed ? winner.LibraryIndex : null,
+            InstallDir = installed ? winner.InstallDir : null,
+            SizeOnDiskBytes = installed ? games.Max(game => game.SizeOnDiskBytes) : null,
+            PlaytimeMinutes = games.Max(game => game.PlaytimeMinutes),
+            LastUpdated = games.Max(game => game.LastUpdated),
+            LastPlayed = games.Max(game => game.LastPlayed),
+            Categories = games
+                .SelectMany(game => game.Categories)
+                .GroupBy(category => category, StringComparer.OrdinalIgnoreCase)
+                .Select(group => group.OrderBy(category => category, StringComparer.Ordinal).First())
+                .OrderBy(category => category, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(category => category, StringComparer.Ordinal)
+                .ToArray(),
+        };
+    }
+
+    private sealed record IndexedGame(SnapshotGame Game, int Index);
 }

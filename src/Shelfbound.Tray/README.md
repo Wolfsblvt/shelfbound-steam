@@ -40,8 +40,9 @@ token.
   Confirming sends that same prepared body — the tray does not rescan or reserialize between preview
   and transport.
 - New installs default auto-sync off. Background sync can run on an interval after the user enables it
-  and has previewed + successfully sent the current projection version once. If the uploaded field set
-  expands later, that versioned consent is invalidated.
+  and has previewed + successfully sent the current projection version once. An uploaded field-set
+  expansion or material purpose change invalidates that consent; projection v2 does so for the changed
+  `stats.scope` coverage meaning without adding a field.
 - Closing the window hides it to the tray. Auto-start on login and background auto-sync are optional
   and configurable independently.
 

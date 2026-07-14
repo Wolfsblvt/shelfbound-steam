@@ -87,8 +87,9 @@ public class SteamWebApiLoggingTests
 
         if (outcome is RequestOutcome.Success)
         {
-            IReadOnlyList<OwnedGame> games = await client.GetOwnedGamesAsync("76561198000000000", DummyApiKey);
-            games.ShouldBeEmpty();
+            OwnedGamesResult result = await client.GetOwnedGamesAsync("76561198000000000", DummyApiKey);
+            result.Status.ShouldBe(OwnedGamesResultStatus.EmptyGameList);
+            result.Games.ShouldBeEmpty();
         }
         else
         {

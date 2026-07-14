@@ -16,7 +16,13 @@ public class RecencyTests
         Source = new SnapshotSource { Tool = "t", ToolVersion = "0", Platform = OsPlatform.Windows },
         Device = new SnapshotDevice { Id = "d", Name = "d", Type = DeviceType.Desktop, Os = OsPlatform.Windows },
         Games = games,
-        Stats = new SnapshotStats { LibraryCount = 0, InstalledGameCount = 0, TotalSizeOnDiskBytes = 0 },
+        Stats = new SnapshotStats
+        {
+            LibraryCount = 0,
+            InstalledGameCount = 0,
+            TotalSizeOnDiskBytes = 0,
+            Scope = LibraryScope.FullLibrary,
+        },
     };
 
     [Fact]
@@ -38,7 +44,7 @@ public class RecencyTests
     }
 
     // End-to-end: a scope expansion (installedOnly baseline → fullLibrary scan) must NOT make
-    // previously-owned games read as "recently added"; a genuine purchase once scope is stable still does.
+    // previously unobserved games read as "recently added"; a genuine new row once scope is stable still does.
     [Fact]
     public void Scope_expansion_does_not_produce_false_recently_added()
     {
@@ -48,7 +54,7 @@ public class RecencyTests
         var baseline = DateTimeOffset.UtcNow.AddDays(-30);
         UserDataActions.RecordFirstSeen(profile, [1, 2], baseline, LibraryScope.InstalledOnly);
 
-        // Later: a full-library scan reveals owned-but-not-installed games (3, 4) for the first time.
+        // Later: a complete-source scan reveals not-installed games (3, 4) for the first time.
         var fullScan = DateTimeOffset.UtcNow.AddDays(-10);
         UserDataActions.RecordFirstSeen(profile, [1, 2, 3, 4], fullScan, LibraryScope.FullLibrary);
 
@@ -63,14 +69,14 @@ public class RecencyTests
         // None read as "recently added" — the wider scan made them visible, not newly acquired.
         view.Games.ShouldAllBe(g => g.AddedAgo == null);
 
-        // A genuine purchase after the scope has stabilized at full DOES read as recently added.
-        var purchase = DateTimeOffset.UtcNow.AddDays(-3);
-        UserDataActions.RecordFirstSeen(profile, [1, 2, 3, 4, 5], purchase, LibraryScope.FullLibrary);
+        // A genuine addition after the scope has stabilized at full DOES read as recently added.
+        var addition = DateTimeOffset.UtcNow.AddDays(-3);
+        UserDataActions.RecordFirstSeen(profile, [1, 2, 3, 4, 5], addition, LibraryScope.FullLibrary);
 
-        var afterPurchase = LibraryViewBuilder.Build(
-            Snapshot(new SnapshotGame { AppId = 5, Name = "Just Bought", Installed = true }),
+        var afterAddition = LibraryViewBuilder.Build(
+            Snapshot(new SnapshotGame { AppId = 5, Name = "New Addition", Installed = true }),
             profile);
-        afterPurchase.Games.Single(g => g.AppId == 5).AddedAgo.ShouldBe("3 days ago");
+        afterAddition.Games.Single(g => g.AppId == 5).AddedAgo.ShouldBe("3 days ago");
     }
 
     [Fact]
@@ -78,5 +84,49 @@ public class RecencyTests
     {
         var view = LibraryViewBuilder.Build(Snapshot(new SnapshotGame { AppId = 1, Name = "G", Installed = true }));
         view.Games[0].LastPlayedAgo.ShouldBe("never");
+    }
+
+    [Fact]
+    public void Partial_view_never_surfaces_an_acquisition_claim_from_a_stored_timestamp()
+    {
+        var baseline = DateTimeOffset.UtcNow.AddDays(-30);
+        var profile = new UserProfile { OwnerId = "x", FirstScanAt = baseline };
+        profile.FirstSeen[1] = DateTimeOffset.UtcNow.AddDays(-3);
+        SnapshotDocument partial = Snapshot(new SnapshotGame { AppId = 1, Name = "Observed", Installed = false }) with
+        {
+            Stats = new SnapshotStats
+            {
+                LibraryCount = 0,
+                InstalledGameCount = 0,
+                TotalSizeOnDiskBytes = 0,
+                Scope = LibraryScope.ObservedSubset,
+            },
+        };
+
+        LibraryViewBuilder.Build(partial, profile).Games.Single().AddedAgo.ShouldBeNull();
+
+        SnapshotDocument complete = partial with
+        {
+            Stats = partial.Stats with { Scope = LibraryScope.FullLibrary },
+        };
+        LibraryViewBuilder.Build(complete, profile).Games.Single().AddedAgo.ShouldBe("3 days ago");
+    }
+
+    [Fact]
+    public void Legacy_false_full_library_scope_is_partial_in_the_read_view()
+    {
+        var baseline = DateTimeOffset.UtcNow.AddDays(-30);
+        var profile = new UserProfile { OwnerId = "x", FirstScanAt = baseline };
+        profile.FirstSeen[1] = DateTimeOffset.UtcNow.AddDays(-3);
+        SnapshotDocument legacy = Snapshot(new SnapshotGame { AppId = 1, Name = "Legacy", Installed = false }) with
+        {
+            SchemaVersion = "0.5.0",
+        };
+
+        LibraryView view = LibraryViewBuilder.Build(legacy, profile);
+
+        view.Scope.ShouldBe(LibraryScope.ObservedSubset);
+        view.Games.Single().AddedAgo.ShouldBeNull();
+        legacy.Stats.Scope.ShouldBe(LibraryScope.FullLibrary);
     }
 }

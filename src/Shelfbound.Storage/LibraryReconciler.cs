@@ -4,12 +4,9 @@ using Shelfbound.Core.UserData;
 namespace Shelfbound.Storage;
 
 /// <summary>
-/// Records when each owned game was first observed, so Shelfbound can infer "recently added/bought"
-/// (Steam exposes no purchase date). On the first run it stores a baseline scan time and marks all
-/// current apps as seen then; on later runs it timestamps any newly observed app. A scan whose
-/// <c>scanScope</c> is broader than any prior scan reveals previously-owned games that are newly
-/// <em>visible</em>, not newly <em>added</em>, so those get baselined rather than dated. Games first
-/// seen after the baseline under a stable-or-narrower scope are the genuinely new ones.
+/// Records conservative first-observation state. The first run establishes a baseline; later apps are
+/// dated only under stable complete coverage. Broader or partial scans baseline new appids because
+/// presence without complete prior absence cannot support an acquisition claim.
 /// </summary>
 public static class LibraryReconciler
 {

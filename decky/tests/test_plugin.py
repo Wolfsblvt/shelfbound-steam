@@ -12,7 +12,7 @@ CLAIMED_TOKEN = "claimed-token-that-must-stay-backend-side"
 ACCOUNT = {"accountId": "acc-1", "displayName": "Wolf"}
 DEVICE = {"id": "device-1", "name": "testdeck", "type": "steamDeck", "os": "linux"}
 SNAPSHOT = {
-    "schemaVersion": "0.5.0",
+    "schemaVersion": "0.6.0",
     "snapshotId": "77777777-7777-7777-7777-777777777777",
     "createdAt": "2026-07-11T12:00:00+00:00",
     "source": {"tool": "shelfbound-decky", "toolVersion": "0.1.0-test", "platform": "linux"},

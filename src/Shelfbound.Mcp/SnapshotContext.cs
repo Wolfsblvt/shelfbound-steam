@@ -17,7 +17,7 @@ namespace Shelfbound.Mcp;
 /// <list type="bullet">
 ///   <item><c>SHELFBOUND_SNAPSHOT</c> — path to an existing snapshot JSON to load (skips scanning).</item>
 ///   <item><c>SHELFBOUND_STEAM_PATH</c> — Steam install root (else auto-detected).</item>
-///   <item><c>STEAM_WEB_API_KEY</c> — overrides the saved key; enriches with owned games + playtime.</item>
+///   <item><c>STEAM_WEB_API_KEY</c> — overrides the saved key; adds visible game/playtime observations.</item>
 /// </list>
 /// </summary>
 public sealed class SnapshotContext(ISteamWebApiClient steamWebApiClient, IUserDataStore userDataStore, ILogger<SnapshotContext> logger)
@@ -40,7 +40,10 @@ public sealed class SnapshotContext(ISteamWebApiClient steamWebApiClient, IUserD
             SnapshotDocument loaded = SnapshotSerializer.Deserialize(await File.ReadAllTextAsync(snapshotFile, cancellationToken));
             _snapshot = loaded;
             OwnerId = ResolveOwner(config, loaded);
-            LibraryReconciler.RecordFirstSeen(userDataStore, OwnerId, loaded.Games.Select(g => g.AppId), loaded.Stats.Scope);
+            LibraryScope operationalScope = LibraryScopeSemantics.GetOperationalScope(
+                loaded.SchemaVersion,
+                loaded.Stats.Scope);
+            LibraryReconciler.RecordFirstSeen(userDataStore, OwnerId, loaded.Games.Select(g => g.AppId), operationalScope);
             logger.LogInformation("Loaded snapshot from {File} ({Games} games).", snapshotFile, loaded.Games.Count);
             return;
         }
@@ -76,9 +79,23 @@ public sealed class SnapshotContext(ISteamWebApiClient steamWebApiClient, IUserD
         {
             try
             {
-                var owned = await steamWebApiClient.GetOwnedGamesAsync(account.SteamId64, apiKey, cancellationToken);
-                snapshot = SteamWebEnricher.Enrich(snapshot, scan.CategoriesByApp, owned);
-                logger.LogInformation("Enriched with {Owned} owned games from the Steam Web API.", owned.Count);
+                OwnedGamesResult owned = await steamWebApiClient
+                    .GetOwnedGamesAsync(account.SteamId64, apiKey, cancellationToken);
+                if (owned.IsUsable)
+                {
+                    snapshot = SteamWebEnricher.Enrich(snapshot, scan.CategoriesByApp, owned.Games);
+                    logger.LogInformation(
+                        "Added {Observed} visible game observations from the Steam Web API response received at {ObservedAt}.",
+                        owned.Games.Count,
+                        owned.ObservedAt);
+                }
+                else
+                {
+                    logger.LogWarning(
+                        "{Warning} Response received at {ObservedAt}.",
+                        owned.Warning,
+                        owned.ObservedAt);
+                }
             }
             catch (Exception ex)
             {

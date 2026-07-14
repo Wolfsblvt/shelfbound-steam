@@ -145,8 +145,8 @@
     },
     "libraryScope": {
       "type": "string",
-      "enum": ["installedOnly", "fullLibrary"],
-      "description": "Whether the game list covers only installed games or the full owned library. Absent defaults to installedOnly."
+      "enum": ["installedOnly", "observedSubset", "fullLibrary"],
+      "description": "Coverage of the game observations. installedOnly is local installed presence; observedSubset adds positive non-complete observations whose absences prove nothing; fullLibrary is reserved for a source with an explicit completeness contract. Absent defaults to installedOnly."
     }
   }
 }

@@ -25,7 +25,10 @@ public sealed record LibraryGame
     public int? CompletionPercent => UserData?.CompletionPercent;
     public bool PlayedElsewhere => UserData?.PlayedElsewhere ?? false;
 
-    /// <summary>When Shelfbound first observed the game owned — a proxy for when it was added/bought.</summary>
+    /// <summary>
+    /// Conservative first-observation time. It is a baseline for partial coverage and may date a post-baseline
+    /// addition only under stable complete coverage; it is never a purchase timestamp by itself.
+    /// </summary>
     public DateTimeOffset? FirstSeenAt { get; init; }
 
     // Recency as human phrases (models weight "3 days ago" over a raw date).

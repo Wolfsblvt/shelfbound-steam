@@ -23,16 +23,17 @@ public sealed record UserProfile
     /// <summary>When Shelfbound first scanned this owner's library (the baseline for "recently added").</summary>
     public DateTimeOffset? FirstScanAt { get; set; }
 
-    /// <summary>First time each app id was observed owned — a proxy for when it was added/bought.</summary>
+    /// <summary>
+    /// Conservative first-observation timestamps. A timestamp after <see cref="FirstScanAt"/> is only
+    /// recorded when a stable complete source can support acquisition recency.
+    /// </summary>
     public Dictionary<int, DateTimeOffset> FirstSeen { get; init; } = [];
 
     /// <summary>
-    /// The widest scan coverage observed so far (a high-water mark). When a later scan is broader than
-    /// this (e.g. <see cref="LibraryScope.InstalledOnly"/> → <see cref="LibraryScope.FullLibrary"/>), the
-    /// previously-owned games it reveals are newly <em>visible</em>, not newly <em>added</em>, so they're
-    /// baselined instead of dated. Defaults to <see cref="LibraryScope.InstalledOnly"/> (the conservative
-    /// assumption, matching <see cref="Model.SnapshotStats.Scope"/>) so a legacy profile lacking this
-    /// field never treats a later full scan as a wave of genuine acquisitions.
+    /// The widest scan coverage observed so far (a high-water mark). Comparisons use
+    /// <see cref="LibraryScopeSemantics"/>, never enum ordinals. A broader scan reveals games without
+    /// proving when they were acquired, so those games are baselined instead of dated. Defaults to
+    /// <see cref="LibraryScope.InstalledOnly"/> so legacy profiles remain conservative.
     /// </summary>
     public LibraryScope WidestScanScope { get; set; } = LibraryScope.InstalledOnly;
 

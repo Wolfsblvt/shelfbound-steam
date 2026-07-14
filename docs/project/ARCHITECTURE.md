@@ -19,7 +19,7 @@ talks through one **versioned, language-neutral snapshot**, never through each o
 
 ```
 Steam local files ─┐
-Steam Web API ─────┼─► scanner/exporter ─► complete Shelfbound snapshot ─┬─► local MCP server
+Steam Web API ─────┼─► scanner/exporter ─► portable Shelfbound snapshot ─┬─► local MCP server
 device/env ────────┘                                                     ├─► explicit local export
                                                                          └─► HostedProjection ─► minimized upload
 ```
@@ -120,8 +120,13 @@ This is the **derived/user data** category — deliberately separate from the ra
    hand-rolled snappy + LevelDB reader), falling back to the legacy
    `userdata/<id>/7/remote/sharedconfig.vdf` when unavailable. See [steam-collections.md](./steam-collections.md).
 6. **Collect device specs** (best-effort CPU/RAM/GPU/OS via `Shelfbound.Steam.HardwareInfo`).
-7. **Assemble** a `SnapshotDocument` with device (+ specs), accounts, libraries, games (with their
-   categories), a category summary, and stats (including the library scope: installed-only vs full).
+7. **Optionally enrich** through the visibility-gated Steam Web API. A structured response records
+   freshness and distinguishes usable positive rows from missing/empty/malformed evidence; only usable
+   rows enter the pure deterministic appid merge.
+8. **Assemble** a `SnapshotDocument` with device (+ specs), accounts, libraries, games (with their
+   categories), a category summary, and stats. Scope is `installedOnly` for local presence,
+   `observedSubset` after usable Web API observations, or `fullLibrary` only for a producer with an
+   explicit completeness contract.
 
 Non-fatal problems become `warnings` on the result rather than aborting the scan.
 
@@ -131,9 +136,10 @@ Non-fatal problems become `warnings` on the result rather than aborting the scan
   store for notes/profile). Nothing leaves the machine. Open source, auditable.
 - **Explicit local export / general consumers:** may receive the complete personal snapshot when the
   user chooses to share it.
-- **Official hosted transport:** receives only `HostedProjection` v1. Steam account identity is
+- **Official hosted transport:** receives only `HostedProjection` v2. Steam account identity is
   dropped, automatic hostnames are neutralized, and exact OS builds are coarsened. Preview and HTTP
-  reuse one prepared serialized body.
+  reuse one prepared serialized body. Version 2 renews consent for the changed `stats.scope` purpose;
+  it does not expand the uploaded field set.
 - **Decky:** emits the same complete snapshot contract locally, then mirrors the hosted whitelist in
   Python because the platform cannot consume the C# client assembly.
 
@@ -174,7 +180,7 @@ raw snapshot.
 
 ## Build order
 
-The local-first core is built: scanner, local categories (modern + legacy), owned-not-installed +
+The local-first core is built: scanner, local categories (modern + legacy), positive Web API observations +
 playtime, the query/recommendation engine, the user-data store, the tray app, and the local MCP server.
 Remaining local work and the forward roadmap live in [PROJECT.md](./PROJECT.md); the local-first
 rationale is in [DECISIONS.md](./DECISIONS.md). Hosted/product phases are tracked privately.
