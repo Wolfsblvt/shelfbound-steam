@@ -14,7 +14,7 @@ from dataclasses import dataclass
 
 from .device_identity import DEFAULT_DEVICE_NAME
 
-PROJECTION_VERSION = "1"
+PROJECTION_VERSION = "2"
 
 # Mirrors Shelfbound.Client.HostedProjection.FieldPurposes. Paths cover every surviving leaf.
 FIELD_PURPOSES: tuple[tuple[str, str], ...] = (
@@ -55,7 +55,7 @@ FIELD_PURPOSES: tuple[tuple[str, str], ...] = (
     ("stats.libraryCount", "Provides a consistency and summary aggregate."),
     ("stats.installedGameCount", "Provides a consistency and summary aggregate."),
     ("stats.totalSizeOnDiskBytes", "Provides a device storage summary."),
-    ("stats.scope", "Distinguishes installed-only scans from complete owned-library scans."),
+    ("stats.scope", "States whether observations are installed-only, a non-complete observed subset, or complete under an explicit source contract."),
 )
 
 

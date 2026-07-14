@@ -119,7 +119,7 @@ public static class HostedProjection
     /// Version of the projection/consent contract. Increment when the uploaded field set expands or
     /// a field purpose materially changes. It is local client state, not part of the ingest wire shape.
     /// </summary>
-    public const string ProjectionVersion = "1";
+    public const string ProjectionVersion = "2";
 
     /// <summary>The explicit purpose manifest for every leaf field that can leave the machine.</summary>
     public static IReadOnlyList<HostedFieldPurpose> FieldPurposes { get; } =
@@ -161,7 +161,7 @@ public static class HostedProjection
         new("stats.libraryCount", "Provides a consistency and summary aggregate."),
         new("stats.installedGameCount", "Provides a consistency and summary aggregate."),
         new("stats.totalSizeOnDiskBytes", "Provides a device storage summary."),
-        new("stats.scope", "Distinguishes installed-only scans from complete owned-library scans."),
+        new("stats.scope", "States whether observations are installed-only, a non-complete observed subset, or complete under an explicit source contract."),
     ];
 
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -219,7 +219,7 @@ public static class HostedProjection
                 LibraryCount = stats.LibraryCount,
                 InstalledGameCount = stats.InstalledGameCount,
                 TotalSizeOnDiskBytes = stats.TotalSizeOnDiskBytes,
-                Scope = stats.Scope,
+                Scope = LibraryScopeSemantics.GetOperationalScope(snapshot.SchemaVersion, stats.Scope),
             },
         };
     }

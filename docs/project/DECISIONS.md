@@ -42,26 +42,34 @@ Build the local core (scanner → snapshot → local MCP) before anything networ
 differentiator, has zero auth/infra/cost, can be dogfooded immediately on a real library, and
 pressure-tests the snapshot schema before anything depends on it.
 
-### Privacy-separated local snapshot and hosted projection (updated 2026-07-11)
-The complete local snapshot remains useful to local consumers and includes Steam identity detail. It
+### Privacy-separated local snapshot and hosted projection (updated 2026-07-14)
+The full-fidelity local snapshot remains useful to local consumers and includes Steam identity detail. It
 still omits full filesystem paths (libraries → index + label; games → relative install-dir only), uses
 a random non-hardware `device.id`, and never represents credentials, saves, screenshots, serials, or
 arbitrary files — but it is personal, not an upload-safe anonymous blob.
 
-Official hosted clients must pass it through **projection v1** in `Shelfbound.Client`: a dedicated,
+Official hosted clients must pass it through **projection v2** in `Shelfbound.Client`: a dedicated,
 whitelist-only DTO graph shared by CLI + tray. The projection drops `steamAccounts` entirely, prevents
 an automatic hostname label, coarsens exact OS builds, and retains product-justified device/library/
 game/category/stats fields with a leaf-by-leaf purpose manifest. Preview and transport share one
-prepared compact JSON body; tray background consent is versioned. Decky's Python mirror is pinned to
-the same byte-exact golden fixture. *Rejected:* redacting at the receiver (the data has already crossed
-the trust boundary), serializing the local model with ignored properties (new nested fields could leak),
+prepared compact JSON body; tray background consent is versioned. Projection v2 does not add a field,
+but renews consent because the purpose of `stats.scope` now includes the materially different
+`observedSubset` meaning. Decky's Python mirror is pinned to the same byte-exact golden fixture.
+*Rejected:* bypassing renewed consent because the JSON field name is unchanged; redacting at the receiver
+(the data has already crossed the trust boundary), serializing the local model with ignored properties (new nested fields could leak),
 or maintaining separate CLI/tray payload builders (drift). See [privacy-and-data.md](./privacy-and-data.md).
 
 ### Data scope — installed games + local categories
 The local scan yields *installed* games per library plus the user's **local categories**.
-**Owned-but-not-installed** needs the Steam Web API, so the snapshot carries an explicit **library
-scope** (`installedOnly` vs `fullLibrary`, on `stats.scope`): without a key the scan is installed-only,
-and the CLI/MCP say so loudly so a missing game is never read as "not owned" (schema bumped to `v0.4.0`).
+The visibility-gated Steam Web API can add positive owned-game/playtime observations, including visible
+not-installed games, but has no documented completeness contract. Snapshot schema `v0.6.0` therefore
+distinguishes `installedOnly`, `observedSubset`, and `fullLibrary`: the current Web API path emits
+`observedSubset`, absence under either partial scope proves nothing, and `fullLibrary` is reserved for a
+source that actually guarantees completion. The published `FullLibrary = 1` ordinal remains unchanged;
+`ObservedSubset = 2` is compared through `LibraryScopeSemantics`, never raw enum ordering.
+Consumers also use that helper to treat legacy schema `0.4.x`/`0.5.x` `fullLibrary` reports as
+`observedSubset` operationally while leaving the serialized report untouched.
+
 Categories are read from the **modern Steam collections** (Chromium-leveldb), falling back to the legacy
 `sharedconfig.vdf` `tags` store — the legacy file is **stale for users who manage collections in the
 modern Steam UI** (confirmed: it reported wrong categories that an AI then repeated). See the
@@ -98,10 +106,14 @@ consumers; the **local MCP server** (`Shelfbound.Mcp`, official C# SDK, stdio) e
 it. Keeping query logic out of the MCP layer lets the dashboard/hosted layer reuse it later.
 
 ### Steam Web API as composable enrichment
-Owned-but-not-installed games + playtime come from the Steam Web API behind `ISteamWebApiClient`
-(swappable/mockable). A **pure** `SteamWebEnricher` merges the fetched data into the local snapshot, so
-the network call and the merge logic stay separable and testable. Requires a user-provided key
-(`STEAM_WEB_API_KEY` or the saved local config); secret values are never accepted in argv.
+Positive visible game/playtime observations come from the Steam Web API behind `ISteamWebApiClient`
+(swappable/mockable). Its structured result preserves response time and distinguishes usable non-empty,
+missing, empty, and malformed responses; the latter three warn and leave the scan installed-only rather
+than laundering an empty response into completeness. A **pure** `SteamWebEnricher` merges usable rows,
+consolidating duplicate appids deterministically (maximum playtime/latest last-played, stable name and
+local-row selection) so one appid produces one output row. Requires a user-provided key
+(`STEAM_WEB_API_KEY` or the saved local config); secret values are never accepted in argv or retained in
+surfaced request exceptions.
 
 ### User-data storage + identity/auth seam
 Durable user/derived data (per-game status/rating/completion/aspects, scoped memories, category
@@ -174,15 +186,17 @@ tag. *Rejected:* attaching nupkgs to GitHub Releases for manual `--add-source` i
 `dotnet tool install -g`) and continuing the mixed publish set with silent duplicate skips.
 
 ### Library package identity — immutable version/schema/commit, gated before publish
-The current library release is **package `0.7.0` carrying snapshot schema `0.5.0`**. Published `0.6.0`
-remains its historical schema-`0.4.0` payload forever; an immutable version is never repacked. The .NET SDK's
-built-in Source Link support emits portable symbols and the exact repository commit, while the nuspec release
-notes embed the schema mapping. CI packs and inspects all three libraries, compares schema/package changes to
-the previous `v*` release, and runs SDK package validation against the previous published package.
+Current source targets **package `0.8.0` carrying snapshot schema `0.6.0`**. Published `0.6.0` remains
+its historical schema-`0.4.0` payload and published `0.7.0` remains schema `0.5.0`; an immutable version
+is never repacked. The .NET SDK's built-in Source Link support emits portable symbols and the exact
+repository commit, while the nuspec release notes embed the schema mapping. CI packs and inspects all
+three libraries, compares schema/package changes to the previous `v*` release, and runs SDK package
+validation against the previous published package.
 
 API breaks are fail-closed. Before 1.0, an intentional break requires a minor package bump plus a reviewed,
-target-specific APICompat suppression; package `0.7.0` records the existing three-argument →
-four-argument `RecordFirstSeen` break explicitly. A new suppression on a patch/same version fails policy.
+target-specific APICompat suppression. Package `0.8.0` records the intentional `ISteamWebApiClient`
+raw-list → structured-result change; the now-baseline `0.7.0` recency signature suppression is removed.
+A new suppression on a patch/same version fails policy.
 NuGet publishing preflights that the version is absent and pushes without `--skip-duplicate`, so a race or
 partial prior publish also fails visibly.
 
@@ -336,31 +350,27 @@ copy just needs to follow the **0.5.0** bump.
 
 ---
 
-## Recency correctness — newly-visible ≠ newly-added (2026-07-03)
+## Recency correctness — newly-visible ≠ newly-added (2026-07-03; refined 2026-07-14)
 
 ### First-observation is "added" only under a stable scan scope; a scope expansion baselines, not dates
-Steam exposes no purchase/added date, so Shelfbound infers "recently added" from when it **first observed
-a game owned**, relative to a once-set baseline (`UserProfile.FirstScanAt`). That holds only while the
-scan's *coverage* is stable. When coverage **widens** — an `installedOnly` baseline (no Steam Web API key)
-then a `fullLibrary` scan — previously-owned games become visible for the first time *after* the baseline
-and were falsely flagged "Added N days ago". This skewed the owner's own dev library: a stale narrow
-baseline made a later full scan look full of "new" games.
+Steam exposes no purchase/added date. Shelfbound may use first observation as an acquisition-recency
+proxy only when an actually complete source is stable. `installedOnly` and `observedSubset` observations
+establish useful app identity/presence but cannot prove when a game was acquired, even when that partial
+scope is unchanged between scans. A coverage expansion likewise reveals games that may have been present
+all along.
 
 Decision (**implemented**): the profile records the **widest scan scope observed so far**
-(`UserProfile.WidestScanScope`, a high-water mark; `LibraryScope` is ordered by increasing coverage). A
-scan broader than that mark **baselines** the games it reveals — stamps their first-seen at `FirstScanAt`
-rather than "now" — so a scope expansion never fires recency. Games first seen under a stable-or-narrower
-scope are genuine acquisitions and get the current timestamp; a real purchase after scope has stabilized
-at full still reads "Added N days ago". Steam can't distinguish a purchase made *during* a scope change
-from a pure reveal, so the rule errs conservative: **a missed novelty nudge beats a whole library falsely
-flagged**. The fix is entirely upstream in the first-seen derivation (`UserDataActions.RecordFirstSeen`
-plus the `SnapshotContext` ingest passing `stats.scope`); the consuming cloud signal (`RecentlyAddedSignal`,
-`LibraryGame.AddedAgo != null && unplayed → +3`) is unchanged.
+(`UserProfile.WidestScanScope`, a high-water mark) using the explicit logical order installed-only →
+observed subset → full, not published enum ordinals. A broader or partial scan baselines new appids at
+`FirstScanAt`; only a new app first seen under stable `fullLibrary` is dated at "now". Read views also
+suppress `AddedAgo` whenever current scope is partial, so legacy timestamps cannot become UI/MCP
+acquisition claims. A real purchase under a stable complete-source fixture still reads "Added N days
+ago". The rule deliberately favors a missed novelty nudge over a false purchase claim.
 
 *Considered and rejected:* **freezing the first baseline's scope** instead of a high-water mark — every
 later full scan would then read as "broader than baseline" and wrongly baseline genuine purchases forever,
-breaking the real-acquisition case. **Gating recency at read time** on scope-stability — masks the symptom
-in one view without fixing stored data and suppresses legitimate post-baseline acquisitions. The additive
+breaking the real-acquisition case. **Gating only at read time** — masks newly written bad timestamps;
+the implemented read guard is defense-in-depth after conservative write-time derivation. The additive
 `WidestScanScope` defaults to `installedOnly` (matching `SnapshotStats.Scope`), so a legacy profile
 lacking it never treats a later full scan as a wave of real purchases. For an already-skewed profile,
 `shelfbound profile --reset-recency` re-establishes the baseline from the current library (recency state

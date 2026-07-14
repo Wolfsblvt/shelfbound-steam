@@ -8,7 +8,7 @@ public static class SnapshotSchema
     /// mapping in Directory.Build.props synchronized; see docs/project/snapshot-schema.md and
     /// schema/snapshot.v0.schema.json.
     /// </summary>
-    public const string Version = "0.5.0";
+    public const string Version = "0.6.0";
 
     /// <summary>Canonical tool name recorded in <c>source.tool</c> for the bundled CLI scanner.</summary>
     public const string CliToolName = "shelfbound-cli";

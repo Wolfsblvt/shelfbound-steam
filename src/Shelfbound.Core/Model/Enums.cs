@@ -45,18 +45,26 @@ public enum StorageKind
 }
 
 /// <summary>
-/// How complete a snapshot's game list is. A local scan only sees the games installed on this device;
-/// the full owned library (including owned-but-not-installed games) requires Steam Web API enrichment.
-/// Consumers MUST treat <see cref="InstalledOnly"/> as "absence is not proof of non-ownership": a game
-/// missing from such a snapshot may simply be owned-but-not-installed, not un-owned.
-/// The values are ordered by increasing coverage, and recency baselining relies on that ordering to
-/// detect a scope expansion (see <c>UserDataActions.RecordFirstSeen</c>) — keep it monotonic.
+/// How much of a game library a snapshot observes. Scope describes coverage, not ownership or access.
+/// Consumers MUST treat <see cref="InstalledOnly"/> and <see cref="ObservedSubset"/> as partial:
+/// absence from either scope proves nothing about ownership, access, or acquisition.
+/// Enum ordinals are published compatibility values, not a coverage ordering. Use
+/// <see cref="LibraryScopeSemantics"/> for comparisons.
 /// </summary>
 public enum LibraryScope
 {
-    /// <summary>Only games installed on this device are included (no Steam Web API enrichment ran).</summary>
+    /// <summary>Only games observed installed on this device are included.</summary>
     InstalledOnly = 0,
 
-    /// <summary>The full owned library, including owned-but-not-installed games, is included.</summary>
-    FullLibrary,
+    /// <summary>
+    /// A source with an explicit completeness contract supplied the complete game list. This published
+    /// value remains 1 for compatibility; current Steam Web API enrichment does not qualify.
+    /// </summary>
+    FullLibrary = 1,
+
+    /// <summary>
+    /// Positive observations beyond locally installed games are included, but the source does not
+    /// guarantee completeness. Missing games prove nothing.
+    /// </summary>
+    ObservedSubset = 2,
 }

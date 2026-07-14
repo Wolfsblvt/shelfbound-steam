@@ -11,9 +11,8 @@ public sealed record LibrarySummary
     public required long TotalSizeOnDiskBytes { get; init; }
 
     /// <summary>
-    /// Whether <see cref="TotalGames"/> is the full owned library or only what's installed. When
-    /// <see cref="LibraryScope.InstalledOnly"/>, owned-but-not-installed games are absent, so a missing
-    /// game does not mean the user doesn't own it.
+    /// Coverage behind <see cref="TotalGames"/>. Absence proves nothing under
+    /// <see cref="LibraryScope.InstalledOnly"/> or <see cref="LibraryScope.ObservedSubset"/>.
     /// </summary>
     public LibraryScope Scope { get; init; } = LibraryScope.InstalledOnly;
 

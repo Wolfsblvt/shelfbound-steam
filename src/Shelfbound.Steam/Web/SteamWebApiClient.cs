@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace Shelfbound.Steam.Web;
@@ -7,30 +8,103 @@ namespace Shelfbound.Steam.Web;
 /// Steam Web API client for IPlayerService/GetOwnedGames. Requires a user-provided API key and a
 /// public-enough profile. Never logs or stores the key.
 /// </summary>
-public sealed class SteamWebApiClient(HttpClient httpClient) : ISteamWebApiClient
+public sealed class SteamWebApiClient : ISteamWebApiClient
 {
     private const string OwnedGamesUrl = "https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/";
+    private readonly HttpClient _httpClient;
+    private readonly TimeProvider _clock;
 
-    public async Task<IReadOnlyList<OwnedGame>> GetOwnedGamesAsync(
+    public SteamWebApiClient(HttpClient httpClient)
+        : this(httpClient, TimeProvider.System)
+    {
+    }
+
+    internal SteamWebApiClient(HttpClient httpClient, TimeProvider clock)
+    {
+        _httpClient = httpClient;
+        _clock = clock;
+    }
+
+    public async Task<OwnedGamesResult> GetOwnedGamesAsync(
         string steamId64, string apiKey, CancellationToken cancellationToken = default)
     {
         string url = $"{OwnedGamesUrl}?key={Uri.EscapeDataString(apiKey)}&steamid={Uri.EscapeDataString(steamId64)}" +
                      "&include_appinfo=1&include_played_free_games=1&format=json";
 
-        Envelope? payload = await httpClient.GetFromJsonAsync<Envelope>(url, cancellationToken);
+        Envelope? payload;
+        DateTimeOffset observedAt;
+        try
+        {
+            using HttpResponseMessage response = await _httpClient.GetAsync(url, cancellationToken);
+            observedAt = _clock.GetUtcNow();
+            response.EnsureSuccessStatusCode();
+            try
+            {
+                payload = await response.Content.ReadFromJsonAsync<Envelope>(cancellationToken);
+            }
+            catch (Exception ex) when (ex is JsonException or NotSupportedException)
+            {
+                return Unavailable(OwnedGamesResultStatus.MalformedResponse, observedAt);
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch
+        {
+            // HttpClient exceptions can carry the request URI, which contains the API key. Do not
+            // retain them as an inner exception or surface their message to CLI/MCP consumers.
+            throw new InvalidOperationException(
+                "Steam Web API request failed. Check network access and Steam game-details visibility, then try again.");
+        }
+
         List<ApiGame>? games = payload?.Response?.Games;
         if (games is null)
-            return [];
+            return Unavailable(OwnedGamesResultStatus.MissingGameList, observedAt);
+        if (games.Count == 0)
+            return Unavailable(OwnedGamesResultStatus.EmptyGameList, observedAt);
 
-        return games
+        OwnedGame[] observations = games
+            .Where(game => game.AppId > 0)
             .Select(g => new OwnedGame
             {
                 AppId = g.AppId,
                 Name = string.IsNullOrWhiteSpace(g.Name) ? $"App {g.AppId}" : g.Name,
-                PlaytimeForeverMinutes = g.PlaytimeForever,
-                LastPlayed = g.RtimeLastPlayed > 0 ? DateTimeOffset.FromUnixTimeSeconds(g.RtimeLastPlayed) : null,
+                PlaytimeForeverMinutes = Math.Max(0, g.PlaytimeForever),
+                LastPlayed = ParseLastPlayed(g.RtimeLastPlayed),
             })
-            .ToList();
+            .ToArray();
+
+        return observations.Length == 0
+            ? Unavailable(OwnedGamesResultStatus.MalformedResponse, observedAt)
+            : new OwnedGamesResult
+            {
+                Status = OwnedGamesResultStatus.Usable,
+                ObservedAt = observedAt,
+                Games = observations,
+            };
+    }
+
+    private static OwnedGamesResult Unavailable(OwnedGamesResultStatus status, DateTimeOffset observedAt) => new()
+    {
+        Status = status,
+        ObservedAt = observedAt,
+    };
+
+    private static DateTimeOffset? ParseLastPlayed(long unixSeconds)
+    {
+        if (unixSeconds <= 0)
+            return null;
+
+        try
+        {
+            return DateTimeOffset.FromUnixTimeSeconds(unixSeconds);
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            return null;
+        }
     }
 
     private sealed record Envelope([property: JsonPropertyName("response")] Payload? Response);

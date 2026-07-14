@@ -17,15 +17,54 @@ public class SnapshotSerializerTests
             Source = new SnapshotSource { Tool = "t", ToolVersion = "0.1.0", Platform = OsPlatform.Windows },
             Device = new SnapshotDevice { Id = "id", Name = "PC", Type = DeviceType.SteamDeck, Os = OsPlatform.Linux },
             Games = [new SnapshotGame { AppId = 1, Name = "G", Installed = true, LibraryIndex = 0 }],
-            Stats = new SnapshotStats { LibraryCount = 1, InstalledGameCount = 1, TotalSizeOnDiskBytes = 10 },
+            Stats = new SnapshotStats
+            {
+                LibraryCount = 1,
+                InstalledGameCount = 1,
+                TotalSizeOnDiskBytes = 10,
+                Scope = LibraryScope.ObservedSubset,
+            },
         };
 
         string json = SnapshotSerializer.Serialize(snapshot);
 
         json.ShouldContain("\"steamDeck\""); // enums serialize as camelCase strings
+        json.ShouldContain("\"observedSubset\"");
 
         // Re-serializing the round-tripped document must reproduce the original JSON exactly.
         SnapshotSerializer.Serialize(SnapshotSerializer.Deserialize(json)).ShouldBe(json);
+    }
+
+    [Fact]
+    public void Preserves_published_library_scope_ordinals_without_using_them_as_coverage_rank()
+    {
+        ((int)LibraryScope.InstalledOnly).ShouldBe(0);
+        ((int)LibraryScope.FullLibrary).ShouldBe(1);
+        ((int)LibraryScope.ObservedSubset).ShouldBe(2);
+
+        LibraryScopeSemantics.IsBroaderThan(
+            LibraryScope.ObservedSubset,
+            LibraryScope.InstalledOnly).ShouldBeTrue();
+        LibraryScopeSemantics.IsBroaderThan(
+            LibraryScope.FullLibrary,
+            LibraryScope.ObservedSubset).ShouldBeTrue();
+    }
+
+    [Theory]
+    [InlineData("0.4.0")]
+    [InlineData("0.5.9")]
+    [InlineData("0.5.0+producer")]
+    public void Legacy_full_library_reports_are_operationally_partial(string schemaVersion)
+    {
+        LibraryScopeSemantics.GetOperationalScope(schemaVersion, LibraryScope.FullLibrary)
+            .ShouldBe(LibraryScope.ObservedSubset);
+    }
+
+    [Fact]
+    public void Current_full_library_reports_keep_their_completeness_contract()
+    {
+        LibraryScopeSemantics.GetOperationalScope("0.6.0", LibraryScope.FullLibrary)
+            .ShouldBe(LibraryScope.FullLibrary);
     }
 
     [Fact]

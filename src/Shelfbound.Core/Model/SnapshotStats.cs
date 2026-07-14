@@ -8,10 +8,10 @@ public sealed record SnapshotStats
     public required long TotalSizeOnDiskBytes { get; init; }
 
     /// <summary>
-    /// Whether the game list covers the full owned library or only installed games. Defaults to
-    /// <see cref="LibraryScope.InstalledOnly"/> (the conservative assumption) so older/un-enriched
-    /// snapshots never falsely imply completeness. Set to <see cref="LibraryScope.FullLibrary"/> once
-    /// Steam Web API enrichment has added owned-but-not-installed games.
+    /// Coverage of the game observations. Defaults to <see cref="LibraryScope.InstalledOnly"/> so
+    /// older or unenriched snapshots never imply facts beyond local installed presence. Steam Web API
+    /// enrichment produces <see cref="LibraryScope.ObservedSubset"/>; only a source with an explicit
+    /// completeness contract may produce <see cref="LibraryScope.FullLibrary"/>.
     /// </summary>
     public LibraryScope Scope { get; init; } = LibraryScope.InstalledOnly;
 }

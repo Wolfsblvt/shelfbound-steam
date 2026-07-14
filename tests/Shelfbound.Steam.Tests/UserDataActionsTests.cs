@@ -69,7 +69,7 @@ public class UserDataActionsTests
     }
 
     [Fact]
-    public void A_narrower_scan_after_a_full_baseline_still_dates_newly_installed_games()
+    public void A_partial_scan_after_a_full_baseline_does_not_claim_an_acquisition()
     {
         var profile = new UserProfile { OwnerId = "x" };
         var baseline = DateTimeOffset.UtcNow.AddDays(-10);
@@ -77,12 +77,64 @@ public class UserDataActionsTests
 
         UserDataActions.RecordFirstSeen(profile, [1, 2], baseline, LibraryScope.FullLibrary);
 
-        // A narrower installed-only scan can't reveal owned-but-not-installed games, but a brand-new
-        // game showing up in it is a genuine acquisition (you installed it) — dated, not baselined.
+        // Installed presence alone does not prove when or how the game was acquired.
         UserDataActions.RecordFirstSeen(profile, [1, 2, 3], installScan, LibraryScope.InstalledOnly);
 
-        profile.FirstSeen[3].ShouldBe(installScan);
+        profile.FirstSeen[3].ShouldBe(baseline);
         profile.WidestScanScope.ShouldBe(LibraryScope.FullLibrary); // high-water mark never regresses
+    }
+
+    [Fact]
+    public void Observed_subset_expands_installed_coverage_but_stable_partial_evidence_never_dates_apps()
+    {
+        var profile = new UserProfile { OwnerId = "x" };
+        var baseline = DateTimeOffset.UtcNow.AddDays(-10);
+        var observedScan = DateTimeOffset.UtcNow.AddDays(-5);
+        var laterObservedScan = DateTimeOffset.UtcNow;
+
+        UserDataActions.RecordFirstSeen(profile, [1], baseline, LibraryScope.InstalledOnly);
+        UserDataActions.RecordFirstSeen(profile, [1, 2], observedScan, LibraryScope.ObservedSubset);
+
+        profile.FirstSeen[2].ShouldBe(baseline);
+        profile.WidestScanScope.ShouldBe(LibraryScope.ObservedSubset);
+
+        UserDataActions.RecordFirstSeen(profile, [1, 2, 3], laterObservedScan, LibraryScope.ObservedSubset);
+
+        profile.FirstSeen[3].ShouldBe(baseline);
+        profile.WidestScanScope.ShouldBe(LibraryScope.ObservedSubset);
+    }
+
+    [Fact]
+    public void Full_library_is_broader_than_observed_subset_despite_its_preserved_lower_ordinal()
+    {
+        var profile = new UserProfile { OwnerId = "x" };
+        var baseline = DateTimeOffset.UtcNow.AddDays(-10);
+        var observedScan = DateTimeOffset.UtcNow.AddDays(-5);
+        var fullScan = DateTimeOffset.UtcNow;
+
+        UserDataActions.RecordFirstSeen(profile, [1], baseline, LibraryScope.InstalledOnly);
+        UserDataActions.RecordFirstSeen(profile, [1, 2], observedScan, LibraryScope.ObservedSubset);
+        UserDataActions.RecordFirstSeen(profile, [1, 2, 3], fullScan, LibraryScope.FullLibrary);
+
+        profile.FirstSeen[3].ShouldBe(baseline);
+        profile.WidestScanScope.ShouldBe(LibraryScope.FullLibrary);
+    }
+
+    [Fact]
+    public void Profile_json_round_trips_observed_subset_and_legacy_full_library_names()
+    {
+        var observed = new UserProfile
+        {
+            OwnerId = "observed",
+            WidestScanScope = LibraryScope.ObservedSubset,
+        };
+
+        string json = UserDataJson.Serialize(observed);
+
+        json.ShouldContain("\"widestScanScope\":\"observedSubset\"");
+        UserDataJson.Deserialize(json).WidestScanScope.ShouldBe(LibraryScope.ObservedSubset);
+        UserDataJson.Deserialize("{\"ownerId\":\"legacy\",\"widestScanScope\":\"fullLibrary\"}")
+            .WidestScanScope.ShouldBe(LibraryScope.FullLibrary);
     }
 
     [Fact]

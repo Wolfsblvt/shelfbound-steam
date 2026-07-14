@@ -24,14 +24,14 @@ function Assert-Throws {
 
 # T-16 rejection 1: an already-published immutable package version is never reusable.
 Assert-Throws {
-    Assert-PackageVersionNotReused -PackageId 'Shelfbound.Core' -PackageVersion '0.7.0' -PublishedVersions @('0.6.0', '0.7.0')
+    Assert-PackageVersionNotReused -PackageId 'Shelfbound.Core' -PackageVersion '0.8.0' -PublishedVersions @('0.7.0', '0.8.0')
 } 'already published'
 
 # T-16 rejection 2: changing the schema contract requires both schema and package version bumps.
 Assert-Throws {
     $arguments = @{
-        BaselinePackageVersion = '0.7.0'
-        CurrentPackageVersion = '0.7.0'
+        BaselinePackageVersion = '0.8.0'
+        CurrentPackageVersion = '0.8.0'
         BaselineSchemaVersion = '0.5.0'
         CurrentSchemaVersion = '0.6.0'
         SchemaContractChanged = $true
@@ -41,26 +41,26 @@ Assert-Throws {
 
 # T-16 rejection 3: a new APICompat suppression is an explicit breaking change and needs the policy bump.
 Assert-Throws {
-    Assert-BreakingChangeReleasePolicy -BaselinePackageVersion '0.7.0' -CurrentPackageVersion '0.7.1' -HasNewApiCompatSuppressions $true
+    Assert-BreakingChangeReleasePolicy -BaselinePackageVersion '0.8.0' -CurrentPackageVersion '0.8.1' -HasNewApiCompatSuppressions $true
 } 'pre-1.0 minor bump'
 
 # T-16 rejection 4: the cloud consumer must pin the producer's immutable package version.
 Assert-Throws {
-    Assert-CloudPackagePin -ProducerPackageVersion '0.7.0' -CloudPackageVersion '0.6.0'
+    Assert-CloudPackagePin -ProducerPackageVersion '0.8.0' -CloudPackageVersion '0.7.0'
 } 'Cloud pins'
 
 # Positive controls keep the rejection fixtures honest.
-Assert-PackageVersionNotReused -PackageId 'Shelfbound.Core' -PackageVersion '0.7.0' -PublishedVersions @('0.6.0')
+Assert-PackageVersionNotReused -PackageId 'Shelfbound.Core' -PackageVersion '0.8.0' -PublishedVersions @('0.7.0')
 $schemaArguments = @{
-    BaselinePackageVersion = '0.6.0'
-    CurrentPackageVersion = '0.7.0'
-    BaselineSchemaVersion = '0.4.0'
-    CurrentSchemaVersion = '0.5.0'
+    BaselinePackageVersion = '0.7.0'
+    CurrentPackageVersion = '0.8.0'
+    BaselineSchemaVersion = '0.5.0'
+    CurrentSchemaVersion = '0.6.0'
     SchemaContractChanged = $true
 }
 Assert-SchemaReleasePolicy @schemaArguments
-Assert-BreakingChangeReleasePolicy -BaselinePackageVersion '0.6.0' -CurrentPackageVersion '0.7.0' -HasNewApiCompatSuppressions $true
-Assert-CloudPackagePin -ProducerPackageVersion '0.7.0' -CloudPackageVersion '0.7.0'
+Assert-BreakingChangeReleasePolicy -BaselinePackageVersion '0.7.0' -CurrentPackageVersion '0.8.0' -HasNewApiCompatSuppressions $true
+Assert-CloudPackagePin -ProducerPackageVersion '0.8.0' -CloudPackageVersion '0.8.0'
 
 $lfContract = "{`n  `"version`": 1`n}`n"
 $crlfContract = $lfContract -replace "`n", "`r`n"

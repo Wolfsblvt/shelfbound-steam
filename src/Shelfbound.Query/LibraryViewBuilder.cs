@@ -13,6 +13,9 @@ public static class LibraryViewBuilder
     public static LibraryView Build(SnapshotDocument snapshot, UserProfile? userData = null)
     {
         DateTimeOffset? firstScanAt = userData?.FirstScanAt;
+        LibraryScope operationalScope = LibraryScopeSemantics.GetOperationalScope(
+            snapshot.SchemaVersion,
+            snapshot.Stats.Scope);
 
         var games = snapshot.Games.Select(game =>
         {
@@ -29,8 +32,10 @@ public static class LibraryViewBuilder
                     firstSeen = seen;
             }
 
-            // "Added" is only meaningful for games first seen after the baseline scan.
-            string? addedAgo = firstSeen is { } s && firstScanAt is { } baseline && s > baseline
+            // Partial coverage cannot support an acquisition claim even if an older profile contains a
+            // post-baseline timestamp. Surface "added" only while the current view is actually complete.
+            string? addedAgo = LibraryScopeSemantics.IsComplete(operationalScope) &&
+                firstSeen is { } s && firstScanAt is { } baseline && s > baseline
                 ? RelativeTime.Describe(s)
                 : null;
 
@@ -50,7 +55,7 @@ public static class LibraryViewBuilder
             Categories = snapshot.Categories,
             Libraries = snapshot.Libraries,
             Device = snapshot.Device,
-            Scope = snapshot.Stats.Scope,
+            Scope = operationalScope,
             CategoryDefinitions = userData?.CategoryDefinitions ?? new Dictionary<string, CategoryDefinition>(),
             GlobalMemories = userData?.Memories.Where(m => m.Scope == MemoryScope.Global).ToList() ?? [],
             FirstScanAt = firstScanAt,

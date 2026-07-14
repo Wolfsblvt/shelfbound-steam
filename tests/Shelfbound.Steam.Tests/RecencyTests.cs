@@ -16,7 +16,13 @@ public class RecencyTests
         Source = new SnapshotSource { Tool = "t", ToolVersion = "0", Platform = OsPlatform.Windows },
         Device = new SnapshotDevice { Id = "d", Name = "d", Type = DeviceType.Desktop, Os = OsPlatform.Windows },
         Games = games,
-        Stats = new SnapshotStats { LibraryCount = 0, InstalledGameCount = 0, TotalSizeOnDiskBytes = 0 },
+        Stats = new SnapshotStats
+        {
+            LibraryCount = 0,
+            InstalledGameCount = 0,
+            TotalSizeOnDiskBytes = 0,
+            Scope = LibraryScope.FullLibrary,
+        },
     };
 
     [Fact]
@@ -78,5 +84,49 @@ public class RecencyTests
     {
         var view = LibraryViewBuilder.Build(Snapshot(new SnapshotGame { AppId = 1, Name = "G", Installed = true }));
         view.Games[0].LastPlayedAgo.ShouldBe("never");
+    }
+
+    [Fact]
+    public void Partial_view_never_surfaces_an_acquisition_claim_from_a_stored_timestamp()
+    {
+        var baseline = DateTimeOffset.UtcNow.AddDays(-30);
+        var profile = new UserProfile { OwnerId = "x", FirstScanAt = baseline };
+        profile.FirstSeen[1] = DateTimeOffset.UtcNow.AddDays(-3);
+        SnapshotDocument partial = Snapshot(new SnapshotGame { AppId = 1, Name = "Observed", Installed = false }) with
+        {
+            Stats = new SnapshotStats
+            {
+                LibraryCount = 0,
+                InstalledGameCount = 0,
+                TotalSizeOnDiskBytes = 0,
+                Scope = LibraryScope.ObservedSubset,
+            },
+        };
+
+        LibraryViewBuilder.Build(partial, profile).Games.Single().AddedAgo.ShouldBeNull();
+
+        SnapshotDocument complete = partial with
+        {
+            Stats = partial.Stats with { Scope = LibraryScope.FullLibrary },
+        };
+        LibraryViewBuilder.Build(complete, profile).Games.Single().AddedAgo.ShouldBe("3 days ago");
+    }
+
+    [Fact]
+    public void Legacy_false_full_library_scope_is_partial_in_the_read_view()
+    {
+        var baseline = DateTimeOffset.UtcNow.AddDays(-30);
+        var profile = new UserProfile { OwnerId = "x", FirstScanAt = baseline };
+        profile.FirstSeen[1] = DateTimeOffset.UtcNow.AddDays(-3);
+        SnapshotDocument legacy = Snapshot(new SnapshotGame { AppId = 1, Name = "Legacy", Installed = false }) with
+        {
+            SchemaVersion = "0.5.0",
+        };
+
+        LibraryView view = LibraryViewBuilder.Build(legacy, profile);
+
+        view.Scope.ShouldBe(LibraryScope.ObservedSubset);
+        view.Games.Single().AddedAgo.ShouldBeNull();
+        legacy.Stats.Scope.ShouldBe(LibraryScope.FullLibrary);
     }
 }

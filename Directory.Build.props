@@ -2,10 +2,10 @@
 
   <!-- Shared package/assembly metadata for the whole solution. -->
   <PropertyGroup>
-    <Version>0.7.0</Version>
-    <!-- Package 0.7.0 carries snapshot schema 0.5.0. Keep this mapping in sync with
+    <Version>0.8.0</Version>
+    <!-- Package 0.8.0 carries snapshot schema 0.6.0. Keep this mapping in sync with
          SnapshotSchema.Version; scripts/test-package-release.ps1 enforces it. -->
-    <SnapshotSchemaVersion>0.5.0</SnapshotSchemaVersion>
+    <SnapshotSchemaVersion>0.6.0</SnapshotSchemaVersion>
     <Authors>Wolfsblvt</Authors>
     <Company>Wolfsblvt</Company>
     <Product>Shelfbound</Product>

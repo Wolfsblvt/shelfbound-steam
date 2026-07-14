@@ -18,13 +18,14 @@ This is a **thin controller** over the same open core everything else uses — a
 not a second scanner architecture:
 
 - **One local producer contract, one hosted privacy boundary.** The backend emits the standard versioned snapshot
-  ([`schema/snapshot.v0.schema.json`](../schema/snapshot.v0.schema.json), currently **0.5.0**) with
+  ([`schema/snapshot.v0.schema.json`](../schema/snapshot.v0.schema.json), currently **0.6.0**) with
   `source.tool: "shelfbound-decky"`. Same shape the CLI/tray produce; no forked data model, no
   special ingest path. The scanner code deliberately mirrors the C# reference
   (`src/Shelfbound.Steam`) file-for-file: same VDF semantics (case-insensitive keys, last-wins),
   same fallbacks, same warning texts. Before network transport, `hosted_projection.py` reconstructs
   the same minimized whitelist as the C# client; the Python and C# serializers share one byte-exact
-  golden fixture.
+  golden fixture. Decky has no Web API enrichment, so it truthfully remains `installedOnly`; the
+  contract's new `observedSubset` value is available to producers with positive non-complete sources.
 - **Per-storage is a contract field; paths are not.** As of contract **v0.5.0** each library carries
   an optional `storage` object — medium kind (internal/sdCard/external/network/unknown) + free/total
   bytes — classified from the mount table and emitted like every other producer's storage data. The

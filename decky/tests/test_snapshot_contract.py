@@ -68,7 +68,7 @@ def test_round_trips_through_json(scan):
 def test_header_and_source(scan):
     output, _ = scan
     snapshot = output.snapshot
-    assert snapshot["schemaVersion"] == SCHEMA_VERSION == "0.5.0"
+    assert snapshot["schemaVersion"] == SCHEMA_VERSION == "0.6.0"
     assert snapshot["source"] == {"tool": "shelfbound-decky", "toolVersion": "0.1.0", "platform": "linux"}
     # createdAt parses as an aware UTC timestamp.
     created_at = datetime.fromisoformat(snapshot["createdAt"])

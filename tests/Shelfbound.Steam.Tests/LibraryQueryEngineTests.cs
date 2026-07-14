@@ -94,6 +94,19 @@ public class LibraryQueryEngineTests
         // "not found" as "not owned".
         LibraryQueryEngine.Summarize(View(Game(1, "A", true))).Scope.ShouldBe(LibraryScope.InstalledOnly);
 
+        SnapshotDocument observed = Snapshot(Game(1, "A", true)) with
+        {
+            Stats = new SnapshotStats
+            {
+                LibraryCount = 0,
+                InstalledGameCount = 1,
+                TotalSizeOnDiskBytes = 0,
+                Scope = LibraryScope.ObservedSubset,
+            },
+        };
+        LibraryQueryEngine.Summarize(LibraryViewBuilder.Build(observed)).Scope
+            .ShouldBe(LibraryScope.ObservedSubset);
+
         SnapshotDocument full = Snapshot(Game(1, "A", true)) with
         {
             Stats = new SnapshotStats { LibraryCount = 0, InstalledGameCount = 1, TotalSizeOnDiskBytes = 0, Scope = LibraryScope.FullLibrary },

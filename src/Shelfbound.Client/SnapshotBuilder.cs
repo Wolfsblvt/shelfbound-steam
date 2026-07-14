@@ -46,7 +46,7 @@ public static class SnapshotBuilder
 
         var warnings = new List<string>();
 
-        // Optional Steam Web API enrichment: owned-but-not-installed games + playtime.
+        // Optional Steam Web API enrichment: positive visible game/playtime observations.
         string? apiKey = options.SteamApiKey
             ?? Environment.GetEnvironmentVariable("STEAM_WEB_API_KEY")
             ?? ShelfboundConfig.Load().SteamApiKey;
@@ -63,8 +63,22 @@ public static class SnapshotBuilder
                 try
                 {
                     using var http = new HttpClient();
-                    var owned = await new SteamWebApiClient(http).GetOwnedGamesAsync(account.SteamId64, apiKey);
-                    result = result with { Snapshot = SteamWebEnricher.Enrich(result.Snapshot, result.CategoriesByApp, owned) };
+                    OwnedGamesResult owned = await new SteamWebApiClient(http)
+                        .GetOwnedGamesAsync(account.SteamId64, apiKey, ct);
+                    if (owned.IsUsable)
+                    {
+                        result = result with
+                        {
+                            Snapshot = SteamWebEnricher.Enrich(
+                                result.Snapshot,
+                                result.CategoriesByApp,
+                                owned.Games),
+                        };
+                    }
+                    else
+                    {
+                        warnings.Add(owned.Warning!);
+                    }
                 }
                 catch (Exception ex)
                 {

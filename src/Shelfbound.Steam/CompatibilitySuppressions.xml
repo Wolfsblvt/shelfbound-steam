@@ -1,0 +1,30 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!--
+  APICompat baseline: published Shelfbound.Steam 0.7.0.
+  Package 0.8.0 intentionally replaces the ambiguous raw-list Web API result with a structured
+  availability/freshness result. New suppressions still require the pre-1.0 minor-version policy gate.
+  Diagnostic reference: https://learn.microsoft.com/dotnet/fundamentals/package-validation/diagnostic-ids
+-->
+<Suppressions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:Shelfbound.Steam.Web.ISteamWebApiClient.GetOwnedGamesAsync(System.String,System.String,System.Threading.CancellationToken)</Target>
+    <Left>lib/net10.0/Shelfbound.Steam.dll</Left>
+    <Right>lib/net10.0/Shelfbound.Steam.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:Shelfbound.Steam.Web.SteamWebApiClient.GetOwnedGamesAsync(System.String,System.String,System.Threading.CancellationToken)</Target>
+    <Left>lib/net10.0/Shelfbound.Steam.dll</Left>
+    <Right>lib/net10.0/Shelfbound.Steam.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0006</DiagnosticId>
+    <Target>M:Shelfbound.Steam.Web.ISteamWebApiClient.GetOwnedGamesAsync(System.String,System.String,System.Threading.CancellationToken)</Target>
+    <Left>lib/net10.0/Shelfbound.Steam.dll</Left>
+    <Right>lib/net10.0/Shelfbound.Steam.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+</Suppressions>

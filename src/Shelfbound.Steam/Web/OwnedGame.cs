@@ -1,6 +1,6 @@
 namespace Shelfbound.Steam.Web;
 
-/// <summary>A game the user owns, as reported by the Steam Web API (IPlayerService/GetOwnedGames).</summary>
+/// <summary>A positive visibility-gated owned-game observation from IPlayerService/GetOwnedGames.</summary>
 public sealed record OwnedGame
 {
     public required int AppId { get; init; }

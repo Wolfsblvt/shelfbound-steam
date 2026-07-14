@@ -1,4 +1,4 @@
-"""Builds a Shelfbound snapshot (contract v0.5.0) from a local Steam installation.
+"""Builds a Shelfbound snapshot (contract v0.6.0) from a local Steam installation.
 
 Mirrors the C# SteamScanner (src/Shelfbound.Steam/Steam/SteamScanner.cs): same file
 walk, same fallbacks, same warning texts, same output shape. The snapshot dict is

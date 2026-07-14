@@ -6,7 +6,10 @@ namespace Shelfbound.Steam.Web;
 /// </summary>
 public interface ISteamWebApiClient
 {
-    /// <summary>Fetches the owned games (with total playtime) for a public/visible Steam profile.</summary>
-    Task<IReadOnlyList<OwnedGame>> GetOwnedGamesAsync(
+    /// <summary>
+    /// Fetches positive owned-game/playtime observations for a visible Steam profile. The result
+    /// distinguishes a usable non-empty response from missing, empty, or malformed evidence.
+    /// </summary>
+    Task<OwnedGamesResult> GetOwnedGamesAsync(
         string steamId64, string apiKey, CancellationToken cancellationToken = default);
 }

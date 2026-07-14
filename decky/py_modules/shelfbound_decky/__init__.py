@@ -16,4 +16,4 @@ TOOL_VERSION = "0.1.0"
 
 # Single source of truth in code is SnapshotSchema.Version (C#); keep this constant in
 # lockstep when the contract bumps.
-SCHEMA_VERSION = "0.5.0"
+SCHEMA_VERSION = "0.6.0"

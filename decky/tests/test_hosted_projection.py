@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 
 from shelfbound_decky.device_identity import DEFAULT_DEVICE_NAME
-from shelfbound_decky.hosted_projection import FIELD_PURPOSES, prepare_hosted_upload
+from shelfbound_decky.hosted_projection import FIELD_PURPOSES, PROJECTION_VERSION, prepare_hosted_upload
 
 GOLDEN_PATH = (
     Path(__file__).resolve().parents[2] / "tests" / "Fixtures" / "hosted-snapshot.golden.json"
@@ -48,6 +48,12 @@ def test_legacy_machine_hostname_is_neutralized(monkeypatch):
     assert "synthetic-private-host" not in upload.body
 
 
+def test_coverage_semantics_use_projection_consent_version_two():
+    assert PROJECTION_VERSION == "2"
+    purpose = next(purpose for path, purpose in FIELD_PURPOSES if path == "stats.scope")
+    assert "non-complete observed subset" in purpose
+
+
 def test_purpose_manifest_covers_every_surviving_golden_leaf():
     upload = prepare_hosted_upload(full_local_snapshot())
     leaves: set[str] = set()
@@ -85,7 +91,7 @@ def collect_leaf_paths(value, path: str, leaves: set[str]) -> None:
 
 def full_local_snapshot() -> dict:
     return {
-        "schemaVersion": "0.5.0",
+        "schemaVersion": "0.6.0",
         "snapshotId": "11111111-1111-1111-1111-111111111111",
         "createdAt": "2026-07-11T12:34:56+00:00",
         "source": {
@@ -155,6 +161,6 @@ def full_local_snapshot() -> dict:
             "libraryCount": 1,
             "installedGameCount": 1,
             "totalSizeOnDiskBytes": 12_345,
-            "scope": "fullLibrary",
+            "scope": "observedSubset",
         },
     }

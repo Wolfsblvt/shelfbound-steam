@@ -350,9 +350,8 @@ static void PrintSummary(SnapshotDocument s, SnapshotDevice device, string path)
     Console.WriteLine($"  libraries   : {s.Stats.LibraryCount}");
     foreach (var lib in s.Libraries)
         Console.WriteLine($"      - [{lib.Index}] {lib.Label}: {lib.GameCount} game(s)");
-    bool fullLibrary = s.Stats.Scope == LibraryScope.FullLibrary;
     Console.WriteLine($"  games       : {s.Games.Count} ({s.Stats.InstalledGameCount} fully installed)");
-    Console.WriteLine($"  scope       : {(fullLibrary ? "full owned library" : "installed games only")}");
+    Console.WriteLine($"  scope       : {DescribeScope(s.Stats.Scope)}");
     Console.WriteLine($"  on disk     : {FormatBytes(s.Stats.TotalSizeOnDiskBytes)}");
     Console.WriteLine($"  categories  : {s.Categories.Count}");
     foreach (var cat in s.Categories)
@@ -366,17 +365,35 @@ static void PrintSummary(SnapshotDocument s, SnapshotDevice device, string path)
     Console.WriteLine("See docs/project/privacy-and-data.md.");
 }
 
-// When a snapshot is installed-only, say so loudly: it's the difference between "I don't own Portal"
-// and "Portal just isn't installed". The fix is a Steam Web API key.
 static void PrintScopeNotice(SnapshotDocument s)
 {
-    if (s.Stats.Scope == LibraryScope.FullLibrary)
-        return;
-    Console.WriteLine("Note: this snapshot includes only installed games. Owned-but-not-installed games");
-    Console.WriteLine("are missing. Add them with a free Steam Web API key:");
-    Console.WriteLine("  shelfbound setup --steam-api-key-stdin   (then re-run)   https://steamcommunity.com/dev/apikey");
-    Console.WriteLine();
+    switch (s.Stats.Scope)
+    {
+        case LibraryScope.FullLibrary:
+            return;
+        case LibraryScope.ObservedSubset:
+            Console.WriteLine("Note: Steam supplied useful visible games and playtime, but does not guarantee a complete list.");
+            Console.WriteLine("A missing game does not mean you do not own or have access to it.");
+            Console.WriteLine();
+            return;
+        case LibraryScope.InstalledOnly:
+            Console.WriteLine("Note: this snapshot includes only games observed installed on this device.");
+            Console.WriteLine("A Steam Web API key may add visible games and playtime, but still cannot prove completeness:");
+            Console.WriteLine("  shelfbound setup --steam-api-key-stdin   (then re-run)   https://steamcommunity.com/dev/apikey");
+            Console.WriteLine();
+            return;
+        default:
+            throw new ArgumentOutOfRangeException(nameof(s), s.Stats.Scope, "Unknown library scope.");
+    }
 }
+
+static string DescribeScope(LibraryScope scope) => scope switch
+{
+    LibraryScope.InstalledOnly => "installed games observed on this device",
+    LibraryScope.ObservedSubset => "observed subset (absence proves nothing)",
+    LibraryScope.FullLibrary => "complete library (source contract)",
+    _ => throw new ArgumentOutOfRangeException(nameof(scope), scope, "Unknown library scope."),
+};
 
 static int RunSetup(string[] args)
 {

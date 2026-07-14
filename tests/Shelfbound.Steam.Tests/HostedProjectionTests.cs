@@ -10,6 +10,14 @@ namespace Shelfbound.Steam.Tests;
 public class HostedProjectionTests
 {
     [Fact]
+    public void Coverage_semantics_require_projection_consent_version_two()
+    {
+        HostedProjection.ProjectionVersion.ShouldBe("2");
+        HostedProjection.FieldPurposes.Single(field => field.Path == "stats.scope").Purpose
+            .ShouldContain("non-complete observed subset");
+    }
+
+    [Fact]
     public void Projects_the_exact_golden_shape_and_drops_local_account_identity()
     {
         SnapshotDocument local = FullLocalSnapshot("Living room PC");
@@ -43,6 +51,22 @@ public class HostedProjectionTests
 
         upload.Snapshot.Device.Name.ShouldBe(DeviceIdentity.DefaultDeviceName);
         upload.Json.ShouldNotContain(syntheticHostname, Case.Insensitive);
+    }
+
+    [Fact]
+    public void Projects_a_legacy_false_full_library_report_as_an_observed_subset()
+    {
+        SnapshotDocument local = FullLocalSnapshot("Legacy device");
+        SnapshotDocument legacy = local with
+        {
+            SchemaVersion = "0.5.0",
+            Stats = local.Stats with { Scope = LibraryScope.FullLibrary },
+        };
+
+        HostedUpload upload = HostedProjection.Prepare(legacy);
+
+        upload.Snapshot.Stats.Scope.ShouldBe(LibraryScope.ObservedSubset);
+        legacy.Stats.Scope.ShouldBe(LibraryScope.FullLibrary);
     }
 
     [Fact]
@@ -137,7 +161,7 @@ public class HostedProjectionTests
             LibraryCount = 1,
             InstalledGameCount = 1,
             TotalSizeOnDiskBytes = 12_345,
-            Scope = LibraryScope.FullLibrary,
+            Scope = LibraryScope.ObservedSubset,
         },
     };
 

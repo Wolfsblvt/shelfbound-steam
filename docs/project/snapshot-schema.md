@@ -20,7 +20,7 @@ from it; the complete local document is not uploaded. See [ARCHITECTURE.md](./AR
 
 ## Versioning
 
-`schemaVersion` (semver) is present in every document. Current: **`0.5.0`**.
+`schemaVersion` (semver) is present in every document. Current: **`0.6.0`**.
 
 - **Patch/minor:** additive, backward-compatible (new optional fields). Consumers ignore unknowns.
 - **Major:** breaking changes; consumers must branch on the major version.
@@ -34,14 +34,15 @@ the immutable library releases is:
 | Library package version | Snapshot schema produced | Notes |
 |---|---|---|
 | `0.6.0` | `0.4.0` | Historical published payload; immutable, no `libraries[].storage` |
-| `0.7.0` | `0.5.0` | Adds optional `libraries[].storage`; current source |
+| `0.7.0` | `0.5.0` | Historical published payload; adds optional `libraries[].storage` |
+| `0.8.0` | `0.6.0` | Adds honest `observedSubset` coverage; current source |
 
 `Directory.Build.props` records the current mapping as `Version` + `SnapshotSchemaVersion`. CI compares
 both to the previous `v*` release, package-validates the public API, and inspects the packed nuspec's
 version/schema/repository commit. A schema change without both its schema bump and a new package version
 fails; a published package version is never overwritten.
 
-## Document shape (v0.5.0)
+## Document shape (v0.6.0)
 
 | Field | Type | Notes |
 |---|---|---|
@@ -57,7 +58,7 @@ fails; a published package version is never overwritten.
 | `games[]` | array | see below |
 | `categories[]` | array | `name`, `gameCount` — the user's local collections vocabulary |
 | `stats` | object | `libraryCount`, `installedGameCount`, `totalSizeOnDiskBytes`, `scope` |
-| `stats.scope` | enum | `installedOnly` (default) or `fullLibrary` — whether the game list is the full owned library or only installed games. Absence ≠ non-ownership when `installedOnly`. |
+| `stats.scope` | enum | `installedOnly` (default) = local installed presence; `observedSubset` = positive non-complete observations were added; `fullLibrary` = an explicit source completeness contract. Absence proves nothing for either partial scope. |
 
 `games[]` entry: `appId`, `name`, `installed`, `libraryIndex?` (null when owned but not installed),
 `installDir?` (relative folder name only), `sizeOnDiskBytes?`, `playtimeMinutes?` (from the Steam Web
@@ -65,8 +66,16 @@ API), `lastUpdated?`, `lastPlayed?`, `categories[]` (the user's category names f
 Steam's tag order; empty if uncategorized).
 
 Enums: `osPlatform` = `unknown|windows|linux|macOs`; `deviceType` =
-`unknown|desktop|laptop|steamDeck|server`; `libraryScope` = `installedOnly|fullLibrary`;
+`unknown|desktop|laptop|steamDeck|server`; `libraryScope` =
+`installedOnly|observedSubset|fullLibrary`;
 `storageKind` = `internal|sdCard|external|network|unknown`.
+
+The C# package preserves the already-published `FullLibrary = 1` ordinal and adds
+`ObservedSubset = 2`. Those integers are compatibility identities, not logical ordering;
+`LibraryScopeSemantics` defines installed-only → observed subset → complete wherever coverage is
+compared. Its operational-scope helper also downgrades legacy schema `0.4.x`/`0.5.x` `fullLibrary`
+reports to `observedSubset` without changing the raw serialized document: those published producers
+used the same visibility-gated Web API path and did not have a completeness contract.
 
 ## Privacy rules baked into the local contract
 
@@ -80,12 +89,13 @@ These are contract-level guarantees, not just scanner behavior (see
 - Steam ids/login/persona names are included for local completeness, so the local file is personal.
   They are not part of the hosted projection.
 
-## Hosted upload projection v1
+## Hosted upload projection v2
 
-The hosted body is a producer-side subset; it does **not** change snapshot schema v0.5.0 or the
+The hosted body is a producer-side subset; it does **not** add fields beyond snapshot schema v0.6.0 or the
 `/ingest` shape. C# uses `Shelfbound.Client.HostedProjection` (shared by CLI + tray), while Decky's
 Python mirror is checked against the same byte-exact golden fixture. Both are whitelist-only and have
-an explicit field-purpose manifest.
+an explicit field-purpose manifest. Projection v2 renews tray consent because the purpose of
+`stats.scope` now includes non-complete positive observations; the uploaded field set itself is unchanged.
 
 | Local field/group | Hosted decision |
 |---|---|
@@ -104,17 +114,15 @@ preview/consent details in [privacy-and-data.md](./privacy-and-data.md).
 ## Scope and what's intentionally missing
 
 The scanner emits **installed Steam games per library**, plus accounts, device info, and the user's
-**local categories** (`userdata/<id>/7/remote/sharedconfig.vdf`). With a Steam Web API key it also adds
-**owned-but-not-installed games and playtime**. Still to come (each a focused follow-up, tracked in
-[PROJECT.md](./PROJECT.md)):
+**local categories**. With a Steam Web API key, a usable non-empty `GetOwnedGames` response also adds
+visible owned-but-not-installed observations and playtime, producing `observedSubset`. Missing, empty,
+or malformed results warn and leave the snapshot `installedOnly`; no current Web API path emits
+`fullLibrary`. Still to come (each a focused follow-up, tracked in [PROJECT.md](./PROJECT.md)):
 
 - **Dynamic collections** — the scanner reads the **modern Steam collections** (Chromium Local Storage
   leveldb), falling back to the legacy `sharedconfig.vdf` `tags` store. Static collections (explicit
   membership) are covered; **dynamic, rule-based (`filterSpec`) collections** are not read yet — see
   [steam-collections.md](./steam-collections.md).
-- **Owned-not-installed games + playtime** — populated only when a Steam Web API key is provided
-  (`STEAM_WEB_API_KEY` or the saved local config). Without a key, only installed games are listed and
-  `stats.scope` stays `installedOnly`; with a key it becomes `fullLibrary`.
 - **Non-Steam shortcuts** and deeper per-device install nuance beyond the per-library `storage` kind +
   free/total already in the contract (added additively in v0.5.0; classified per OS by the desktop
   scanner and per mount-table by the decky plugin).
@@ -125,10 +133,10 @@ When these land they extend the contract additively and bump the schema version.
 
 ```json
 {
-  "schemaVersion": "0.5.0",
+  "schemaVersion": "0.6.0",
   "snapshotId": "1b9d…",
   "createdAt": "2026-06-28T10:00:00+00:00",
-  "source": { "tool": "shelfbound-cli", "toolVersion": "0.7.0", "platform": "windows" },
+  "source": { "tool": "shelfbound-cli", "toolVersion": "0.8.0", "platform": "windows" },
   "device": { "id": "b54997ab-…", "name": "Shelfbound device", "type": "unknown", "os": "windows" },
   "steamAccounts": [ { "steamId64": "765611…", "personaName": "…", "mostRecent": true } ],
   "libraries": [
@@ -142,6 +150,6 @@ When these land they extend the contract additively and bump the schema version.
   ],
   "categories": [ { "name": "Directly Choice", "gameCount": 21 }, { "name": "Deck", "gameCount": 18 } ],
   "stats": { "libraryCount": 2, "installedGameCount": 111, "totalSizeOnDiskBytes": 1175000000000,
-    "scope": "fullLibrary" }
+    "scope": "observedSubset" }
 }
 ```

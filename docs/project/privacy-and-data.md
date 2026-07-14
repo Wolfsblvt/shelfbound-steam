@@ -25,6 +25,9 @@ separate hosted service has its own privacy policy, retention rules, and account
   storage (`htmlcache/Local Storage/leveldb`), falling back to the legacy
   `userdata/<id>/7/remote/sharedconfig.vdf`. Only collection names + game membership are read; see
   [steam-collections.md](./steam-collections.md).
+- With an optional user-provided Steam Web API key, positive visibility-gated game/playtime
+  observations. The response is never treated as complete; missing, empty, and malformed results warn
+  and add no remote rows. The key is sent only to Steam and is never written into a snapshot or warning.
 - A device label, OS, and a locally persisted random device id. Upload-capable scanner paths use a
   user choice or the neutral default `Shelfbound device`; a local-only producer may retain more local
   detail, which is why the hosted projection also neutralizes the current machine hostname.
@@ -62,7 +65,7 @@ mount points, storage-device names, hardware serials, or MACs. That makes the lo
 **not anonymous and not the hosted upload body**. It contains Steam identity fields and should be
 treated as personal data. See [snapshot-schema.md](./snapshot-schema.md).
 
-## Hosted upload projection v1
+## Hosted upload projection v2
 
 `Shelfbound.Client.HostedProjection` is the C# source of truth used by the CLI and tray. Decky's
 `hosted_projection.py` mirrors the same whitelist and is pinned to the same cross-language golden
@@ -74,7 +77,9 @@ The hosted body includes:
 - random `device.id`, the **user-chosen or neutral** `device.name`, type and OS family;
 - CPU/GPU/core/RAM/architecture specs and a **coarsened** OS description (`Windows 10/11`, `Linux`,
   or `macOS`, never an exact build/kernel string);
-- libraries (index, label, count, optional storage kind/free/total), games, categories, and stats.
+- libraries (index, label, count, optional storage kind/free/total), games, categories, and stats,
+  including whether coverage is installed-only, an observed non-complete subset, or complete under an
+  explicit source contract.
 
 It drops the complete `steamAccounts` array: `steamId64`, `accountName`, `personaName`, and
 `mostRecent` do not leave the machine. Account ownership comes from the authenticated upload token,
@@ -96,8 +101,9 @@ uploading.
   needs neither a server URL nor token.
 - The tray builds one prepared body, displays its exact JSON, and uploads that same object only after
   confirmation. New installs default background sync off. Background sync cannot start until a user
-  has previewed and successfully sent the current projection version; a future field-set expansion
-  invalidates that consent.
+  has previewed and successfully sent the current projection version; a future field-set expansion or
+  material field-purpose change invalidates that consent. Projection v2 renews consent for the changed
+  `stats.scope` purpose without adding a new uploaded field.
 - Decky returns one prepared body plus a one-use upload id. Confirming sends those exact bytes; a
   stale/reused id is rejected and requires a fresh preview.
 

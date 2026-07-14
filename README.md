@@ -29,8 +29,9 @@ Early but already useful, all local:
 - **`shelfbound scan`** writes a versioned **snapshot** of your library — installed games across all
   libraries (names, install state, size, timestamps), your Steam accounts, the device, and your
   **local categories** (read from your **modern Steam collections**, falling back to the legacy store).
-  With a Steam Web API key it also adds **owned-but-not-installed games and playtime**. No install
-  paths, credentials, or saves.
+  With a Steam Web API key it also adds **visible owned-but-not-installed observations and playtime**.
+  Steam does not guarantee that visibility-gated result is complete; Shelfbound keeps useful positive
+  rows and never treats absence as non-ownership. No install paths, credentials, or saves.
 - **`shelfbound-mcp`** — a local **MCP server** that exposes the library to AI tools (ChatGPT/Claude):
   search by category / install state / playtime, library summary, game details, "what haven't I played?".
 - **Per-game context** — the MCP server can also *remember* what you tell it: statuses
@@ -63,17 +64,19 @@ dotnet run --project src/Shelfbound.Cli -- scan --pretty
 dotnet run --project src/Shelfbound.Cli -- profile      # what Shelfbound remembers about your library
 ```
 
-**Steam Web API key (optional — for owned-but-not-installed games + playtime):** get one at
+**Steam Web API key (optional — for additional visible games + playtime):** get one at
 <https://steamcommunity.com/dev/apikey> (sign in, register any domain — `localhost` is fine), then
 run `shelfbound setup --steam-api-key-stdin` and provide the key as one line on standard input, or set
 `STEAM_WEB_API_KEY` and run `shelfbound setup --steam-api-key-env`. Also set your Steam profile
-**Game details → Public**, or the API returns nothing. Both the CLI and the MCP server then use the
-saved key. Secrets are deliberately not accepted as command-line arguments.
+**Game details → Public**, or the API may return no usable game list. Even with that visibility, the
+result is an observed subset rather than proof of a complete library. Both the CLI and MCP server use
+the saved key, warn on missing/empty/malformed responses, and never include the key in warnings. Secrets
+are deliberately not accepted as command-line arguments.
 
 This writes `shelfbound-snapshot.json` (git-ignored — it lists your games, so treat it as personal).
 Useful options: `--output <file>`, `--stdout`, `--steam-path <dir>`, `--device-name <name>`,
-and `--device-type …`. Set `STEAM_WEB_API_KEY` or use the saved configuration to add
-owned-but-not-installed games + playtime via the Steam Web API. Run `shelfbound --help`.
+and `--device-type …`. Set `STEAM_WEB_API_KEY` or use the saved configuration to add visible game and
+playtime observations via the Steam Web API. Run `shelfbound --help`.
 
 ### Upload to a Shelfbound server (optional)
 
@@ -106,7 +109,7 @@ preview behavior.
 `shelfbound-mcp` scans your library on startup and serves it to MCP-compatible AI clients over stdio.
 Point your client (e.g. Claude Desktop) at the built `shelfbound-mcp` executable. It reads config from
 the environment: `SHELFBOUND_STEAM_PATH` (else auto-detected), `STEAM_WEB_API_KEY` (optional, for
-owned games + playtime), `SHELFBOUND_SNAPSHOT` (load a snapshot file instead of scanning). Read tools:
+additional visible games + playtime), `SHELFBOUND_SNAPSHOT` (load a snapshot file instead of scanning). Read tools:
 `search_library`, `get_library_summary`, `get_categories`, `get_game_details`, `find_installed_unplayed`.
 Write/remember tools: `record_game_status`, `record_game_opinion`, `set_game_completion`,
 `set_category_definition`, `remember`, plus `get_game_user_data` / `get_remembered`.
