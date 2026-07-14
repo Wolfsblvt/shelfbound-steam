@@ -57,12 +57,17 @@ fails; a published package version is never overwritten.
 | `games[]` | array | see below |
 | `categories[]` | array | `name`, `gameCount` — the user's local collections vocabulary |
 | `stats` | object | `libraryCount`, `installedGameCount`, `totalSizeOnDiskBytes`, `scope` |
-| `stats.scope` | enum | `installedOnly` (default) or `fullLibrary` — whether the game list is the full owned library or only installed games. Absence ≠ non-ownership when `installedOnly`. |
+| `stats.scope` | enum | `installedOnly` (default) or `fullLibrary` — whether the game list contains only local installation observations or has been enriched with the full owned set. Absence ≠ non-ownership when `installedOnly`. |
 
 `games[]` entry: `appId`, `name`, `installed`, `libraryIndex?` (null when owned but not installed),
 `installDir?` (relative folder name only), `sizeOnDiskBytes?`, `playtimeMinutes?` (from the Steam Web
 API), `lastUpdated?`, `lastPlayed?`, `categories[]` (the user's category names for that game, in
 Steam's tag order; empty if uncategorized).
+
+Schema v0.5.0 has no ownership, access-grant, Family, or Steam-Private field. For compatibility, an
+installed app manifest produces a `games[]` entry, but manifest presence proves only that an install is
+recorded on this device—not that the active account owns the game or has current access. Manifest
+`LastOwner` is not emitted. See the [Steam client access spike](./research/2026-07-14-steam-client-access-spike.md).
 
 Enums: `osPlatform` = `unknown|windows|linux|macOs`; `deviceType` =
 `unknown|desktop|laptop|steamDeck|server`; `libraryScope` = `installedOnly|fullLibrary`;
@@ -103,8 +108,8 @@ preview/consent details in [privacy-and-data.md](./privacy-and-data.md).
 
 ## Scope and what's intentionally missing
 
-The scanner emits **installed Steam games per library**, plus accounts, device info, and the user's
-**local categories** (`userdata/<id>/7/remote/sharedconfig.vdf`). With a Steam Web API key it also adds
+The scanner emits **installed Steam app-manifest observations per library**, plus accounts, device
+info, and the user's **local categories** (`userdata/<id>/7/remote/sharedconfig.vdf`). With a Steam Web API key it also adds
 **owned-but-not-installed games and playtime**. Still to come (each a focused follow-up, tracked in
 [PROJECT.md](./PROJECT.md)):
 
