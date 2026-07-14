@@ -29,6 +29,22 @@ public class SteamWebApiClientTests
         result.Warning.ShouldBeNull();
     }
 
+    [Fact]
+    public async Task Duplicate_appids_are_folded_into_one_deterministic_observation()
+    {
+        const string json =
+            """{"response":{"games":[{"appid":20,"name":"App 20","playtime_forever":100,"rtime_last_played":1700000000},{"appid":10,"name":"Ten","playtime_forever":5},{"appid":20,"name":"Zed","playtime_forever":80},{"appid":20,"name":"Alpha","playtime_forever":30,"rtime_last_played":1720000000}]}}""";
+        var client = CreateClient(_ => Response(json));
+
+        OwnedGamesResult result = await client.GetOwnedGamesAsync("steam-id", "api-key");
+
+        result.Games.Select(game => game.AppId).ShouldBe([10, 20]);
+        OwnedGame merged = result.Games[1];
+        merged.Name.ShouldBe("Alpha");
+        merged.PlaytimeForeverMinutes.ShouldBe(100);
+        merged.LastPlayed.ShouldBe(DateTimeOffset.FromUnixTimeSeconds(1720000000));
+    }
+
     [Theory]
     [InlineData("{\"response\":{}}", OwnedGamesResultStatus.MissingGameList)]
     [InlineData("{\"response\":{\"games\":[]}}", OwnedGamesResultStatus.EmptyGameList)]

@@ -73,7 +73,7 @@ played_elsewhere + platform, drop from Steam backlog recs.
 Game results include recency as human phrases (`installedOrUpdatedAgo`, `lastPlayedAgo`, `addedAgo`)
 alongside raw dates. Steam exposes no purchase date, so `addedAgo` is available only when a stable,
 actually complete source supports first-observation as a conservative acquisition proxy. Last-played
-for a visible owned-but-not-installed game may still come from the Steam Web API
+for a visible not-installed game observation may still come from the Steam Web API
 (`rtime_last_played`) without implying complete coverage.
 
 **Newly *visible* ≠ newly *added*.** The profile records the widest coverage observed so far using the

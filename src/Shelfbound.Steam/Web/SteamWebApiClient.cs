@@ -74,6 +74,9 @@ public sealed class SteamWebApiClient : ISteamWebApiClient
                 PlaytimeForeverMinutes = Math.Max(0, g.PlaytimeForever),
                 LastPlayed = ParseLastPlayed(g.RtimeLastPlayed),
             })
+            .GroupBy(game => game.AppId)
+            .Select(group => OwnedGame.Merge(group.Key, group))
+            .OrderBy(game => game.AppId)
             .ToArray();
 
         return observations.Length == 0

@@ -60,7 +60,7 @@ fails; a published package version is never overwritten.
 | `stats` | object | `libraryCount`, `installedGameCount`, `totalSizeOnDiskBytes`, `scope` |
 | `stats.scope` | enum | `installedOnly` (default) = local installed presence; `observedSubset` = positive non-complete observations were added; `fullLibrary` = an explicit source completeness contract. Absence proves nothing for either partial scope. |
 
-`games[]` entry: `appId`, `name`, `installed`, `libraryIndex?` (null when owned but not installed),
+`games[]` entry: `appId`, `name`, `installed`, `libraryIndex?` (null when not observed installed),
 `installDir?` (relative folder name only), `sizeOnDiskBytes?`, `playtimeMinutes?` (from the Steam Web
 API), `lastUpdated?`, `lastPlayed?`, `categories[]` (the user's category names for that game, in
 Steam's tag order; empty if uncategorized).
@@ -115,7 +115,7 @@ preview/consent details in [privacy-and-data.md](./privacy-and-data.md).
 
 The scanner emits **installed Steam games per library**, plus accounts, device info, and the user's
 **local categories**. With a Steam Web API key, a usable non-empty `GetOwnedGames` response also adds
-visible owned-but-not-installed observations and playtime, producing `observedSubset`. Missing, empty,
+visible not-installed observations and playtime, producing `observedSubset`. Missing, empty,
 or malformed results warn and leave the snapshot `installedOnly`; no current Web API path emits
 `fullLibrary`. Still to come (each a focused follow-up, tracked in [PROJECT.md](./PROJECT.md)):
 

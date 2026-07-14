@@ -180,7 +180,7 @@ raw snapshot.
 
 ## Build order
 
-The local-first core is built: scanner, local categories (modern + legacy), owned-not-installed +
+The local-first core is built: scanner, local categories (modern + legacy), positive Web API observations +
 playtime, the query/recommendation engine, the user-data store, the tray app, and the local MCP server.
 Remaining local work and the forward roadmap live in [PROJECT.md](./PROJECT.md); the local-first
 rationale is in [DECISIONS.md](./DECISIONS.md). Hosted/product phases are tracked privately.

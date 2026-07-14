@@ -44,7 +44,7 @@ public class RecencyTests
     }
 
     // End-to-end: a scope expansion (installedOnly baseline → fullLibrary scan) must NOT make
-    // previously-owned games read as "recently added"; a genuine purchase once scope is stable still does.
+    // previously unobserved games read as "recently added"; a genuine new row once scope is stable still does.
     [Fact]
     public void Scope_expansion_does_not_produce_false_recently_added()
     {
@@ -54,7 +54,7 @@ public class RecencyTests
         var baseline = DateTimeOffset.UtcNow.AddDays(-30);
         UserDataActions.RecordFirstSeen(profile, [1, 2], baseline, LibraryScope.InstalledOnly);
 
-        // Later: a full-library scan reveals owned-but-not-installed games (3, 4) for the first time.
+        // Later: a complete-source scan reveals not-installed games (3, 4) for the first time.
         var fullScan = DateTimeOffset.UtcNow.AddDays(-10);
         UserDataActions.RecordFirstSeen(profile, [1, 2, 3, 4], fullScan, LibraryScope.FullLibrary);
 
@@ -69,14 +69,14 @@ public class RecencyTests
         // None read as "recently added" — the wider scan made them visible, not newly acquired.
         view.Games.ShouldAllBe(g => g.AddedAgo == null);
 
-        // A genuine purchase after the scope has stabilized at full DOES read as recently added.
-        var purchase = DateTimeOffset.UtcNow.AddDays(-3);
-        UserDataActions.RecordFirstSeen(profile, [1, 2, 3, 4, 5], purchase, LibraryScope.FullLibrary);
+        // A genuine addition after the scope has stabilized at full DOES read as recently added.
+        var addition = DateTimeOffset.UtcNow.AddDays(-3);
+        UserDataActions.RecordFirstSeen(profile, [1, 2, 3, 4, 5], addition, LibraryScope.FullLibrary);
 
-        var afterPurchase = LibraryViewBuilder.Build(
-            Snapshot(new SnapshotGame { AppId = 5, Name = "Just Bought", Installed = true }),
+        var afterAddition = LibraryViewBuilder.Build(
+            Snapshot(new SnapshotGame { AppId = 5, Name = "New Addition", Installed = true }),
             profile);
-        afterPurchase.Games.Single(g => g.AppId == 5).AddedAgo.ShouldBe("3 days ago");
+        afterAddition.Games.Single(g => g.AppId == 5).AddedAgo.ShouldBe("3 days ago");
     }
 
     [Fact]

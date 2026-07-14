@@ -5,7 +5,7 @@ namespace Shelfbound.Steam.Enrichment;
 
 /// <summary>
 /// Merges positive visibility-gated Steam Web API observations into a locally scanned snapshot: sets
-/// playtime on installed games and adds visible owned-but-not-installed games (with local categories).
+/// playtime on installed games and adds visible not-installed game observations (with local categories).
 /// Pure and deterministic — the network fetch happens separately via <see cref="ISteamWebApiClient"/>.
 ///
 /// The document-level category summary is already computed from the full local category map, so it
@@ -21,7 +21,7 @@ public static class SteamWebEnricher
         var ownedByApp = ownedGames
             .Where(game => game.AppId > 0)
             .GroupBy(o => o.AppId)
-            .ToDictionary(group => group.Key, MergeOwnedObservations);
+            .ToDictionary(group => group.Key, group => OwnedGame.Merge(group.Key, group));
 
         if (ownedByApp.Count == 0)
             return snapshot;
@@ -43,7 +43,7 @@ public static class SteamWebEnricher
                 : game);
         }
 
-        // Visible owned-but-not-installed observations: add them with categories and playtime.
+        // Visible not-installed observations: add them with categories and playtime.
         foreach (OwnedGame owned in ownedByApp.Values.OrderBy(game => game.AppId))
         {
             if (localAppIds.Contains(owned.AppId))
@@ -75,30 +75,6 @@ public static class SteamWebEnricher
         };
     }
 
-    private static OwnedGame MergeOwnedObservations(IGrouping<int, OwnedGame> observations)
-    {
-        string fallbackName = $"App {observations.Key}";
-        string[] names = observations
-            .Select(game => game.Name)
-            .Where(value => !string.IsNullOrWhiteSpace(value))
-            .Distinct(StringComparer.Ordinal)
-            .ToArray();
-        string name = names
-            .Where(value => !string.Equals(value, fallbackName, StringComparison.Ordinal))
-            .OrderBy(value => value, StringComparer.Ordinal)
-            .FirstOrDefault()
-            ?? names.OrderBy(value => value, StringComparer.Ordinal).FirstOrDefault()
-            ?? fallbackName;
-
-        return new OwnedGame
-        {
-            AppId = observations.Key,
-            Name = name,
-            PlaytimeForeverMinutes = observations.Max(game => game.PlaytimeForeverMinutes),
-            LastPlayed = observations.Max(game => game.LastPlayed),
-        };
-    }
-
     private static SnapshotGame MergeLocalObservations(IEnumerable<SnapshotGame> observations)
     {
         SnapshotGame[] games = observations.ToArray();
@@ -121,7 +97,8 @@ public static class SteamWebEnricher
             LastPlayed = games.Max(game => game.LastPlayed),
             Categories = games
                 .SelectMany(game => game.Categories)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .GroupBy(category => category, StringComparer.OrdinalIgnoreCase)
+                .Select(group => group.OrderBy(category => category, StringComparer.Ordinal).First())
                 .OrderBy(category => category, StringComparer.OrdinalIgnoreCase)
                 .ThenBy(category => category, StringComparer.Ordinal)
                 .ToArray(),

@@ -457,7 +457,7 @@ static int RunSetup(string[] args)
         Console.WriteLine("Get a Steam Web API key at https://steamcommunity.com/dev/apikey, then:");
         Console.WriteLine("  shelfbound setup --steam-api-key-stdin   # reads one line from standard input");
         Console.WriteLine("  shelfbound setup --steam-api-key-env     # saves STEAM_WEB_API_KEY");
-        Console.WriteLine("For owned-but-not-installed games, set your Steam profile 'Game details' to Public.");
+        Console.WriteLine("For visible not-installed observations, set your Steam profile 'Game details' to Public.");
     }
     return 0;
 }
@@ -513,7 +513,7 @@ static int RunProfile(string[] args)
     var store = new JsonUserDataStore(ShelfboundPaths.ProfilesDirectory);
 
     // Recovery path: forget the "recently added" baseline so the next scan re-establishes it from the
-    // current library. Fixes a profile skewed by a scope change (owned games that a wider scan revealed
+    // current library. Fixes a profile skewed by a scope change (games that a wider scan revealed
     // as if newly added). Only touches recency state — ratings, statuses, and memories are untouched.
     if (resetRecency)
     {
@@ -605,7 +605,7 @@ static void PrintUsage()
 
         PROFILE OPTIONS:
           --reset-recency        Clear the "recently added" baseline; the next scan re-establishes it
-                                 (use if a scope change made owned games look newly added)
+                                 (use if a scope change made newly visible games look newly added)
 
         SCAN OPTIONS:
           --steam-path <dir>     Steam install root (else auto-detected / SHELFBOUND_STEAM_PATH)

@@ -139,7 +139,7 @@ only within the exact same origin, so a bearer is never resent after a scheme, h
   lists only and skips dynamic `filterSpec` collections, exactly like the C# reader, and can lag
   the live client by the last unflushed edit. **[NEEDS-DECK]** the exact SteamOS Local Storage path
   is the one hardware-TBD seam (`steam_localstorage.py`; env override + candidate provided).
-- **No Steam Web API enrichment** (owned-but-not-installed + playtime): `stats.scope` is always
+- **No Steam Web API enrichment** (visible not-installed observations + playtime): `stats.scope` is always
   `installedOnly`, `playtimeMinutes` never emitted. Enrichment likely stays a desktop/CLI concern.
 - **GPU spec not collected** (C# uses the `Hardware.Info` library); other specs are best-effort
   from `/proc` and `uname`.

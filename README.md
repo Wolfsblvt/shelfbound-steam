@@ -29,7 +29,7 @@ Early but already useful, all local:
 - **`shelfbound scan`** writes a versioned **snapshot** of your library — installed games across all
   libraries (names, install state, size, timestamps), your Steam accounts, the device, and your
   **local categories** (read from your **modern Steam collections**, falling back to the legacy store).
-  With a Steam Web API key it also adds **visible owned-but-not-installed observations and playtime**.
+  With a Steam Web API key it also adds **visible not-installed game observations and playtime**.
   Steam does not guarantee that visibility-gated result is complete; Shelfbound keeps useful positive
   rows and never treats absence as non-ownership. No install paths, credentials, or saves.
 - **`shelfbound-mcp`** — a local **MCP server** that exposes the library to AI tools (ChatGPT/Claude):

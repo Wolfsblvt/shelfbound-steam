@@ -53,7 +53,7 @@ public static class UserDataActions
     /// Later observations are dated at <paramref name="now"/> only under a stable
     /// <see cref="LibraryScope.FullLibrary"/> source; partial installed/observed-subset scans cannot prove
     /// acquisition, and a scope expansion only reveals games that may already have been present. Those
-    /// observations are stamped at the baseline so UI and MCP consumers do not call them newly bought.
+    /// observations are stamped at the baseline so UI and MCP consumers do not call them newly added or bought.
     /// Pure — call inside a store transaction.
     /// </summary>
     public static void RecordFirstSeen(UserProfile profile, IEnumerable<int> appIds, DateTimeOffset now, LibraryScope scanScope)

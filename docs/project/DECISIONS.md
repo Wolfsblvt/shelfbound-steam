@@ -353,7 +353,7 @@ copy just needs to follow the **0.5.0** bump.
 ## Recency correctness — newly-visible ≠ newly-added (2026-07-03; refined 2026-07-14)
 
 ### First-observation is "added" only under a stable scan scope; a scope expansion baselines, not dates
-Steam exposes no purchase/added date. Shelfbound may use first observation as an acquisition-recency
+Steam exposes no purchase/added date. Shelfbound may use first observation as conservative addition-recency
 proxy only when an actually complete source is stable. `installedOnly` and `observedSubset` observations
 establish useful app identity/presence but cannot prove when a game was acquired, even when that partial
 scope is unchanged between scans. A coverage expansion likewise reveals games that may have been present
@@ -364,14 +364,14 @@ Decision (**implemented**): the profile records the **widest scan scope observed
 observed subset → full, not published enum ordinals. A broader or partial scan baselines new appids at
 `FirstScanAt`; only a new app first seen under stable `fullLibrary` is dated at "now". Read views also
 suppress `AddedAgo` whenever current scope is partial, so legacy timestamps cannot become UI/MCP
-acquisition claims. A real purchase under a stable complete-source fixture still reads "Added N days
+acquisition claims. A genuinely new row under a stable complete-source fixture still reads "Added N days
 ago". The rule deliberately favors a missed novelty nudge over a false purchase claim.
 
 *Considered and rejected:* **freezing the first baseline's scope** instead of a high-water mark — every
-later full scan would then read as "broader than baseline" and wrongly baseline genuine purchases forever,
+later full scan would then read as "broader than baseline" and wrongly baseline genuine additions forever,
 breaking the real-acquisition case. **Gating only at read time** — masks newly written bad timestamps;
 the implemented read guard is defense-in-depth after conservative write-time derivation. The additive
 `WidestScanScope` defaults to `installedOnly` (matching `SnapshotStats.Scope`), so a legacy profile
-lacking it never treats a later full scan as a wave of real purchases. For an already-skewed profile,
+lacking it never treats a later full scan as a wave of real additions. For an already-skewed profile,
 `shelfbound profile --reset-recency` re-establishes the baseline from the current library (recency state
 only; ratings/statuses/memories untouched).

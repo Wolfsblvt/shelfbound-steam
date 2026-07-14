@@ -40,7 +40,7 @@ public class UserDataActionsTests
         UserDataActions.RecordFirstSeen(profile, [1, 2], baseline, LibraryScope.InstalledOnly);
         profile.WidestScanScope.ShouldBe(LibraryScope.InstalledOnly);
 
-        // A later full-library scan reveals owned-but-not-installed games (3, 4). They were always owned
+        // A later complete-source scan reveals not-installed games (3, 4). They may have been present
         // — newly visible, not newly added — so they're stamped at the baseline, not at the later scan.
         UserDataActions.RecordFirstSeen(profile, [1, 2, 3, 4], fullScan, LibraryScope.FullLibrary);
 
@@ -56,16 +56,16 @@ public class UserDataActionsTests
         var profile = new UserProfile { OwnerId = "x" };
         var baseline = DateTimeOffset.UtcNow.AddDays(-10);
         var expandScan = DateTimeOffset.UtcNow.AddDays(-5);
-        var purchaseScan = DateTimeOffset.UtcNow;
+        var additionScan = DateTimeOffset.UtcNow;
 
         UserDataActions.RecordFirstSeen(profile, [1, 2], baseline, LibraryScope.InstalledOnly);
         UserDataActions.RecordFirstSeen(profile, [1, 2, 3], expandScan, LibraryScope.FullLibrary); // 3 baselined
 
-        // Scope is now stable at fullLibrary; a genuinely new app under stable scope is a real purchase.
-        UserDataActions.RecordFirstSeen(profile, [1, 2, 3, 4], purchaseScan, LibraryScope.FullLibrary);
+        // Scope is now stable at fullLibrary; a genuinely new app under stable scope can be dated as an addition.
+        UserDataActions.RecordFirstSeen(profile, [1, 2, 3, 4], additionScan, LibraryScope.FullLibrary);
 
         profile.FirstSeen[3].ShouldBe(baseline);       // still baselined from the expansion
-        profile.FirstSeen[4].ShouldBe(purchaseScan);   // genuine acquisition — dated
+        profile.FirstSeen[4].ShouldBe(additionScan);   // genuine stable-scope addition — dated
     }
 
     [Fact]

@@ -21,7 +21,7 @@ rationale.
 
 ## Why it exists (the differentiator)
 
-A plain Steam Web API wrapper is not interesting — anyone can expose owned games and playtime. The
+A plain Steam Web API wrapper is not interesting — anyone can expose visibility-gated game observations and playtime. The
 unique value is what the public API *cannot* give, read from the **local Steam client**:
 
 - local categories / collections and **what they personally mean** (`Soon`, `Deck`, `Paused`, …)

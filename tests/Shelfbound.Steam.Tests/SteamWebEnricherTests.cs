@@ -79,7 +79,7 @@ public class SteamWebEnricherTests
                 Installed = true,
                 LibraryIndex = 1,
                 InstallDir = "z-folder",
-                Categories = ["Zeta"],
+                Categories = ["Zeta", "Action"],
             },
             new SnapshotGame
             {
@@ -88,7 +88,7 @@ public class SteamWebEnricherTests
                 Installed = true,
                 LibraryIndex = 0,
                 InstallDir = "a-folder",
-                Categories = ["Alpha"],
+                Categories = ["Alpha", "action"],
             });
         var observations = new List<OwnedGame>
         {
@@ -104,7 +104,7 @@ public class SteamWebEnricherTests
             new Dictionary<int, IReadOnlyList<string>> { [20] = ["Backlog"] },
             observations);
         SnapshotDocument reverse = SteamWebEnricher.Enrich(
-            snapshot,
+            snapshot with { Games = snapshot.Games.Reverse().ToArray() },
             new Dictionary<int, IReadOnlyList<string>> { [20] = ["Backlog"] },
             observations.AsEnumerable().Reverse().ToArray());
 
@@ -118,7 +118,7 @@ public class SteamWebEnricherTests
         installed.InstallDir.ShouldBe("a-folder");
         installed.PlaytimeMinutes.ShouldBe(90);
         installed.LastPlayed.ShouldBe(newer);
-        installed.Categories.ShouldBe(["Alpha", "Zeta"]);
+        installed.Categories.ShouldBe(["Action", "Alpha", "Zeta"]);
 
         SnapshotGame observed = forward.Games.Single(game => game.AppId == 20);
         observed.Name.ShouldBe("Alpha");
