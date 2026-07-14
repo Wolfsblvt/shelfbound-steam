@@ -65,6 +65,12 @@ fails; a published package version is never overwritten.
 API), `lastUpdated?`, `lastPlayed?`, `categories[]` (the user's category names for that game, in
 Steam's tag order; empty if uncategorized).
 
+Schema v0.6.0 has no per-game ownership, access-grant, Family, or Steam-Private field. An installed app
+manifest produces a `games[]` entry under `installedOnly`, but manifest presence proves only that an
+install is recorded on this device—not that the active account owns the game or has current access.
+`observedSubset` adds positive non-complete observations without changing that rule. Manifest
+`LastOwner` is not emitted. See the [Steam client access spike](./research/2026-07-14-steam-client-access-spike.md).
+
 Enums: `osPlatform` = `unknown|windows|linux|macOs`; `deviceType` =
 `unknown|desktop|laptop|steamDeck|server`; `libraryScope` =
 `installedOnly|observedSubset|fullLibrary`;
@@ -115,11 +121,11 @@ preview/consent details in [privacy-and-data.md](./privacy-and-data.md).
 
 ## Scope and what's intentionally missing
 
-The scanner emits **installed Steam games per library**, plus accounts, device info, and the user's
-**local categories**. With a Steam Web API key, a usable non-empty `GetOwnedGames` response also adds
-visible not-installed observations and playtime, producing `observedSubset`. Missing, empty,
-or malformed results warn and leave the snapshot `installedOnly`; no current Web API path emits
-`fullLibrary`. Still to come (each a focused follow-up, tracked in [PROJECT.md](./PROJECT.md)):
+The scanner emits **installed Steam app-manifest observations per library**, plus accounts, device info, and the user's
+**local categories**. With a Steam Web API key, a usable non-empty `GetOwnedGames` response also adds visible
+not-installed observations and playtime, producing `observedSubset`. Missing, empty, or malformed results warn and
+leave the snapshot `installedOnly`; no current Web API path emits `fullLibrary`. Still to come (each a focused follow-up,
+tracked in [PROJECT.md](./PROJECT.md)):
 
 - **Dynamic collections** — the scanner reads the **modern Steam collections** (Chromium Local Storage
   leveldb), falling back to the legacy `sharedconfig.vdf` `tags` store. Static collections (explicit

@@ -36,6 +36,32 @@ separate hosted service has its own privacy policy, retention rules, and account
 
 Nothing else. The scanner does not traverse saves, unrelated user files, or arbitrary directories.
 
+## Steam access-state research boundary
+
+The current scanner does not derive or emit Steam Private or Steam Family state. A redacted local
+[evidence spike](./research/2026-07-14-steam-client-access-spike.md) established narrower rules for any
+future work:
+
+- `UserLocalConfigStore/WebStorage/PrivateApps_<accountId>` in `localconfig.vdf` is a per-account,
+  VDF-backed fallback cache used by the current client. It can be stale while offline and has no proven
+  freshness/completeness marker. Its raw suffix and value are personal library/identity data and must
+  not be logged or uploaded.
+- Manifest presence proves installation only. `LastOwner` can differ from the active account for a
+  known borrowed install, but the raw value may identify another person and does not establish current
+  Family access. Future diagnostics should compare in memory, discard the ids, and retain only the
+  minimum qualified evidence.
+- `SharedAuth.AuthData`, cookies, login/session/access tokens, token-bearing request URLs, and
+  equivalent Steam client credential material are forbidden inputs. A separately user-provided Steam
+  Web API key may be used only through the existing protected API path; never inspect or log its value
+  or a credential-bearing URL. Do not invoke privileged Steam client RPCs or turn ambient authenticated
+  client state into a scanner dependency.
+- Missing, empty, stale, withheld, offline, and failed states remain distinct until a source supplies a
+  documented successful-completeness signal. A privacy boundary must not reinterpret any of them as
+  “no Private games” or “not borrowed.”
+
+The additional cache/binary candidates are not part of the current scanner's declared local-read set
+above; manifest `LastOwner` is not extracted or emitted.
+
 ## Local input and storage hardening
 
 - Steam VDF and Chromium LevelDB inputs have explicit file, nesting, decoded-output, entry-count, and
