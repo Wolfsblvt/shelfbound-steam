@@ -26,9 +26,11 @@ public partial class App : Application
             _agent = new SyncAgent();
             _update = new UpdateService();
             _window = new MainWindow(_agent, _update);
+            var appIcon = LoadAppIcon();
+            _window.Icon = appIcon;
             _agent.Start();
 
-            SetupTray(desktop);
+            SetupTray(desktop, appIcon);
 
             // Start hidden in the tray when configured — but always show on first run (not connected yet)
             // so the user sees the "Connect account" prompt instead of wondering where the app went.
@@ -45,11 +47,14 @@ public partial class App : Application
         base.OnFrameworkInitializationCompleted();
     }
 
-    private void SetupTray(IClassicDesktopStyleApplicationLifetime desktop)
+    private static WindowIcon LoadAppIcon()
     {
         using Stream stream = AssetLoader.Open(new Uri("avares://Shelfbound.Tray/Assets/tray.png"));
-        var icon = new WindowIcon(stream);
+        return new WindowIcon(stream);
+    }
 
+    private void SetupTray(IClassicDesktopStyleApplicationLifetime desktop, WindowIcon icon)
+    {
         var open = new NativeMenuItem("Open Shelfbound");
         open.Click += (_, _) => ShowWindow();
         var sync = new NativeMenuItem("Sync now");
