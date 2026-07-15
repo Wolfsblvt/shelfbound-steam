@@ -148,3 +148,7 @@ improvements to hosted or modified versions remain available to users and the co
 the open-source core free for everyone and prevents it from being quietly turned into a closed
 product. A separate hosted version may be offered for convenience; it is developed privately and is
 out of scope for this repository.
+
+The whole repository, including copyright in the tray artwork, remains under that license. Shelfbound names and marks
+are also subject to the separate, narrow [trademark notice](TRADEMARKS.md); the copyright license does not grant
+trademark rights beyond applicable law.

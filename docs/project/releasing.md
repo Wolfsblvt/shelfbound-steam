@@ -75,7 +75,6 @@ real users — safe to defer until then:
       nothing on an installed build. The URLs are hosted-product config, deliberately not hardcoded here.
 - [ ] **Windows code signing** (optional but removes SmartScreen warnings) — see [Signing](#signing).
 - [ ] **macOS signing + notarization** — required before macOS is public — see [Signing](#signing).
-- [ ] **Branded icons** — replace the placeholder — see [Icons](#icons).
 
 None block local use or a Windows/Linux beta.
 
@@ -118,7 +117,7 @@ Locally you can also pack Windows to eyeball the installer (outputs to `./Releas
 ```pwsh
 dotnet tool install -g vpk --version 1.2.0
 dotnet publish src/Shelfbound.Tray -c Release -r win-x64 --self-contained -o publish
-vpk pack --packId Shelfbound.Tray --packVersion 0.6.1 --packDir publish --mainExe Shelfbound.Tray.exe --packTitle Shelfbound
+vpk pack --packId Shelfbound.Tray --packVersion 0.6.1 --packDir publish --mainExe Shelfbound.Tray.exe --packTitle Shelfbound --icon assets/icon.ico
 ```
 
 ### CI workflow shape
@@ -148,19 +147,29 @@ resolves the version (from the tag, else `Directory.Build.props`), then
 
 ### Icons
 
-**`assets/icon.svg` is the single source of truth** (a placeholder mark today; drop in branded artwork later,
-same filename). Neither Avalonia's tray icon nor the OS installers consume SVG directly — they need raster at
-fixed sizes — so we **generate-and-commit** the rasters rather than rasterize on every build (keeps CI free of
-an SVG toolchain, and macOS `.icns` needs macOS tooling anyway):
+**`assets/icon.svg` is the locked full-color source** for the tray and application icons.
+`assets/icon-mono.svg` preserves the approved optional monochrome/template fallback but is not currently consumed.
+Neither Avalonia nor Velopack consumes the color SVG directly, so the exact platform outputs are generated and committed;
+release CI validates them and fails if any required file is missing or structurally wrong.
 
 ```pwsh
-./scripts/icons.ps1        # requires ImageMagick; regenerates the raster icons from the SVG
+./scripts/icons.ps1                   # export; ImageMagick 7 is a build-only prerequisite
+./scripts/icons.ps1 -MagickPath <path-to-portable-magick>
+./scripts/icons.ps1 -Check            # validate committed sources/outputs; no renderer required
 ```
 
-That produces `src/Shelfbound.Tray/Assets/tray.png` (in-app icon), `assets/icon-256.png` (Linux AppImage),
-`assets/icon.ico` (Windows — auto-picked up by the pack step when present), and best-effort `assets/icon.icns`
-(prefer `iconutil` on a Mac for crisp results). Commit the regenerated files. Until they're generated the
-installers fall back to Velopack's default icon — nothing breaks.
+The exporter writes only the files actually consumed:
+
+- `src/Shelfbound.Tray/Assets/tray.png` — 32×32 color tray and main-window icon.
+- `assets/icon-256.png` — 256×256 Linux AppImage application icon.
+- `assets/icon.ico` — Windows application/installer icon with 16, 24, 32, 48, 64, 128, and 256px frames.
+- `assets/icon.icns` — macOS application icon with 16 through 1024px representations.
+
+On macOS, the script creates the standard 16–1024px `.iconset` and runs Apple's `iconutil`. On Windows/Linux,
+ImageMagick refreshes the PNG/ICO outputs and the script validates (but does not rewrite) the committed ICNS; canonical
+ICNS regeneration stays with Apple's platform tool. Commit all four outputs and run the exporter twice: the second run
+must leave no diff. The release workflow passes each platform's committed icon explicitly; there is no default-icon
+fallback.
 
 ## CLI / MCP tools (separate release stream)
 
