@@ -28,19 +28,19 @@ jobs:
         run: pwsh scripts/test-package-release.ps1
       # Render a coverage table into the run's job summary — visibility without an external service.
       - name: Coverage summary
-        if: always()
+        if: ${{ !cancelled() && hashFiles('coverage/**/coverage.cobertura.xml') != '' }}
         run: |
           dotnet tool install --global dotnet-reportgenerator-globaltool
           reportgenerator -reports:'./coverage/**/coverage.cobertura.xml' -targetdir:./coverage/report -reporttypes:MarkdownSummaryGithub
           cat ./coverage/report/SummaryGithub.md >> "$GITHUB_STEP_SUMMARY"
       - name: Upload coverage to Codecov
-        if: always()
+        if: ${{ github.event_name == 'push' && hashFiles('coverage/**/coverage.cobertura.xml') != '' }}
         uses: codecov/codecov-action@v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./coverage/**/coverage.cobertura.xml
       - name: Upload coverage report
-        if: always()
+        if: ${{ !cancelled() && hashFiles('coverage/**/coverage.cobertura.xml') != '' }}
         uses: actions/upload-artifact@v7
         with:
           name: coverage-report

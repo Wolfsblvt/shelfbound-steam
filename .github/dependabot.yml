@@ -8,9 +8,14 @@ updates:
     labels:
       - "type:maintenance"
       - "area:dependencies"
-    # Bundle minor/patch bumps into one PR; majors still come separately for review.
+    # Avalonia packages form one framework graph and must move together, including majors.
+    # Framework majors remain explicit review items rather than partial package bumps.
     groups:
+      avalonia:
+        applies-to: version-updates
+        patterns: ["Avalonia*"]
       nuget-minor:
+        applies-to: version-updates
         update-types: ["minor", "patch"]
 
   - package-ecosystem: github-actions
