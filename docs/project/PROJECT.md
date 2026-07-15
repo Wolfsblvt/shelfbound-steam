@@ -1,6 +1,6 @@
 # Shelfbound — Project Overview (open-source core)
 
-> Status as of 2026-07-11. This file is the living overview of the **open-source core**. Read it first.
+> Status as of 2026-07-15. This file is the living overview of the **open-source core**. Read it first.
 
 ## What Shelfbound is
 
@@ -82,10 +82,11 @@ The local Steam data is the moat. AI reasoning is commodity; good structured fac
   upload with an exact `--dry-run` preview.
 - **Tray agent** (`Shelfbound.Tray`, Avalonia): background auto-sync, a numeric-loopback **one-time-code
   connect** flow that stores only a device-bound `device:upload` token, a deliberately minimal connected-device
-  card, an **exact-body upload preview/confirmation** (background sync stays gated until the current projection
-  is consented), hardware specs, and login auto-start — plus a **Velopack installer + self-update** from GitHub
-  Releases (Windows + Linux `AppImage` shipping; macOS unsigned/testing until notarized). *Compiles and the logic
-  is covered; a manual GUI/E2E pass is the owner's remaining step.*
+  card, and explicit editable Desktop/Laptop/Steam Deck/Other setup before any hosted action. An **exact-body upload
+  preview/confirmation** gates background sync until the current projection is consented; hardware specs and login
+  auto-start remain local controls. Distribution uses a **Velopack installer + self-update** from GitHub Releases
+  (Windows + Linux `AppImage` shipping; macOS unsigned/testing until notarized). *Compiles and the logic is covered;
+  a manual GUI/E2E pass is the owner's remaining step.*
 - xUnit + Shouldly suites for the core and tray security flow, plus Decky pytest contract/parity coverage.
   Verified on a real ~111-game /
   2-library install; MCP server smoke-tested over stdio (write→search round-trip, server instructions,
