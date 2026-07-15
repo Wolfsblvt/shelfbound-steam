@@ -60,7 +60,7 @@ public sealed class DeviceTypeSetupTests
     }
 
     [Fact]
-    public async Task Incomplete_setup_blocks_connect_preview_upload_and_auto_sync_without_outbound_work()
+    public async Task Incomplete_setup_blocks_connect_preview_and_auto_sync_without_outbound_work()
     {
         var counters = new OutboundCounters();
         var settings = new AppSettings
@@ -79,8 +79,18 @@ public sealed class DeviceTypeSetupTests
         counters.ConnectCount.ShouldBe(0);
         counters.BuildCount.ShouldBe(0);
         counters.UploadCount.ShouldBe(0);
+    }
 
-        agent.UpdateSettings(current => current.DeviceType = DeviceType.Desktop);
+    [Fact]
+    public async Task Setup_reset_blocks_uploading_a_prepared_body()
+    {
+        var counters = new OutboundCounters();
+        using var agent = CreateAgent(new AppSettings
+        {
+            DeviceName = "Desk",
+            DeviceType = DeviceType.Desktop,
+        }, counters);
+
         PreparedSync prepared = (await agent.PrepareSyncAsync()).ShouldNotBeNull();
         agent.UpdateSettings(current => current.DeviceType = null);
         await agent.SyncNowAsync(prepared);
