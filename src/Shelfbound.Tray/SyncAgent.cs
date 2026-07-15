@@ -16,6 +16,7 @@ public sealed class SyncAgent : IDisposable
 {
     private readonly object _lock = new();
     private readonly List<string> _history = [];
+    private readonly SyncAgentDependencies _dependencies;
     private Timer? _timer;
     private string? _token;
 
@@ -23,6 +24,8 @@ public sealed class SyncAgent : IDisposable
     public DeviceSpecs Specs { get; }
     public string? HostedOsDescription { get; }
     public bool IsConnected => !string.IsNullOrEmpty(_token);
+    public bool IsSetupComplete => DeviceTypeSetup.IsComplete(Settings.DeviceType);
+    public DeviceType? SuggestedDeviceType { get; }
     public DateTimeOffset? LastSync { get; private set; }
     public string StatusLine { get; private set; } = "Starting…";
     public IReadOnlyList<string> History
@@ -32,13 +35,19 @@ public sealed class SyncAgent : IDisposable
 
     public event Action? Changed;
 
-    public SyncAgent()
+    public SyncAgent() : this(AppSettings.Load(), TokenStore.Load(), SyncAgentDependencies.Default)
     {
-        Settings = AppSettings.Load();
-        _token = TokenStore.Load();
+    }
+
+    internal SyncAgent(AppSettings settings, string? token, SyncAgentDependencies dependencies)
+    {
+        Settings = settings;
+        _token = token;
+        _dependencies = dependencies;
         SnapshotDevice device = DeviceIdentity.Resolve(Settings.DeviceName, null);
         Specs = device.Specs ?? new DeviceSpecs();
         HostedOsDescription = HostedProjection.CoarsenOsDescription(device.Os, Specs.OsDescription);
+        SuggestedDeviceType = DeviceTypeSetup.GetSuggestion();
     }
 
     public void Start()
@@ -50,8 +59,8 @@ public sealed class SyncAgent : IDisposable
     public void UpdateSettings(Action<AppSettings> mutate)
     {
         mutate(Settings);
-        Settings.Save();
-        AutoStart.Apply(Settings.StartOnLogin);
+        _dependencies.SaveSettings(Settings);
+        _dependencies.ApplyAutoStart(Settings.StartOnLogin);
         Reschedule();
     }
 
@@ -60,6 +69,9 @@ public sealed class SyncAgent : IDisposable
 
     private async Task<PreparedSync?> BuildPreparedSyncAsync(bool logPreview)
     {
+        if (!RequireSetup())
+            return null;
+
         if (!IsConnected)
         {
             Log("Not connected — connect your account first.");
@@ -71,11 +83,14 @@ public sealed class SyncAgent : IDisposable
         try
         {
             string deviceName = DeviceIdentity.NormalizeName(Settings.DeviceName);
-            SnapshotBuildResult build = await SnapshotBuilder.BuildAsync(new SnapshotBuildOptions
-            {
-                ToolVersion = AppInfo.Version,
-                DeviceName = deviceName,
-            });
+            SnapshotBuildResult build = await _dependencies.BuildSnapshotAsync(
+                new SnapshotBuildOptions
+                {
+                    ToolVersion = AppInfo.Version,
+                    DeviceName = deviceName,
+                    DeviceType = Settings.DeviceType,
+                },
+                CancellationToken.None);
             return new PreparedSync(HostedProjection.Prepare(build.Snapshot), build.Warnings);
         }
         catch (Exception ex)
@@ -89,35 +104,42 @@ public sealed class SyncAgent : IDisposable
     public async Task SyncNowAsync(PreparedSync prepared)
     {
         ArgumentNullException.ThrowIfNull(prepared);
+        if (!RequireSetup())
+            return;
+
         UploadResult result = await UploadPreparedAsync(prepared);
         if (result.Ok)
         {
             Settings.HostedUploadConsentVersion = HostedProjection.ProjectionVersion;
-            Settings.Save();
+            _dependencies.SaveSettings(Settings);
             Reschedule(startImmediately: false);
         }
     }
 
     public async Task ConnectAsync()
     {
+        if (!RequireSetup())
+            return;
+
         Log("Opening browser to connect…");
         try
         {
             string deviceName = DeviceIdentity.NormalizeName(Settings.DeviceName);
-            ConnectFlowResult? connection = await ConnectFlow.RunAsync(
+            ConnectFlowResult? connection = await _dependencies.ConnectAsync(
                 Settings.WebAppUrl,
                 Settings.ServerUrl,
-                deviceName);
+                deviceName,
+                CancellationToken.None);
             if (connection is null)
             {
                 Log("Connect cancelled or timed out.");
                 return;
             }
 
-            _token = TokenStore.Load();
+            _token = _dependencies.LoadToken();
             if (string.IsNullOrEmpty(_token))
             {
-                TokenStore.Clear();
+                _dependencies.ClearToken();
                 Log("Connect failed — the device token could not be loaded from secure storage.");
                 return;
             }
@@ -125,11 +147,11 @@ public sealed class SyncAgent : IDisposable
             try
             {
                 Settings.DeviceName = connection.DeviceName;
-                Settings.Save();
+                _dependencies.SaveSettings(Settings);
             }
             catch
             {
-                TokenStore.Clear();
+                _dependencies.ClearToken();
                 _token = null;
                 throw;
             }
@@ -152,7 +174,7 @@ public sealed class SyncAgent : IDisposable
     /// </summary>
     public Task SignOutAsync()
     {
-        TokenStore.Clear();
+        _dependencies.ClearToken();
         _token = null;
         Log("Signed out.");
         Reschedule(); // IsConnected is now false → auto-sync timer is torn down.
@@ -166,7 +188,7 @@ public sealed class SyncAgent : IDisposable
     {
         _timer?.Dispose();
         _timer = null;
-        if (Settings.AutoSync && IsConnected && HasUploadConsent)
+        if (Settings.AutoSync && IsConnected && HasUploadConsent && IsSetupComplete)
         {
             var interval = TimeSpan.FromMinutes(Math.Max(1, Settings.IntervalMinutes));
             TimeSpan dueTime = startImmediately ? TimeSpan.Zero : interval;
@@ -184,6 +206,16 @@ public sealed class SyncAgent : IDisposable
 
     private async Task<UploadResult> UploadPreparedAsync(PreparedSync prepared)
     {
+        if (!RequireSetup())
+        {
+            return new UploadResult
+            {
+                Status = UploadStatus.Forbidden,
+                ErrorCode = UploadErrorCode.Forbidden,
+                Message = "Choose this device type before syncing.",
+            };
+        }
+
         if (!IsConnected)
         {
             Log("Not connected — connect your account first.");
@@ -196,8 +228,11 @@ public sealed class SyncAgent : IDisposable
         }
 
         Log("Syncing approved hosted body…");
-        using var client = new ShelfboundClient(Settings.ServerUrl, _token!);
-        UploadResult result = await client.UploadAsync(prepared.Upload);
+        UploadResult result = await _dependencies.UploadAsync(
+            Settings.ServerUrl,
+            _token!,
+            prepared.Upload,
+            CancellationToken.None);
         Log(Describe(result));
         if (!string.IsNullOrWhiteSpace(result.Warning))
             Log($"Server warning — {result.Warning}");
@@ -213,7 +248,8 @@ public sealed class SyncAgent : IDisposable
 
     private void UpdateStatus()
     {
-        StatusLine = !IsConnected ? "Not connected"
+        StatusLine = !IsSetupComplete ? "Setup required — choose this device type"
+            : !IsConnected ? "Not connected"
             : Settings.AutoSync && !HasUploadConsent ? "Connected — review an upload to enable auto-sync"
             : LastSync is null ? "Connected — not synced yet"
             : $"Last synced {Friendly(LastSync.Value)}";
@@ -229,6 +265,15 @@ public sealed class SyncAgent : IDisposable
                 _history.RemoveAt(_history.Count - 1);
         }
         Changed?.Invoke();
+    }
+
+    private bool RequireSetup()
+    {
+        if (IsSetupComplete)
+            return true;
+
+        Log("Choose this device type before using hosted features.");
+        return false;
     }
 
     private static string Friendly(DateTimeOffset when)
@@ -253,4 +298,30 @@ public sealed class SyncAgent : IDisposable
     };
 
     public void Dispose() => _timer?.Dispose();
+}
+
+internal sealed record SyncAgentDependencies
+{
+    public required Func<SnapshotBuildOptions, CancellationToken, Task<SnapshotBuildResult>> BuildSnapshotAsync { get; init; }
+    public required Func<string, string, string, CancellationToken, Task<ConnectFlowResult?>> ConnectAsync { get; init; }
+    public required Func<string, string, HostedUpload, CancellationToken, Task<UploadResult>> UploadAsync { get; init; }
+    public required Func<string?> LoadToken { get; init; }
+    public required Action ClearToken { get; init; }
+    public required Action<AppSettings> SaveSettings { get; init; }
+    public required Action<bool> ApplyAutoStart { get; init; }
+
+    public static SyncAgentDependencies Default { get; } = new()
+    {
+        BuildSnapshotAsync = SnapshotBuilder.BuildAsync,
+        ConnectAsync = ConnectFlow.RunAsync,
+        UploadAsync = async (serverUrl, token, upload, ct) =>
+        {
+            using var client = new ShelfboundClient(serverUrl, token);
+            return await client.UploadAsync(upload, ct);
+        },
+        LoadToken = TokenStore.Load,
+        ClearToken = TokenStore.Clear,
+        SaveSettings = settings => settings.Save(),
+        ApplyAutoStart = AutoStart.Apply,
+    };
 }

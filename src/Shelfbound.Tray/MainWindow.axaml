@@ -73,6 +73,17 @@
         </Grid>
       </Border>
 
+      <Border x:Name="DeviceTypeSetupCard" Classes="card" BorderBrush="#6366f1">
+        <StackPanel Spacing="9">
+          <TextBlock Classes="label" Text="DEVICE TYPE"/>
+          <TextBlock x:Name="DeviceTypeSetupText" Foreground="#e2e8f0" FontSize="12" TextWrapping="Wrap"/>
+          <StackPanel Orientation="Horizontal" Spacing="10">
+            <ComboBox x:Name="DeviceTypeInput" Width="190"/>
+            <Button x:Name="SaveDeviceTypeButton" Classes="primary" Content="Save device type"/>
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
       <!-- Two-column dashboard so everything fits without scrolling -->
       <Grid ColumnDefinitions="*,*" ColumnSpacing="14">
 

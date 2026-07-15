@@ -1,6 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Threading;
+using Shelfbound.Core.Model;
 using Shelfbound.Steam.Steam;
 
 namespace Shelfbound.Tray;
@@ -37,8 +38,15 @@ public partial class MainWindow : Window
         StartLoginCheck.IsChecked = _agent.Settings.StartOnLogin;
         StartMinimizedCheck.IsChecked = _agent.Settings.StartMinimized;
         AutoUpdateCheck.IsChecked = _agent.Settings.AutoUpdate;
+        DeviceTypeInput.ItemsSource = DeviceTypeSetup.Choices;
+        DeviceType? initialDeviceType = DeviceTypeSetup.GetInitialSelection(
+            _agent.Settings.DeviceType,
+            _agent.SuggestedDeviceType);
+        DeviceTypeInput.SelectedItem = DeviceTypeSetup.Choices.FirstOrDefault(choice =>
+            choice.Type == initialDeviceType);
         _loading = false;
         UpdateSyncEnabledState();
+        UpdateDeviceTypeSaveState();
     }
 
     private void WireEvents()
@@ -58,6 +66,8 @@ public partial class MainWindow : Window
         StartMinimizedCheck.IsCheckedChanged += (_, _) => Apply();
         AutoUpdateCheck.IsCheckedChanged += (_, _) => Apply();
         IntervalInput.ValueChanged += (_, _) => Apply();
+        DeviceTypeInput.SelectionChanged += (_, _) => UpdateDeviceTypeSaveState();
+        SaveDeviceTypeButton.Click += (_, _) => SaveDeviceType();
         // Drag the window by the custom title bar (we draw our own chrome).
         TitleBar.PointerPressed += (_, e) =>
         {
@@ -95,6 +105,17 @@ public partial class MainWindow : Window
     // The interval only applies to background auto-sync — grey it out when that's off.
     private void UpdateSyncEnabledState() => IntervalRow.IsEnabled = AutoSyncCheck.IsChecked ?? false;
 
+    private void UpdateDeviceTypeSaveState() =>
+        SaveDeviceTypeButton.IsEnabled = DeviceTypeInput.SelectedItem is DeviceTypeChoice;
+
+    private void SaveDeviceType()
+    {
+        if (DeviceTypeInput.SelectedItem is not DeviceTypeChoice choice)
+            return;
+
+        _agent.UpdateSettings(settings => settings.DeviceType = choice.Type);
+    }
+
     private void OnAgentChanged() => Dispatcher.UIThread.Post(Refresh);
     private void OnUpdateChanged() => Dispatcher.UIThread.Post(RefreshUpdate);
 
@@ -104,9 +125,27 @@ public partial class MainWindow : Window
         DeviceText.Text = _agent.IsConnected
             ? $"Device: {DeviceName()}"
             : "Sign in to connect this device.";
-        SyncButton.IsEnabled = _agent.IsConnected && !_syncInProgress;
+        SyncButton.IsEnabled = _agent.IsConnected && _agent.IsSetupComplete && !_syncInProgress;
+        ConnectButton.IsEnabled = _agent.IsSetupComplete;
+        RefreshDeviceTypeSetup();
         HistoryList.ItemsSource = _agent.History;
         RefreshAccount();
+    }
+
+    private void RefreshDeviceTypeSetup()
+    {
+        if (_agent.IsSetupComplete)
+        {
+            DeviceTypeSetupText.Text = $"Currently: {DeviceTypeSetup.LabelFor(_agent.Settings.DeviceType!.Value)}. Change it here when this device changes.";
+        }
+        else if (_agent.SuggestedDeviceType == DeviceType.SteamDeck)
+        {
+            DeviceTypeSetupText.Text = "We detected a Steam Deck. Confirm it, or choose a different type, before connecting or syncing.";
+        }
+        else
+        {
+            DeviceTypeSetupText.Text = "Choose what kind of device this is before connecting or syncing. Other / not sure is a valid choice.";
+        }
     }
 
     private void RefreshAccount()
@@ -151,7 +190,7 @@ public partial class MainWindow : Window
         finally
         {
             _syncInProgress = false;
-            SyncButton.IsEnabled = _agent.IsConnected;
+            SyncButton.IsEnabled = _agent.IsConnected && _agent.IsSetupComplete;
         }
     }
 
@@ -208,6 +247,18 @@ public partial class MainWindow : Window
 
     protected override void OnClosing(WindowClosingEventArgs e)
     {
+        if (e.CloseReason == WindowCloseReason.ApplicationShutdown)
+        {
+            base.OnClosing(e);
+            return;
+        }
+
+        if (!_agent.IsSetupComplete)
+        {
+            e.Cancel = true;
+            return;
+        }
+
         // Hide to the tray instead of quitting; the agent keeps running in the background.
         e.Cancel = true;
         Hide();

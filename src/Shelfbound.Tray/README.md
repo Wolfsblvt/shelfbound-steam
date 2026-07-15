@@ -32,6 +32,10 @@ token.
 - **Connect account** (tray menu or window button) opens the dashboard in your browser to sign in. The browser
   returns a short-lived one-time code to an exact numeric-loopback callback; the tray redeems it directly for
   a device-bound, upload-only token. A bearer never enters browser navigation, history, or callback URLs.
+- Before connecting or syncing, choose this device's type: **Desktop**, **Laptop**, **Steam Deck**, or
+  **Other / not sure**. This is an explicit setup choice, not a hardware guess; a detected Steam Deck is only
+  suggested until saved. The same control remains available later, and changing it affects subsequent previews
+  and uploads while preserving the device id, device-name binding, and token.
 - The **Account** card intentionally shows only this device's bound name and **"Connected (upload-only)"**.
   The device token cannot read account, plan, library, or MCP data. A **"Manage devices in dashboard"** button
   opens the web dashboard for the full device list and revocation. **Sign out** clears the local token and stops
@@ -59,8 +63,9 @@ hostname. Game and collection names are still personal data.
 
 - Settings live in `…/AppData/shelfbound/tray.json` (server URLs default to localhost for now); the upload-only
   device token is stored separately in `token.bin` — DPAPI-encrypted on Windows, a 0600 file elsewhere.
-- The settings file also records only the consented hosted-projection version; it does not duplicate the
-  preview body.
+- The settings file records the explicit device type and consented hosted-projection version; it does not
+  duplicate the preview body. Missing or unrecognised device types require setup again without discarding
+  unrelated settings or the token.
 - Login auto-start is wired for Windows (Run key), Linux (`~/.config/autostart`), and macOS (LaunchAgent).
 
 ## Auto-update

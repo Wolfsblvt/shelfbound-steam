@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Shelfbound.Core.Model;
 
 namespace Shelfbound.Tray;
 
@@ -13,6 +14,8 @@ public sealed class AppSettings
     public string ServerUrl { get; set; } = "http://localhost:5080";
     public string WebAppUrl { get; set; } = "http://localhost:5173";
     public string? DeviceName { get; set; }
+    [JsonConverter(typeof(SelectedDeviceTypeConverter))]
+    public DeviceType? DeviceType { get; set; }
     public bool AutoSync { get; set; }
     // Background upload stays disabled until the user previews and successfully sends this projection version.
     public string? HostedUploadConsentVersion { get; set; }
@@ -31,12 +34,14 @@ public sealed class AppSettings
     private static string FilePath =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "shelfbound", "tray.json");
 
-    public static AppSettings Load()
+    public static AppSettings Load() => Load(FilePath);
+
+    internal static AppSettings Load(string filePath)
     {
         try
         {
-            if (File.Exists(FilePath))
-                return JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(FilePath), Options) ?? new AppSettings();
+            if (File.Exists(filePath))
+                return Deserialize(File.ReadAllText(filePath));
         }
         catch
         {
@@ -45,9 +50,60 @@ public sealed class AppSettings
         return new AppSettings();
     }
 
-    public void Save()
+    public void Save() => Save(FilePath);
+
+    internal void Save(string filePath)
     {
-        Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
-        File.WriteAllText(FilePath, JsonSerializer.Serialize(this, Options));
+        Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
+        string temporaryPath = $"{filePath}.{Guid.NewGuid():N}.tmp";
+        try
+        {
+            File.WriteAllText(temporaryPath, Serialize(this));
+            File.Move(temporaryPath, filePath, overwrite: true);
+        }
+        finally
+        {
+            try { File.Delete(temporaryPath); } catch { /* nothing to clean up */ }
+        }
+    }
+
+    internal static AppSettings Deserialize(string json) =>
+        JsonSerializer.Deserialize<AppSettings>(json, Options) ?? new AppSettings();
+
+    internal static string Serialize(AppSettings settings) => JsonSerializer.Serialize(settings, Options);
+
+    private sealed class SelectedDeviceTypeConverter : JsonConverter<DeviceType?>
+    {
+        public override DeviceType? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            if (reader.TokenType == JsonTokenType.Null)
+                return null;
+
+            if (reader.TokenType == JsonTokenType.String &&
+                Enum.TryParse(reader.GetString(), ignoreCase: true, out DeviceType value) &&
+                DeviceTypeSetup.IsComplete(value))
+            {
+                return value;
+            }
+
+            if (reader.TokenType == JsonTokenType.Number &&
+                reader.TryGetInt32(out int number) &&
+                Enum.IsDefined((DeviceType)number) &&
+                DeviceTypeSetup.IsComplete((DeviceType)number))
+            {
+                return (DeviceType)number;
+            }
+
+            reader.Skip();
+            return null;
+        }
+
+        public override void Write(Utf8JsonWriter writer, DeviceType? value, JsonSerializerOptions options)
+        {
+            if (value is { } selected && DeviceTypeSetup.IsComplete(selected))
+                writer.WriteStringValue(selected.ToString());
+            else
+                writer.WriteNullValue();
+        }
     }
 }

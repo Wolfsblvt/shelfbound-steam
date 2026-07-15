@@ -32,9 +32,9 @@ public partial class App : Application
 
             SetupTray(desktop, appIcon);
 
-            // Start hidden in the tray when configured — but always show on first run (not connected yet)
-            // so the user sees the "Connect account" prompt instead of wondering where the app went.
-            if (!_agent.Settings.StartMinimized || !_agent.IsConnected)
+            // Setup must stay visible until the user makes the explicit device-type choice. A connected
+            // upgraded install may retain its token, but it still cannot resume hosted work silently.
+            if (!_agent.Settings.StartMinimized || !_agent.IsConnected || !_agent.IsSetupComplete)
                 ShowWindow();
 
             // Check for updates in the background — a no-op unless installed via the Velopack installer,

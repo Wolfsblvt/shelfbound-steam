@@ -131,6 +131,10 @@ uploading.
   material field-purpose change invalidates that consent. Projection v2 renews consent for the changed
   `stats.scope` purpose without adding a new uploaded field. Legacy documents retain their published
   scope label and schema identity in the preview/body; consumers apply the compatibility normalization.
+- Before any tray hosted action, the user must explicitly save this device's type. The existing `device.type`
+  field and its purpose are unchanged: Desktop, Laptop, Steam Deck, and Other / not sure (explicit `unknown`) are
+  valid choices; a Steam Deck suggestion still requires confirmation. This is local setup truth, not a new
+  projected field or a consent-version change.
 - Decky returns one prepared body plus a one-use upload id. Confirming sends those exact bytes; a
   stale/reused id is rejected and requires a fresh preview.
 

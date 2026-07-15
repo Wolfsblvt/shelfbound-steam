@@ -24,6 +24,16 @@ public static class DeviceIdentity
     };
 
     /// <summary>
+    /// Returns a conservative device-type suggestion when one is available. This is never an
+    /// explicit user choice and callers must not treat it as one.
+    /// </summary>
+    public static DeviceType? SuggestType()
+    {
+        DeviceType detected = DetectType();
+        return detected == DeviceType.Unknown ? null : detected;
+    }
+
+    /// <summary>
     /// Resolves and validates the snapshot device name. The same normalized value is used by native
     /// connect-code binding and snapshot uploads, so surrounding whitespace can never create two
     /// different device identities.

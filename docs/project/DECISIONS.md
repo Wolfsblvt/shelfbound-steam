@@ -264,6 +264,19 @@ richer card would violate least privilege.
   Keychain/libsecret integration remains a follow-up; the residual non-Windows weakness is materially constrained
   now that the stored credential can only upload for one bound device.
 
+### Explicit tray device type is setup truth, not a hardware inference
+
+The hosted projection already carries `device.type`, but a tray without an explicit override could only identify a
+Steam Deck conservatively and otherwise uploaded `unknown`. Desktop and laptop guesses from batteries, chassis strings,
+or hardware models would be unreliable and turn inferred machine details into account truth.
+
+**Decision (implemented):** the tray requires the user to save one of Desktop, Laptop, Steam Deck, or Other / not sure
+before it can connect, prepare, upload, or schedule hosted work. Other / not sure is an explicit, valid `unknown`;
+missing or future/unrecognised local values are incomplete setup instead. Steam Deck detection may highlight a suggested
+choice, but never completes setup without confirmation. The same choice remains editable and is passed through the
+shared snapshot identity seam, preserving the random device id, normalized device-name binding, token, schema, and
+consent version. Upgrades retain all settings and any token, then require this choice before the next hosted action.
+
 *Considered and rejected:* retaining or minting a broad Bearer so the tray could continue showing display name,
 plan, and allowance. That trades a cosmetic account card for account/library authority on a background uploader.
 A future richer account view needs a separate interactive read session, not broader device-token scope.
