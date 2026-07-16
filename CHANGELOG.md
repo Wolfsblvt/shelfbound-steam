@@ -29,6 +29,8 @@ section up to date as you work — the release step promotes it to a new version
   never enters browser URLs, history, or callback records.
 - Limited GitHub Release write permission to the Windows and Linux tray publishing jobs; all other release-workflow
   jobs inherit read-only repository access.
+- Routed tray-release event/ref data through runner environment variables and an exact validated tag output, preventing
+  adversarial ref names from becoming shell source or a GitHub Release target.
 
 ## [0.6.0] - 2026-07-02
 ### Added

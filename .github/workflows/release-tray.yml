@@ -24,16 +24,21 @@ jobs:
     outputs:
       version: ${{ steps.identity.outputs.version }}
       is_release: ${{ steps.identity.outputs.is_release }}
+      release_tag: ${{ steps.identity.outputs.release_tag }}
     steps:
       - uses: actions/checkout@v7
       - name: Validate tray release identity
         id: identity
         shell: pwsh
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
         run: >
           pwsh scripts/assert-tray-release.ps1
-          -EventName '${{ github.event_name }}'
-          -RefType '${{ github.ref_type }}'
-          -RefName '${{ github.ref_name }}'
+          -EventName $env:EVENT_NAME
+          -RefType $env:REF_TYPE
+          -RefName $env:REF_NAME
           -OutputPath $env:GITHUB_OUTPUT
 
   quality:
@@ -117,28 +122,33 @@ jobs:
           if-no-files-found: error
       - name: Prepare GitHub Release notes from CHANGELOG
         if: needs.identity.outputs.is_release == 'true'
+        env:
+          RELEASE_TAG: ${{ needs.identity.outputs.release_tag }}
         run: >
           pwsh scripts/assert-tray-release.ps1
-          -EventName '${{ github.event_name }}'
-          -RefType '${{ github.ref_type }}'
-          -RefName '${{ github.ref_name }}'
+          -EventName push
+          -RefType tag
+          -RefName $env:RELEASE_TAG
           -ReleaseNotesPath (Join-Path $env:RUNNER_TEMP 'release-notes.md')
       - name: Publish to GitHub Releases
         if: needs.identity.outputs.is_release == 'true'
+        env:
+          RELEASE_TAG: ${{ needs.identity.outputs.release_tag }}
         run: >
           vpk upload github
           --repoUrl "https://github.com/${{ github.repository }}"
           --token "${{ secrets.GITHUB_TOKEN }}"
           --publish
           --releaseName "Shelfbound Tray ${{ needs.identity.outputs.version }}"
-          --tag "${{ github.ref_name }}"
+          --tag "$env:RELEASE_TAG"
       # Set the Release body from the file prepared by the same gate that validated this tagged commit.
       - name: Set release notes from CHANGELOG
         if: needs.identity.outputs.is_release == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.identity.outputs.release_tag }}
         run: |
-          gh release edit '${{ github.ref_name }}' --notes-file (Join-Path $env:RUNNER_TEMP 'release-notes.md')
+          gh release edit $env:RELEASE_TAG --notes-file (Join-Path $env:RUNNER_TEMP 'release-notes.md')
           Write-Host "Release notes set from CHANGELOG [${{ needs.identity.outputs.version }}]."
 
   linux:
@@ -183,13 +193,15 @@ jobs:
           if-no-files-found: error
       - name: Publish to GitHub Releases
         if: needs.identity.outputs.is_release == 'true'
+        env:
+          RELEASE_TAG: ${{ needs.identity.outputs.release_tag }}
         run: >
           vpk upload github
           --repoUrl "https://github.com/${{ github.repository }}"
           --token "${{ secrets.GITHUB_TOKEN }}"
           --publish
           --releaseName "Shelfbound Tray ${{ needs.identity.outputs.version }}"
-          --tag "${{ github.ref_name }}"
+          --tag "$RELEASE_TAG"
 
   macos:
     # Unsigned build for testers only — NOT published to the Release. Gatekeeper blocks unsigned/un-notarized

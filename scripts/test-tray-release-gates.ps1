@@ -107,6 +107,45 @@ function Get-JobPermissionLines {
     return $permissionLines
 }
 
+function Get-WorkflowRunBlocks {
+    param([Parameter(Mandatory)][string]$Workflow)
+
+    $lines = $Workflow -split '\r?\n'
+    $blocks = @()
+    for ($index = 0; $index -lt $lines.Count; $index++) {
+        if ($lines[$index] -notmatch '^(?<indent>\s*)run:\s*(?<value>.*)$') {
+            continue
+        }
+
+        $indent = $Matches.indent.Length
+        $content = @($Matches.value)
+        if ($Matches.value.Trim() -match '^[>|]') {
+            for ($next = $index + 1; $next -lt $lines.Count; $next++) {
+                $line = $lines[$next]
+                $lineIndent = $line.Length - $line.TrimStart().Length
+                if ($line.Trim().Length -gt 0 -and $lineIndent -le $indent) {
+                    break
+                }
+                $content += $line
+            }
+        }
+
+        $blocks += ($content -join "`n")
+    }
+
+    return $blocks
+}
+
+function Assert-NoRawGitHubRefInRunBlocks {
+    param([Parameter(Mandatory)][string]$Workflow)
+
+    foreach ($runBlock in Get-WorkflowRunBlocks -Workflow $Workflow) {
+        if ($runBlock -match '\$\{\{\s*github\.(?:event_name|ref_type|ref_name)\s*\}\}') {
+            throw 'Release workflow run blocks must not interpolate raw GitHub event/ref contexts.'
+        }
+    }
+}
+
 function Assert-TrayReleaseWorkflowContract {
     param([Parameter(Mandatory)][string]$WorkflowPath)
 
@@ -151,9 +190,22 @@ function Assert-TrayReleaseWorkflowContract {
 
     Assert-WorkflowMatch -Text $workflow -Pattern '(?m)^      - "tray-v\*"\s*$' -Message 'Release workflow must keep the tray-v* push-tag trigger.'
     Assert-WorkflowMatch -Text $workflow -Pattern '(?m)^  workflow_dispatch:\s*$' -Message 'Release workflow must retain workflow_dispatch artifact rehearsals.'
-    Assert-WorkflowMatch -Text $jobs.windows -Pattern "(?ms)^      - name: Publish to GitHub Releases\s*\r?\n        if: needs\.identity\.outputs\.is_release == 'true'\s*\r?\n        run:" -Message 'Windows publication must remain gated by the fail-closed release identity output.'
+    Assert-NoRawGitHubRefInRunBlocks -Workflow $workflow
+    Assert-WorkflowMatch -Text $jobs.identity -Pattern '(?m)^      release_tag: \$\{\{ steps\.identity\.outputs\.release_tag \}\}\s*$' -Message 'Identity must expose the validated release tag output.'
+    Assert-WorkflowMatch -Text $jobs.identity -Pattern '(?m)^          EVENT_NAME: \$\{\{ github\.event_name \}\}\s*$' -Message 'Identity must receive the event name as runner environment data.'
+    Assert-WorkflowMatch -Text $jobs.identity -Pattern '(?m)^          REF_TYPE: \$\{\{ github\.ref_type \}\}\s*$' -Message 'Identity must receive the ref type as runner environment data.'
+    Assert-WorkflowMatch -Text $jobs.identity -Pattern '(?m)^          REF_NAME: \$\{\{ github\.ref_name \}\}\s*$' -Message 'Identity must receive the ref name as runner environment data.'
+    Assert-WorkflowMatch -Text $jobs.identity -Pattern '(?m)^          -EventName \$env:EVENT_NAME\s*$' -Message 'Identity must read the event name from runner environment data.'
+    Assert-WorkflowMatch -Text $jobs.identity -Pattern '(?m)^          -RefType \$env:REF_TYPE\s*$' -Message 'Identity must read the ref type from runner environment data.'
+    Assert-WorkflowMatch -Text $jobs.identity -Pattern '(?m)^          -RefName \$env:REF_NAME\s*$' -Message 'Identity must read the ref name from runner environment data.'
+    Assert-WorkflowMatch -Text $jobs.windows -Pattern "(?ms)^      - name: Publish to GitHub Releases(?:(?!^      - ).)*?^        if: needs\.identity\.outputs\.is_release == 'true'(?:(?!^      - ).)*?^        run:" -Message 'Windows publication must remain gated by the fail-closed release identity output.'
     Assert-WorkflowMatch -Text $jobs.windows -Pattern "(?ms)^      - name: Set release notes from CHANGELOG\s*\r?\n        if: needs\.identity\.outputs\.is_release == 'true'\s*\r?\n        env:" -Message 'Windows release-note mutation must remain gated by the fail-closed release identity output.'
-    Assert-WorkflowMatch -Text $jobs.linux -Pattern "(?ms)^      - name: Publish to GitHub Releases\s*\r?\n        if: needs\.identity\.outputs\.is_release == 'true'\s*\r?\n        run:" -Message 'Linux publication must remain gated by the fail-closed release identity output.'
+    Assert-WorkflowMatch -Text $jobs.linux -Pattern "(?ms)^      - name: Publish to GitHub Releases(?:(?!^      - ).)*?^        if: needs\.identity\.outputs\.is_release == 'true'(?:(?!^      - ).)*?^        run:" -Message 'Linux publication must remain gated by the fail-closed release identity output.'
+    Assert-WorkflowMatch -Text $jobs.windows -Pattern '(?m)^          RELEASE_TAG: \$\{\{ needs\.identity\.outputs\.release_tag \}\}\s*$' -Message 'Windows release mutations must receive the validated tag output as environment data.'
+    Assert-WorkflowMatch -Text $jobs.linux -Pattern '(?m)^          RELEASE_TAG: \$\{\{ needs\.identity\.outputs\.release_tag \}\}\s*$' -Message 'Linux publication must receive the validated tag output as environment data.'
+    Assert-WorkflowMatch -Text $jobs.windows -Pattern '(?m)^          --tag "\$env:RELEASE_TAG"\s*$' -Message 'Windows publication must target the validated identity output.'
+    Assert-WorkflowMatch -Text $jobs.windows -Pattern '(?m)^          gh release edit \$env:RELEASE_TAG\s+--notes-file' -Message 'Windows release-note editing must target the validated identity output.'
+    Assert-WorkflowMatch -Text $jobs.linux -Pattern '(?m)^          --tag "\$RELEASE_TAG"\s*$' -Message 'Linux publication must target the validated identity output.'
     Assert-WorkflowMatch -Text $jobs.windows -Pattern '(?m)^    needs: \[identity, quality\]\s*$' -Message 'Windows must require identity and quality before publishing.'
     Assert-WorkflowMatch -Text $jobs.linux -Pattern '(?m)^    needs: \[identity, quality, windows\]\s*$' -Message 'Linux must wait for Windows to create the Release.'
     Assert-WorkflowMatch -Text $jobs.macos -Pattern '(?m)^    needs: \[identity, quality\]\s*$' -Message 'macOS must require identity and quality before artifact packaging.'
@@ -224,6 +276,34 @@ try {
     Assert-Throws {
         Assert-TrayReleaseWorkflowContract -WorkflowPath (New-FixtureFile 'unguarded-publish.yml' ([regex]::Replace($workflow, "if: needs\.identity\.outputs\.is_release == 'true'", 'if: always()', 1)))
     } 'must remain gated'
+    $unsafeRunInterpolation = $workflow.Replace('-EventName $env:EVENT_NAME', '-EventName ''${{ github.event_name }}''')
+    if ($unsafeRunInterpolation -eq $workflow) {
+        throw 'The raw GitHub context rejection fixture did not change the identity command.'
+    }
+    Assert-Throws {
+        Assert-TrayReleaseWorkflowContract -WorkflowPath (New-FixtureFile 'raw-github-context-in-run.yml' $unsafeRunInterpolation)
+    } 'must not interpolate raw GitHub event/ref contexts'
+    $unsafeWindowsTag = $workflow.Replace('--tag "$env:RELEASE_TAG"', '--tag "tray-v1.2.3"')
+    if ($unsafeWindowsTag -eq $workflow) {
+        throw 'The Windows validated-tag rejection fixture did not change the publication target.'
+    }
+    Assert-Throws {
+        Assert-TrayReleaseWorkflowContract -WorkflowPath (New-FixtureFile 'windows-unvalidated-tag.yml' $unsafeWindowsTag)
+    } 'Windows publication must target the validated identity output'
+    $unsafeLinuxTag = $workflow.Replace('--tag "$RELEASE_TAG"', '--tag "tray-v1.2.3"')
+    if ($unsafeLinuxTag -eq $workflow) {
+        throw 'The Linux validated-tag rejection fixture did not change the publication target.'
+    }
+    Assert-Throws {
+        Assert-TrayReleaseWorkflowContract -WorkflowPath (New-FixtureFile 'linux-unvalidated-tag.yml' $unsafeLinuxTag)
+    } 'Linux publication must target the validated identity output'
+    $unsafeReleaseEdit = $workflow.Replace('gh release edit $env:RELEASE_TAG', 'gh release edit tray-v1.2.3')
+    if ($unsafeReleaseEdit -eq $workflow) {
+        throw 'The release-note validated-tag rejection fixture did not change the edit target.'
+    }
+    Assert-Throws {
+        Assert-TrayReleaseWorkflowContract -WorkflowPath (New-FixtureFile 'release-edit-unvalidated-tag.yml' $unsafeReleaseEdit)
+    } 'Windows release-note editing must target the validated identity output'
 
     $props = New-FixtureFile 'valid.props' '<Project><PropertyGroup><Version>1.2.3</Version></PropertyGroup></Project>'
     $prereleaseProps = New-FixtureFile 'prerelease.props' '<Project><PropertyGroup><Version>1.2.3-rc.1</Version></PropertyGroup></Project>'
@@ -243,12 +323,12 @@ try {
 '@
 
     $stable = Invoke-TrayGate -EventName 'push' -RefType 'tag' -RefName 'tray-v1.2.3' -PropsPath $props -ChangelogPath $changelog -WriteNotes
-    if ($stable.version -ne '1.2.3' -or $stable.is_release -ne 'true' -or $stable.notes -notmatch 'Stable release notes') {
-        throw 'The valid stable tag fixture did not preserve version, release mode, and extracted notes.'
+    if ($stable.version -ne '1.2.3' -or $stable.is_release -ne 'true' -or $stable.release_tag -ne 'tray-v1.2.3' -or $stable.notes -notmatch 'Stable release notes') {
+        throw 'The valid stable tag fixture did not preserve version, release mode, validated tag, and extracted notes.'
     }
 
     $prerelease = Invoke-TrayGate -EventName 'push' -RefType 'tag' -RefName 'tray-v1.2.3-rc.1' -PropsPath $prereleaseProps -ChangelogPath $changelog
-    if ($prerelease.version -ne '1.2.3-rc.1' -or $prerelease.is_release -ne 'true') {
+    if ($prerelease.version -ne '1.2.3-rc.1' -or $prerelease.is_release -ne 'true' -or $prerelease.release_tag -ne 'tray-v1.2.3-rc.1') {
         throw 'The admitted prerelease tag fixture was rejected or resolved incorrectly.'
     }
 
@@ -278,12 +358,12 @@ try {
     Assert-Throws { Invoke-TrayGate -EventName 'push' -RefType 'tag' -RefName 'tray-v1.2.3' -PropsPath $props -ChangelogPath $emptyChangelog } 'no release-note content'
 
     $dispatch = Invoke-TrayGate -EventName 'workflow_dispatch' -RefType 'branch' -RefName 'main' -PropsPath $props -ChangelogPath (Join-Path $fixtureRoot 'not-needed.md')
-    if ($dispatch.version -ne '1.2.3' -or $dispatch.is_release -ne 'false') {
+    if ($dispatch.version -ne '1.2.3' -or $dispatch.is_release -ne 'false' -or $dispatch.release_tag -ne '') {
         throw 'An ordinary dispatch must use committed props and remain artifact-only.'
     }
 
     $trayNamedDispatch = Invoke-TrayGate -EventName 'workflow_dispatch' -RefType 'branch' -RefName 'tray-v1.2.3' -PropsPath $props -ChangelogPath (Join-Path $fixtureRoot 'also-not-needed.md')
-    if ($trayNamedDispatch.version -ne '1.2.3' -or $trayNamedDispatch.is_release -ne 'false') {
+    if ($trayNamedDispatch.version -ne '1.2.3' -or $trayNamedDispatch.is_release -ne 'false' -or $trayNamedDispatch.release_tag -ne '') {
         throw 'A dispatch from a tray-v-looking branch must remain artifact-only.'
     }
 }
