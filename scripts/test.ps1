@@ -3,6 +3,12 @@
 .SYNOPSIS
   Runs the Shelfbound open-core .NET and Decky Python test suites.
 #>
+[CmdletBinding()]
+param(
+    [ValidateSet('Debug', 'Release')]
+    [string]$Configuration = 'Debug',
+    [switch]$WarnAsError
+)
 
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
@@ -28,8 +34,16 @@ function Resolve-Python {
     return $python.Source
 }
 
-Write-Host 'Running steam core tests...' -ForegroundColor Cyan
-dotnet test (Join-Path $root 'Shelfbound.slnx') --verbosity normal
+Write-Host "Running steam core tests ($Configuration)..." -ForegroundColor Cyan
+$dotnetArguments = @(
+    (Join-Path $root 'Shelfbound.slnx'),
+    '--configuration', $Configuration,
+    '--verbosity', 'normal'
+)
+if ($WarnAsError) {
+    $dotnetArguments += '-warnaserror'
+}
+dotnet test @dotnetArguments
 if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
 }

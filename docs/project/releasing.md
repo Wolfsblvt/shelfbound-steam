@@ -110,7 +110,8 @@ Run the workflow via **`workflow_dispatch`** (Actions tab → *Release Tray* →
 `gh workflow run release-tray.yml --ref <branch>`). It builds all platforms and uploads the installers as
 **Actions artifacts only** — no GitHub Release, no publish. Do this at least once on a branch (or after
 merge) before the first real tag, since the Linux/macOS packaging only runs on CI. The workflow file must
-exist on the branch you target.
+exist on the branch you target. Dispatch always uses the selected commit's `Directory.Build.props` version,
+even if the selected branch/ref name starts with `tray-v`; only an actual pushed tag is a release.
 
 Locally you can also pack Windows to eyeball the installer (outputs to `./Releases`):
 
@@ -122,8 +123,19 @@ vpk pack --packId Shelfbound.Tray --packVersion 0.6.1 --packDir publish --mainEx
 
 ### CI workflow shape
 
-[`.github/workflows/release-tray.yml`](../../.github/workflows/release-tray.yml): a shared **`version`** job
-resolves the version (from the tag, else `Directory.Build.props`), then
+[`scripts/assert-tray-release.ps1`](../../scripts/assert-tray-release.ps1) is the executable tray identity
+contract used by [`.github/workflows/release-tray.yml`](../../.github/workflows/release-tray.yml). Before any
+platform packages or uploads, it reads exactly one valid `<Version>` from `Directory.Build.props`.
+
+- On an actual `push` tag, it requires the exact `tray-v<version>` spelling, exact agreement with committed
+  props, and exactly one populated `## [<version>]` section in `CHANGELOG.md`. That same tested extractor
+  prepares the Release body before `vpk upload`; missing or empty notes fail before a GitHub Release exists.
+- On `workflow_dispatch`, it uses the committed props version, skips the promoted-version changelog
+  requirement, and returns artifact-only mode regardless of the ref name.
+
+The workflow then runs a **`quality`** job on that exact commit: the complete solution in Release with
+warnings as errors, the Decky pytest contract/security suite, and deterministic tray-release gate fixtures.
+Every platform job needs both `identity` and `quality` to pass; the jobs are:
 
 | Job | Runner | Output | On a `tray-v*` tag |
 | --- | --- | --- | --- |
