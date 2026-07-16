@@ -11,33 +11,55 @@ name: Release Tray
 on:
   push:
     tags:
-      - 'tray-v*'
+      - "tray-v*"
   workflow_dispatch:
 
 permissions:
-  contents: write   # required to create/publish GitHub Releases
+  contents: write # required to create/publish GitHub Releases
 
 jobs:
-  # Resolve the pack version once (from the tag on a tag push, else Directory.Build.props) and share it.
-  version:
+  # Fail closed on the exact checked-out source identity before any test, pack, artifact, or publish work.
+  identity:
     runs-on: ubuntu-latest
     outputs:
-      version: ${{ steps.v.outputs.version }}
+      version: ${{ steps.identity.outputs.version }}
+      is_release: ${{ steps.identity.outputs.is_release }}
     steps:
       - uses: actions/checkout@v7
-      - id: v
-        run: |
-          ref='${{ github.ref_name }}'
-          if [[ "$ref" == tray-v* ]]; then
-            version="${ref#tray-v}"                       # tag push: tray-v0.6.0 -> 0.6.0
-          else
-            version=$(sed -n 's/.*<Version>\(.*\)<\/Version>.*/\1/p' Directory.Build.props | head -1)
-          fi
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "Packing version $version"
+      - name: Validate tray release identity
+        id: identity
+        shell: pwsh
+        run: >
+          pwsh scripts/assert-tray-release.ps1
+          -EventName '${{ github.event_name }}'
+          -RefType '${{ github.ref_type }}'
+          -RefName '${{ github.ref_name }}'
+          -OutputPath $env:GITHUB_OUTPUT
+
+  quality:
+    needs: identity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: "10.0.x"
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: decky/requirements-dev.txt
+      - name: Install Decky test dependencies
+        run: python -m pip install -r decky/requirements-dev.txt
+      - name: Run complete release quality suite
+        shell: pwsh
+        run: pwsh scripts/test.ps1 -Configuration Release -WarnAsError
+      - name: Run tray release-gate fixtures
+        shell: pwsh
+        run: pwsh scripts/test-tray-release-gates.ps1
 
   windows:
-    needs: version
+    needs: [identity, quality]
     runs-on: windows-latest
     defaults:
       run:
@@ -46,7 +68,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: '10.0.x'
+          dotnet-version: "10.0.x"
       - name: Verify committed icons
         run: pwsh scripts/icons.ps1 -Check
       - name: Install Velopack CLI
@@ -56,8 +78,8 @@ jobs:
       - name: Publish (self-contained win-x64)
         run: dotnet publish src/Shelfbound.Tray/Shelfbound.Tray.csproj -c Release -r win-x64 --self-contained -o publish
       - name: Download previous release (for delta updates)
-        if: startsWith(github.ref, 'refs/tags/tray-v')
-        continue-on-error: true   # first release has nothing to delta against
+        if: needs.identity.outputs.is_release == 'true'
+        continue-on-error: true # first release has nothing to delta against
         run: vpk download github --repoUrl "https://github.com/${{ github.repository }}" --token "${{ secrets.GITHUB_TOKEN }}"
       - name: Pack (Velopack)
         env:
@@ -67,7 +89,7 @@ jobs:
           $packArgs = @(
             'pack',
             '--packId', 'Shelfbound.Tray',
-            '--packVersion', '${{ needs.version.outputs.version }}',
+            '--packVersion', '${{ needs.identity.outputs.version }}',
             '--packDir', 'publish',
             '--mainExe', 'Shelfbound.Tray.exe',
             '--packTitle', 'Shelfbound',
@@ -88,46 +110,41 @@ jobs:
           name: shelfbound-tray-win-x64
           path: Releases/*Setup.exe
           if-no-files-found: error
+      - name: Prepare GitHub Release notes from CHANGELOG
+        if: needs.identity.outputs.is_release == 'true'
+        run: >
+          pwsh scripts/assert-tray-release.ps1
+          -EventName '${{ github.event_name }}'
+          -RefType '${{ github.ref_type }}'
+          -RefName '${{ github.ref_name }}'
+          -ReleaseNotesPath (Join-Path $env:RUNNER_TEMP 'release-notes.md')
       - name: Publish to GitHub Releases
-        if: startsWith(github.ref, 'refs/tags/tray-v')
+        if: needs.identity.outputs.is_release == 'true'
         run: >
           vpk upload github
           --repoUrl "https://github.com/${{ github.repository }}"
           --token "${{ secrets.GITHUB_TOKEN }}"
           --publish
-          --releaseName "Shelfbound Tray ${{ needs.version.outputs.version }}"
+          --releaseName "Shelfbound Tray ${{ needs.identity.outputs.version }}"
           --tag "${{ github.ref_name }}"
-      # Set the Release body from CHANGELOG.md (single source of release notes; the tray links to it).
+      # Set the Release body from the file prepared by the same gate that validated this tagged commit.
       - name: Set release notes from CHANGELOG
-        if: startsWith(github.ref, 'refs/tags/tray-v')
+        if: needs.identity.outputs.is_release == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          $version = '${{ needs.version.outputs.version }}'
-          $changelog = Get-Content CHANGELOG.md -Raw
-          $pattern = "(?ms)^## \[$([regex]::Escape($version))\].*?(?=^## \[|\z)"
-          $match = [regex]::Match($changelog, $pattern)
-          if (-not $match.Success) {
-            Write-Host "::warning::No CHANGELOG section for [$version]; leaving vpk's default notes."
-            exit 0
-          }
-          $lines = $match.Value.Trim() -split "`r?`n"
-          $notes = (($lines | Select-Object -Skip 1) -join "`n").Trim()   # drop the "## [x] - date" header
-          if ([string]::IsNullOrWhiteSpace($notes)) { $notes = $match.Value.Trim() }
-          $file = Join-Path $env:RUNNER_TEMP 'release-notes.md'
-          Set-Content -Path $file -Value $notes -Encoding utf8
-          gh release edit '${{ github.ref_name }}' --notes-file $file
-          Write-Host "Release notes set from CHANGELOG [$version]."
+          gh release edit '${{ github.ref_name }}' --notes-file (Join-Path $env:RUNNER_TEMP 'release-notes.md')
+          Write-Host "Release notes set from CHANGELOG [${{ needs.identity.outputs.version }}]."
 
   linux:
     # After windows so the tagged Release already exists — avoids a create-release race on first upload.
-    needs: [version, windows]
+    needs: [identity, quality, windows]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: '10.0.x'
+          dotnet-version: "10.0.x"
       - name: Verify committed icons
         run: pwsh scripts/icons.ps1 -Check
       - name: Install AppImage runtime dependency
@@ -139,14 +156,14 @@ jobs:
       - name: Publish (self-contained linux-x64)
         run: dotnet publish src/Shelfbound.Tray/Shelfbound.Tray.csproj -c Release -r linux-x64 --self-contained -o publish
       - name: Download previous release (for delta updates)
-        if: startsWith(github.ref, 'refs/tags/tray-v')
+        if: needs.identity.outputs.is_release == 'true'
         continue-on-error: true
         run: vpk download github --repoUrl "https://github.com/${{ github.repository }}" --token "${{ secrets.GITHUB_TOKEN }}"
       - name: Pack (Velopack → AppImage)
         run: >
           vpk pack
           --packId Shelfbound.Tray
-          --packVersion "${{ needs.version.outputs.version }}"
+          --packVersion "${{ needs.identity.outputs.version }}"
           --packDir publish
           --mainExe Shelfbound.Tray
           --packTitle Shelfbound
@@ -158,25 +175,25 @@ jobs:
           path: Releases/*.AppImage
           if-no-files-found: error
       - name: Publish to GitHub Releases
-        if: startsWith(github.ref, 'refs/tags/tray-v')
+        if: needs.identity.outputs.is_release == 'true'
         run: >
           vpk upload github
           --repoUrl "https://github.com/${{ github.repository }}"
           --token "${{ secrets.GITHUB_TOKEN }}"
           --publish
-          --releaseName "Shelfbound Tray ${{ needs.version.outputs.version }}"
+          --releaseName "Shelfbound Tray ${{ needs.identity.outputs.version }}"
           --tag "${{ github.ref_name }}"
 
   macos:
     # Unsigned build for testers only — NOT published to the Release. Gatekeeper blocks unsigned/un-notarized
     # apps, so public macOS distribution waits on an Apple Developer cert + notarization (see the README).
-    needs: version
+    needs: [identity, quality]
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: '10.0.x'
+          dotnet-version: "10.0.x"
       - name: Verify committed icons
         run: pwsh scripts/icons.ps1 -Check
       - name: Install Velopack CLI
@@ -189,7 +206,7 @@ jobs:
         run: >
           vpk bundle
           --packId Shelfbound.Tray
-          --packVersion "${{ needs.version.outputs.version }}"
+          --packVersion "${{ needs.identity.outputs.version }}"
           --packDir publish
           --mainExe Shelfbound.Tray
           --packTitle Shelfbound
