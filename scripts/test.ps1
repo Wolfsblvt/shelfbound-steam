@@ -2,17 +2,24 @@
 <#
 .SYNOPSIS
   Runs the Shelfbound open-core .NET and Decky Python test suites.
+
+.PARAMETER DetailedOutput
+  Use normal dotnet/MSBuild and console-test verbosity. Green runs default to minimal output; failures still
+  print their diagnostics.
 #>
 [CmdletBinding()]
 param(
     [ValidateSet('Debug', 'Release')]
     [string]$Configuration = 'Debug',
-    [switch]$WarnAsError
+    [switch]$WarnAsError,
+    [switch]$DetailedOutput
 )
 
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $deckyPath = Join-Path $root 'decky'
+$dotnetVerbosity = if ($DetailedOutput) { 'normal' } else { 'minimal' }
+$testConsoleVerbosity = if ($DetailedOutput) { 'normal' } else { 'minimal' }
 
 function Resolve-Python {
     $venvPython = if ($IsWindows) {
@@ -38,7 +45,8 @@ Write-Host "Running steam core tests ($Configuration)..." -ForegroundColor Cyan
 $dotnetArguments = @(
     (Join-Path $root 'Shelfbound.slnx'),
     '--configuration', $Configuration,
-    '--verbosity', 'normal'
+    '--verbosity', $dotnetVerbosity,
+    '--logger', "console;verbosity=$testConsoleVerbosity"
 )
 if ($WarnAsError) {
     $dotnetArguments += '-warnaserror'

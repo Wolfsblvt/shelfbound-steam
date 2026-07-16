@@ -57,6 +57,9 @@ jobs:
       - name: Run tray release-gate fixtures
         shell: pwsh
         run: pwsh scripts/test-tray-release-gates.ps1
+      - name: Lint GitHub Actions workflows
+        shell: pwsh
+        run: pwsh scripts/actionlint.ps1
 
   windows:
     needs: [identity, quality]

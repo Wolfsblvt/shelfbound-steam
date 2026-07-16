@@ -42,7 +42,7 @@ decky/.venv/bin/python -m pip install -r decky/requirements-dev.txt
 ```bash
 dotnet build
 pwsh scripts/test.ps1    # .NET + Decky pytest
-pwsh scripts/lint.ps1    # C# format report + Decky lint/format gates
+pwsh scripts/lint.ps1    # C# report + Decky lint/format + pinned GitHub Actions actionlint
 dotnet run --project src/Shelfbound.Cli -- scan --pretty
 ```
 

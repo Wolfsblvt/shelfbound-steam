@@ -1,11 +1,11 @@
 #requires -Version 7
 <#
 .SYNOPSIS
-  Reports C# formatting/style and checks Decky ESLint/Prettier.
+  Reports C# formatting/style and checks Decky ESLint/Prettier plus GitHub Actions workflows.
 
 .DESCRIPTION
   C# style remains report-only: this command reports drift through `dotnet format`, but CI does not gate it.
-  Decky lint and format are required gates once the tree is clean.
+  Decky lint/format and actionlint are required gates once the tree is clean.
 
 .PARAMETER Fix
   Apply C# formatting plus safe Decky ESLint/Prettier fixes.
@@ -16,22 +16,29 @@
 .PARAMETER Decky
   Run only the Decky lint and format checks.
 
+.PARAMETER Workflows
+  Run only the pinned actionlint GitHub Actions check.
+
 .EXAMPLE
   pwsh scripts/lint.ps1
   pwsh scripts/lint.ps1 -Cs
   pwsh scripts/lint.ps1 -Decky -Fix
+  pwsh scripts/lint.ps1 -Workflows
 #>
 [CmdletBinding()]
 param(
     [switch]$Fix,
     [switch]$Cs,
-    [switch]$Decky
+    [switch]$Decky,
+    [switch]$Workflows
 )
 
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
-$runCs = $Cs -or -not $Decky
-$runDecky = $Decky -or -not $Cs
+$hasSelection = $Cs -or $Decky -or $Workflows
+$runCs = $Cs -or -not $hasSelection
+$runDecky = $Decky -or -not $hasSelection
+$runWorkflows = $Workflows -or -not $hasSelection
 $failed = @()
 
 function Invoke-Step {
@@ -85,6 +92,12 @@ if ($runDecky) {
         finally {
             Pop-Location
         }
+    }
+}
+
+if ($runWorkflows) {
+    Invoke-Step 'GitHub Actions actionlint' {
+        pwsh -NoProfile (Join-Path $PSScriptRoot 'actionlint.ps1')
     }
 }
 

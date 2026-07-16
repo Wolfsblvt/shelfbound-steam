@@ -58,7 +58,8 @@ The local Steam data is the moat. AI reasoning is commodity; good structured fac
   optional per-library `storage` and adds honest `observedSubset` coverage. The immutable library
   package mapping is `0.8.0` → schema `0.6.0`; published `0.7.0` remains schema `0.5.0` and `0.6.0`
   remains schema `0.4.0`.
-- Local Steam scanner (`Shelfbound.Steam`): install discovery, `libraryfolders.vdf`,
+- Local Steam scanner (`Shelfbound.Steam`): explicit/environment/Windows-current-user-registry/default install discovery,
+  `libraryfolders.vdf`,
   `appmanifest_*.acf`, `loginusers.vdf`, **local categories** — modern Steam collections (a hand-rolled
   Chromium-leveldb reader) with the legacy `sharedconfig.vdf` as fallback — and a minimal VDF parser.
 - **Steam Web API** client + enrichment: positive visible owned-game/playtime observations (with an
@@ -85,9 +86,11 @@ The local Steam data is the moat. AI reasoning is commodity; good structured fac
   card, and explicit editable Desktop/Laptop/Steam Deck/Other setup before any hosted action. An **exact-body upload
   preview/confirmation** gates background sync until the current projection is consented; hardware specs and login
   auto-start remain local controls. Distribution uses a **Velopack installer + self-update** from GitHub Releases
-  (Windows + Linux `AppImage` shipping; macOS unsigned/testing until notarized). *Compiles and the logic is covered;
-  a manual GUI/E2E pass is the owner's remaining step.*
-- xUnit + Shouldly suites for the core and tray security flow, plus Decky pytest contract/parity coverage.
+  (Windows + Linux `AppImage` shipping; macOS unsigned/testing until notarized). Its release workflow now fails before
+  packaging unless tag/props/changelog identity and the complete Release/Decky quality boundary pass. *Compiles and the
+  logic is covered; a manual GUI/E2E pass is the owner's remaining step.*
+- xUnit + Shouldly suites for the core and tray security flow, Decky pytest contract/parity coverage, and pinned
+  `actionlint` checks for every GitHub Actions workflow.
   Verified on a real ~111-game /
   2-library install; MCP server smoke-tested over stdio (write→search round-trip, server instructions,
   get_profile_status).
@@ -109,17 +112,17 @@ Local-first — prove the data model locally before anything depends on it.
    `tray-v*` tag — Windows (`Setup.exe`) and Linux (`AppImage`); macOS is an unsigned test artifact until
    notarized. The **CLI/MCP ship as .NET global tools** on NuGet (`dotnet tool install -g Shelfbound.Cli` /
    `Shelfbound.Mcp`) with independent versions; immutable library `v*` releases deliberately pack only
-   Core/Query/Steam. Process: [releasing.md](./releasing.md). Remaining: macOS
-   signing + notarization, and pointing the tray at production URLs before a public build.
+   Core/Query/Steam. Process: [releasing.md](./releasing.md). Remaining: macOS signing + notarization, pointing the tray
+   at production URLs, and tightening release-workflow ref-input handling/job permissions before a public build.
 2. **Taste/profile depth:** user-data now merges into query results (filter by status/rating/completion);
    remaining — a "what Shelfbound remembers" review/edit view and optional metered LLM extraction.
-3. **Remaining local data:** Windows registry-based install discovery and dynamic (`filterSpec`)
-   collections (the modern-collections reader handles static ones today).
+3. **Remaining local data:** dynamic (`filterSpec`) collections (the modern-collections reader handles static ones
+   today).
 4. **Snapshot/export polish:** validation, import/export ergonomics for other clients.
 
-Done: local scanner, local categories (modern collections + legacy fallback), visible not-installed +
+Done: local scanner including Windows registry discovery, local categories (modern collections + legacy fallback), visible not-installed +
 playtime observations (Steam Web API), the query engine (merging facts + user-data), the local MCP server (read +
-write tools), the user-data store + identity seam, the tray installer + self-update (Velopack), and the
+write tools), the user-data store + identity seam, the tray installer + self-update with fail-closed release gates, and the
 CLI/MCP packaged as .NET global tools.
 
 > Hosted and paid features (if any) are developed separately and are intentionally out of scope here.

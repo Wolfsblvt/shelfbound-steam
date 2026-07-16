@@ -9,6 +9,14 @@ permissions:
   contents: read
 
 jobs:
+  workflow-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Lint GitHub Actions workflows
+        shell: pwsh
+        run: pwsh scripts/actionlint.ps1
+
   build-test:
     runs-on: ubuntu-latest
     steps:

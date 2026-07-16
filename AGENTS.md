@@ -9,7 +9,7 @@ snapshot for AI tools (MCP). .NET 10 / C#. Unofficial; not affiliated with Valve
 dotnet build
 dotnet test
 ./scripts/test.ps1       # .NET tests + Decky pytest contract/security suite
-./scripts/lint.ps1       # report C# format + gate Decky ESLint/Prettier (-Cs = C# only)
+./scripts/lint.ps1       # C# report + Decky gates + pinned actionlint (-Cs/-Decky/-Workflows narrow it)
 ./scripts/coverage.ps1   # collect coverage + generate HTML report + text summary
 dotnet run --project src/Shelfbound.Cli -- setup           # store Steam Web API key in local config
 dotnet run --project src/Shelfbound.Cli -- scan --pretty   # writes shelfbound-snapshot.json
