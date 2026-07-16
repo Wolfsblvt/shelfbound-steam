@@ -112,8 +112,8 @@ Local-first — prove the data model locally before anything depends on it.
    `tray-v*` tag — Windows (`Setup.exe`) and Linux (`AppImage`); macOS is an unsigned test artifact until
    notarized. The **CLI/MCP ship as .NET global tools** on NuGet (`dotnet tool install -g Shelfbound.Cli` /
    `Shelfbound.Mcp`) with independent versions; immutable library `v*` releases deliberately pack only
-   Core/Query/Steam. Process: [releasing.md](./releasing.md). Remaining: macOS signing + notarization, pointing the tray
-   at production URLs, and tightening release-workflow ref-input handling before a public build.
+   Core/Query/Steam. Process: [releasing.md](./releasing.md). Remaining: macOS signing + notarization and pointing the
+   tray at production URLs before a public build.
 2. **Taste/profile depth:** user-data now merges into query results (filter by status/rating/completion);
    remaining — a "what Shelfbound remembers" review/edit view and optional metered LLM extraction.
 3. **Remaining local data:** dynamic (`filterSpec`) collections (the modern-collections reader handles static ones
