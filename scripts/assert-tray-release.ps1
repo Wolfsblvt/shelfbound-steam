@@ -32,6 +32,7 @@ $identity = Resolve-TrayReleaseIdentity @identityArguments
 if ($OutputPath) {
     Add-Content -LiteralPath $OutputPath -Value "version=$($identity.Version)" -Encoding utf8
     Add-Content -LiteralPath $OutputPath -Value "is_release=$($identity.IsRelease.ToString().ToLowerInvariant())" -Encoding utf8
+    Add-Content -LiteralPath $OutputPath -Value "release_tag=$($identity.ReleaseTag)" -Encoding utf8
 }
 
 if ($ReleaseNotesPath) {

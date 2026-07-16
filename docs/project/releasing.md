@@ -133,6 +133,11 @@ platform packages or uploads, it reads exactly one valid `<Version>` from `Direc
 - On `workflow_dispatch`, it uses the committed props version, skips the promoted-version changelog
   requirement, and returns artifact-only mode regardless of the ref name.
 
+Raw GitHub event and ref contexts never become shell program text. The `identity` step receives them only as runner
+environment data, validates the exact tag/version/changelog contract, and emits `release_tag` only for the accepted
+`tray-v<version>` identity. The Windows and Linux release mutations receive that validated output as environment data and
+use it as their sole Release target; dispatch has an empty release tag and remains artifact-only for every selected ref.
+
 The workflow then runs a **`quality`** job on that exact commit: the complete solution in Release with
 warnings as errors, the Decky pytest contract/security suite, and deterministic tray-release gate fixtures.
 Every platform job needs both `identity` and `quality` to pass; the jobs are:

@@ -93,6 +93,7 @@ function Resolve-TrayReleaseIdentity {
         return [pscustomobject]@{
             Version      = $version
             IsRelease    = $false
+            ReleaseTag   = ''
             ReleaseNotes = $null
         }
     }
@@ -114,6 +115,7 @@ function Resolve-TrayReleaseIdentity {
     return [pscustomobject]@{
         Version      = $version
         IsRelease    = $true
+        ReleaseTag   = $tagMatch.Value
         ReleaseNotes = Get-TrayReleaseNotes -ChangelogPath $ChangelogPath -Version $version
     }
 }
