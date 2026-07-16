@@ -35,6 +35,133 @@ function New-FixtureFile {
     return $path
 }
 
+function Assert-WorkflowMatch {
+    param(
+        [Parameter(Mandatory)][string]$Text,
+        [Parameter(Mandatory)][string]$Pattern,
+        [Parameter(Mandatory)][string]$Message
+    )
+
+    if ($Text -notmatch $Pattern) {
+        throw $Message
+    }
+}
+
+function Get-WorkflowJobBlocks {
+    param([Parameter(Mandatory)][string[]]$Lines)
+
+    $jobsStart = -1
+    for ($index = 0; $index -lt $Lines.Count; $index++) {
+        if ($Lines[$index] -match '^jobs:\s*(?:#.*)?$') {
+            $jobsStart = $index
+            break
+        }
+    }
+    if ($jobsStart -lt 0) {
+        throw 'Release workflow has no jobs mapping.'
+    }
+
+    $starts = @()
+    for ($index = $jobsStart + 1; $index -lt $Lines.Count; $index++) {
+        if ($Lines[$index] -match '^  (?<name>[A-Za-z][A-Za-z0-9_-]*):\s*(?:#.*)?$') {
+            $starts += [pscustomobject]@{ Name = $Matches.name; Index = $index }
+        }
+    }
+
+    $jobs = @{}
+    for ($index = 0; $index -lt $starts.Count; $index++) {
+        $end = if ($index + 1 -lt $starts.Count) { $starts[$index + 1].Index } else { $Lines.Count }
+        $jobs[$starts[$index].Name] = $Lines[$starts[$index].Index..($end - 1)] -join "`n"
+    }
+    return $jobs
+}
+
+function Get-JobPermissionLines {
+    param([Parameter(Mandatory)][string]$Job)
+
+    $lines = $Job -split '\r?\n'
+    $start = -1
+    for ($index = 0; $index -lt $lines.Count; $index++) {
+        if ($lines[$index] -match '^    permissions:\s*(?:#.*)?$') {
+            $start = $index
+            break
+        }
+        if ($lines[$index] -match '^    permissions:') {
+            return @($lines[$index].Trim())
+        }
+    }
+    if ($start -lt 0) {
+        return @()
+    }
+
+    $permissionLines = @()
+    for ($index = $start + 1; $index -lt $lines.Count; $index++) {
+        $line = $lines[$index]
+        if ($line.Trim().Length -gt 0 -and $line -notmatch '^\s*#' -and $line -match '^\s{0,4}\S') {
+            break
+        }
+        if ($line -match '^      \S') {
+            $permissionLines += $line.Trim()
+        }
+    }
+    return $permissionLines
+}
+
+function Assert-TrayReleaseWorkflowContract {
+    param([Parameter(Mandatory)][string]$WorkflowPath)
+
+    $workflow = Get-Content -LiteralPath $WorkflowPath -Raw
+    $lines = @($workflow -split '\r?\n' | Where-Object { $_.Length -gt 0 })
+    Assert-WorkflowMatch -Text $workflow -Pattern '(?m)^permissions:\s*(?:#.*)?$' -Message 'Release workflow must declare top-level default permissions.'
+
+    $rootPermissionStart = [array]::IndexOf($lines, ($lines | Where-Object { $_ -match '^permissions:\s*(?:#.*)?$' } | Select-Object -First 1))
+    $rootPermissionLines = @()
+    for ($index = $rootPermissionStart + 1; $index -lt $lines.Count; $index++) {
+        $line = $lines[$index]
+        if ($line.Trim().Length -gt 0 -and $line -notmatch '^\s*#' -and $line -match '^\S') {
+            break
+        }
+        if ($line -match '^  \S') {
+            $rootPermissionLines += $line.Trim()
+        }
+    }
+    if (@($rootPermissionLines).Count -ne 1 -or $rootPermissionLines[0] -notmatch '^contents:\s+read(?:\s+#.*)?$') {
+        throw 'Release workflow must default to exactly contents: read, not workflow-wide write authority.'
+    }
+
+    $jobs = Get-WorkflowJobBlocks -Lines $lines
+    $expectedJobs = @('identity', 'quality', 'windows', 'linux', 'macos')
+    $actualJobNames = ($jobs.Keys | Sort-Object) -join ','
+    $expectedJobNames = ($expectedJobs | Sort-Object) -join ','
+    if ($actualJobNames -ne $expectedJobNames) {
+        throw 'Release workflow job graph changed; update the permission contract deliberately.'
+    }
+
+    foreach ($publisher in @('windows', 'linux')) {
+        $permissionLines = @(Get-JobPermissionLines -Job $jobs[$publisher])
+        if ($permissionLines.Count -ne 1 -or $permissionLines[0] -notmatch '^contents:\s+write(?:\s+#.*)?$') {
+            throw "Publishing job '$publisher' must have exactly contents: write."
+        }
+    }
+    foreach ($nonPublisher in @('identity', 'quality', 'macos')) {
+        if (@(Get-JobPermissionLines -Job $jobs[$nonPublisher]).Count -ne 0) {
+            throw "Non-publishing job '$nonPublisher' must inherit the read-only workflow default."
+        }
+    }
+
+    Assert-WorkflowMatch -Text $workflow -Pattern '(?m)^      - "tray-v\*"\s*$' -Message 'Release workflow must keep the tray-v* push-tag trigger.'
+    Assert-WorkflowMatch -Text $workflow -Pattern '(?m)^  workflow_dispatch:\s*$' -Message 'Release workflow must retain workflow_dispatch artifact rehearsals.'
+    Assert-WorkflowMatch -Text $jobs.windows -Pattern "(?ms)^      - name: Publish to GitHub Releases\s*\r?\n        if: needs\.identity\.outputs\.is_release == 'true'\s*\r?\n        run:" -Message 'Windows publication must remain gated by the fail-closed release identity output.'
+    Assert-WorkflowMatch -Text $jobs.windows -Pattern "(?ms)^      - name: Set release notes from CHANGELOG\s*\r?\n        if: needs\.identity\.outputs\.is_release == 'true'\s*\r?\n        env:" -Message 'Windows release-note mutation must remain gated by the fail-closed release identity output.'
+    Assert-WorkflowMatch -Text $jobs.linux -Pattern "(?ms)^      - name: Publish to GitHub Releases\s*\r?\n        if: needs\.identity\.outputs\.is_release == 'true'\s*\r?\n        run:" -Message 'Linux publication must remain gated by the fail-closed release identity output.'
+    Assert-WorkflowMatch -Text $jobs.windows -Pattern '(?m)^    needs: \[identity, quality\]\s*$' -Message 'Windows must require identity and quality before publishing.'
+    Assert-WorkflowMatch -Text $jobs.linux -Pattern '(?m)^    needs: \[identity, quality, windows\]\s*$' -Message 'Linux must wait for Windows to create the Release.'
+    Assert-WorkflowMatch -Text $jobs.macos -Pattern '(?m)^    needs: \[identity, quality\]\s*$' -Message 'macOS must require identity and quality before artifact packaging.'
+    if ($jobs.macos -match 'vpk upload github|gh release edit') {
+        throw 'macOS must remain artifact-only and never mutate a GitHub Release.'
+    }
+}
+
 function Invoke-TrayGate {
     param(
         [Parameter(Mandatory)][string]$EventName,
@@ -72,6 +199,32 @@ function Invoke-TrayGate {
 
 New-Item -ItemType Directory -Path $fixtureRoot -Force | Out-Null
 try {
+    $workflow = Get-Content -LiteralPath (Join-Path $root '.github/workflows/release-tray.yml') -Raw
+    $workflowPath = New-FixtureFile 'release-tray.yml' $workflow
+    Assert-TrayReleaseWorkflowContract -WorkflowPath $workflowPath
+
+    Assert-Throws {
+        Assert-TrayReleaseWorkflowContract -WorkflowPath (New-FixtureFile 'workflow-wide-write.yml' ($workflow -replace '(?m)^  contents: read.*$', '  contents: write'))
+    } 'default to exactly contents: read'
+    Assert-Throws {
+        Assert-TrayReleaseWorkflowContract -WorkflowPath (New-FixtureFile 'missing-windows-write.yml' ($workflow -replace '(?m)^      contents: write # creates.*$', '      contents: read'))
+    } "Publishing job 'windows'"
+
+    $macosWithWrite = [regex]::Replace(
+        $workflow,
+        '(?m)^(  macos:\r?\n(?:    .*\r?\n)*?    runs-on: macos-latest\r?\n)',
+        { param($match) "$($match.Value)    permissions: write-all`n" }
+    )
+    if ($macosWithWrite -eq $workflow) {
+        throw 'The workflow permission rejection fixture did not add macOS write access.'
+    }
+    Assert-Throws {
+        Assert-TrayReleaseWorkflowContract -WorkflowPath (New-FixtureFile 'macos-write.yml' $macosWithWrite)
+    } "Non-publishing job 'macos'"
+    Assert-Throws {
+        Assert-TrayReleaseWorkflowContract -WorkflowPath (New-FixtureFile 'unguarded-publish.yml' ([regex]::Replace($workflow, "if: needs\.identity\.outputs\.is_release == 'true'", 'if: always()', 1)))
+    } 'must remain gated'
+
     $props = New-FixtureFile 'valid.props' '<Project><PropertyGroup><Version>1.2.3</Version></PropertyGroup></Project>'
     $prereleaseProps = New-FixtureFile 'prerelease.props' '<Project><PropertyGroup><Version>1.2.3-rc.1</Version></PropertyGroup></Project>'
     $changelog = New-FixtureFile 'valid.md' @'
@@ -138,4 +291,4 @@ finally {
     Remove-Item -LiteralPath $fixtureRoot -Recurse -Force -ErrorAction SilentlyContinue
 }
 
-Write-Host 'Tray release gate tests passed (tag identity, changelog, props, and dispatch fixtures).' -ForegroundColor Green
+Write-Host 'Tray release gate tests passed (tag identity, changelog, props, dispatch, and workflow permissions).' -ForegroundColor Green

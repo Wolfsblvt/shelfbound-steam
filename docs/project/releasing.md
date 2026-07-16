@@ -143,6 +143,19 @@ Every platform job needs both `identity` and `quality` to pass; the jobs are:
 | `linux` | `ubuntu-latest` | `AppImage` (+ update packages) | published to the Release (runs after `windows` to avoid a create-release race) |
 | `macos` | `macos-latest` | `.app` (unsigned) | **artifact only** — never published (see Signing) |
 
+### GitHub Actions permissions
+
+The workflow default is `contents: read`, which covers checkout, builds/tests, artifact packaging, and downloading a
+previous release for delta updates. Only the `windows` and `linux` jobs override that default with `contents: write`:
+Windows creates the Release, uploads its updates, and sets the notes; Linux uploads its updates after Windows. The
+`identity`, `quality`, and unsigned `macos` jobs inherit read-only access and cannot mutate a GitHub Release.
+
+GitHub Actions permissions are static for an entire job. Consequently, `windows` and `linux` receive their scoped write
+token for a `workflow_dispatch` run too, although every Release mutation step is guarded by the fail-closed
+`needs.identity.outputs.is_release == 'true'` condition and dispatch always sets that output to `false`. Eliminating
+that residual would require separate publish jobs and cross-platform artifact plumbing; the current model confines
+write access to the two jobs that genuinely publish on a tag without changing the artifact-only dispatch path.
+
 ### Signing
 
 - **Windows (optional now).** Unsigned installers work but trip SmartScreen. To sign, add repo secrets
