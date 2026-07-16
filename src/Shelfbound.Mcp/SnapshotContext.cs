@@ -48,7 +48,7 @@ public sealed class SnapshotContext(ISteamWebApiClient steamWebApiClient, IUserD
             return;
         }
 
-        string? steamRoot = SteamInstallLocator.Locate(Environment.GetEnvironmentVariable("SHELFBOUND_STEAM_PATH"));
+        string? steamRoot = SteamInstallLocator.Locate();
         if (steamRoot is null)
         {
             throw new InvalidOperationException(

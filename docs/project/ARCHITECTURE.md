@@ -109,8 +109,9 @@ This is the **derived/user data** category — deliberately separate from the ra
 
 ## Scanner internals (current)
 
-1. **Locate Steam** (`SteamInstallLocator`): explicit override → `SHELFBOUND_STEAM_PATH` → per-OS
-   well-known paths (Windows / macOS / Linux+SteamOS). Windows registry lookup is a planned add.
+1. **Locate Steam** (`SteamInstallLocator`): explicit override → `SHELFBOUND_STEAM_PATH` → Windows
+   current-user `HKCU\Software\Valve\Steam\SteamPath` (when valid) → per-OS well-known paths
+   (Windows / macOS / Linux+SteamOS). Registry access is read-only and fails soft to the defaults.
 2. **Parse `libraryfolders.vdf`** → libraries (index, path, installed app ids).
 3. For each app id, **parse `appmanifest_<id>.acf`** → name, install state (StateFlags bit 4),
    install dir, size, last updated/played.
