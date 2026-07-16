@@ -99,9 +99,10 @@ deferred. Full findings + algorithm: [steam-collections.md](./steam-collections.
 ### Test assertions — **Shouldly** (not FluentAssertions)
 FluentAssertions 8.x became commercially licensed; Shouldly is free and a clean fit with xUnit.
 
-### Steam discovery — candidate paths + override for v0
-`SteamInstallLocator`: explicit `--steam-path` → `SHELFBOUND_STEAM_PATH` → per-OS default locations.
-Windows registry (`SteamPath`) lookup for non-default installs is a planned enhancement.
+### Steam discovery — explicit path, environment, registry, then defaults
+`SteamInstallLocator`: explicit `--steam-path` → `SHELFBOUND_STEAM_PATH` → valid Windows current-user
+`HKCU\Software\Valve\Steam\SteamPath` → per-OS default locations. The read-only registry lookup is
+Windows-only and fails soft on missing, invalid, or unavailable values.
 
 ### Query engine + local MCP server — the product seam
 A reusable, deterministic `Shelfbound.Query` engine (filter/sort/summary) sits between the snapshot and

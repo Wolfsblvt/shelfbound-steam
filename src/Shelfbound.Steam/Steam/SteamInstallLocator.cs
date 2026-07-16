@@ -1,25 +1,42 @@
 using System.Runtime.InteropServices;
+using System.Security;
+using Microsoft.Win32;
 
 namespace Shelfbound.Steam.Steam;
 
 /// <summary>
 /// Locates the active Steam installation root. Resolution order:
-/// explicit override, SHELFBOUND_STEAM_PATH env var, then well-known per-OS install locations.
-/// Reading the Windows registry (HKCU\Software\Valve\Steam\SteamPath) to support non-default
-/// Windows installs is a planned enhancement; see docs/project/DECISIONS.md.
+/// explicit override, SHELFBOUND_STEAM_PATH env var, the Windows current-user registry, then well-known
+/// per-OS install locations.
 /// </summary>
 public static class SteamInstallLocator
 {
+    private static readonly SteamInstallLocatorSources SystemSources = new(
+        Environment.GetEnvironmentVariable,
+        OperatingSystem.IsWindows,
+        ReadWindowsRegistrySteamPath,
+        CandidatePaths);
+
     public static string? Locate(string? overridePath = null)
+        => Locate(overridePath, SystemSources);
+
+    internal static string? Locate(string? overridePath, SteamInstallLocatorSources sources)
     {
         if (!string.IsNullOrWhiteSpace(overridePath))
             return IsSteamRoot(overridePath) ? overridePath : null;
 
-        string? env = Environment.GetEnvironmentVariable("SHELFBOUND_STEAM_PATH");
+        string? env = sources.GetEnvironmentVariable("SHELFBOUND_STEAM_PATH");
         if (!string.IsNullOrWhiteSpace(env) && IsSteamRoot(env))
             return env;
 
-        foreach (var candidate in CandidatePaths())
+        if (sources.IsWindows())
+        {
+            string? registryPath = TryReadRegistryPath(sources.GetWindowsRegistrySteamPath);
+            if (!string.IsNullOrWhiteSpace(registryPath) && IsSteamRoot(registryPath))
+                return registryPath;
+        }
+
+        foreach (var candidate in sources.GetCandidatePaths())
         {
             if (IsSteamRoot(candidate))
                 return candidate;
@@ -33,6 +50,31 @@ public static class SteamInstallLocator
         if (string.IsNullOrWhiteSpace(path) || !Directory.Exists(path))
             return false;
         return Directory.Exists(Path.Combine(path, "steamapps"));
+    }
+
+    private static object? ReadWindowsRegistrySteamPath()
+    {
+        if (!OperatingSystem.IsWindows())
+            return null;
+
+        using RegistryKey? steamKey = Registry.CurrentUser.OpenSubKey(@"Software\Valve\Steam", writable: false);
+        return steamKey?.GetValue("SteamPath");
+    }
+
+    private static string? TryReadRegistryPath(Func<object?> readRegistrySteamPath)
+    {
+        try
+        {
+            return readRegistrySteamPath() as string;
+        }
+        catch (Exception exception) when (exception is IOException
+                                         or ObjectDisposedException
+                                         or PlatformNotSupportedException
+                                         or SecurityException
+                                         or UnauthorizedAccessException)
+        {
+            return null;
+        }
     }
 
     private static IEnumerable<string> CandidatePaths()
@@ -60,3 +102,9 @@ public static class SteamInstallLocator
         }
     }
 }
+
+internal sealed record SteamInstallLocatorSources(
+    Func<string, string?> GetEnvironmentVariable,
+    Func<bool> IsWindows,
+    Func<object?> GetWindowsRegistrySteamPath,
+    Func<IEnumerable<string>> GetCandidatePaths);

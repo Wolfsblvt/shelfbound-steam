@@ -40,9 +40,10 @@ Early but already useful, all local:
 
 Also built: a cross-platform **tray app** (privacy preview, consent-gated background sync + account
 connect) and **`shelfbound upload`** (send a minimized hosted projection to a Shelfbound server).
-Still to come locally: dynamic (rule-based) collections, Windows-registry install discovery, and
-real-hardware validation/distribution of the Decky prototype. The hosted service lives in a separate
-private repo. See [docs/project/PROJECT.md](docs/project/PROJECT.md) for the roadmap.
+Steam discovery checks an explicit path, `SHELFBOUND_STEAM_PATH`, the current user's Windows Steam
+registry path when applicable, then platform defaults. Still to come locally: dynamic (rule-based)
+collections and real-hardware validation/distribution of the Decky prototype. The hosted service lives
+in a separate private repo. See [docs/project/PROJECT.md](docs/project/PROJECT.md) for the roadmap.
 
 ## Quick start
 
