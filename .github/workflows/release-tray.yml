@@ -15,7 +15,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write # required to create/publish GitHub Releases
+  contents: read # checkout/build/test jobs and previous-release downloads
 
 jobs:
   # Fail closed on the exact checked-out source identity before any test, pack, artifact, or publish work.
@@ -64,6 +64,8 @@ jobs:
   windows:
     needs: [identity, quality]
     runs-on: windows-latest
+    permissions:
+      contents: write # creates the Release, uploads Windows updates, and sets its notes
     defaults:
       run:
         shell: pwsh
@@ -143,6 +145,8 @@ jobs:
     # After windows so the tagged Release already exists — avoids a create-release race on first upload.
     needs: [identity, quality, windows]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # uploads Linux updates to the Release created by Windows
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-dotnet@v5

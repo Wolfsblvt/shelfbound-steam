@@ -27,6 +27,8 @@ section up to date as you work — the release step promotes it to a new version
 - Replaced browser-returned long-lived tokens with a short-lived one-time code. The tray validates an exact
   numeric-loopback callback, redeems the code directly, and stores a device-bound upload-only token; a bearer
   never enters browser URLs, history, or callback records.
+- Limited GitHub Release write permission to the Windows and Linux tray publishing jobs; all other release-workflow
+  jobs inherit read-only repository access.
 
 ## [0.6.0] - 2026-07-02
 ### Added
