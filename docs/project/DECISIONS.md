@@ -214,6 +214,14 @@ A new suppression on a patch/same version fails policy.
 NuGet publishing preflights that the version is absent and pushes without `--skip-duplicate`, so a race or
 partial prior publish also fails visibly.
 
+The main Shelfbound orchestrator may prepare and trigger an already-reviewed library release after both repository
+sides and their cross-repo preflights pass: it may push public Steam `main`, create/push the exact annotated `v*` tag,
+prepare the GitHub Release, and watch the workflow. The protected GitHub `nuget` environment is the owner-final
+publication boundary; only Wolf's explicit approval may release the job, and the orchestrator is forbidden from using
+self-review, the deployment-approval API, or admin bypass even though the shared account technically permits them. This
+keeps the repetitive release mechanics autonomous without delegating the irreversible publication decision. *Rejected:*
+requiring Wolf to copy every mechanical command by hand, and treating the orchestrator's trigger as publication consent.
+
 The published library set stays **Core, Query, Steam**. `Shelfbound.Storage` is deliberately not a package:
 it owns local config and user-data persistence, not the portable snapshot boundary. The similarly named
 `SnapshotStorage` contract DTO lives in `Shelfbound.Core`, so storage facts round-trip without exporting the

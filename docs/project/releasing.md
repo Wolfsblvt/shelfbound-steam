@@ -26,7 +26,7 @@ exact producer commit to a unique throwaway version in a local feed, restores it
 feed, and sends old/current/next golden JSON through `SnapshotSerializer` + `/ingest`. A missing producer
 checkout or skipped HTTP test is a failure.
 
-### Owner publish steps after both repositories merge
+### Protected orchestrator release procedure after both repositories merge
 
 Merge the producer first, then the cloud consumer so cloud CI can pack steam `main`. On clean `main`
 checkouts, run the gates once more:
@@ -37,17 +37,31 @@ pwsh scripts/test-package-release-gates.ps1
 pwsh scripts/test-package-release.ps1 -CloudRepo <path-to-shelfbound-cloud>
 ```
 
-Then create and push the immutable library tag (the implementation agent does not do this):
+The main Shelfbound orchestrator has standing owner authority to finish this narrow release path without another
+permission round. It prepares the exact release notes, fetches and proves public `main` can advance without rewriting
+history, pushes Steam `main`, creates the immutable annotated tag at that exact commit, and pushes the tag:
 
 ```pwsh
+git push origin main
 git tag -a v0.8.0 -m "Shelfbound libraries 0.8.0 (snapshot schema 0.6.0)"
 git push origin v0.8.0
 ```
 
+The tag push triggers `nuget-publish.yml`; do not also dispatch a duplicate manual run. Prepare a draft GitHub Release
+for the same tag while the workflow waits. Announce the exact version/tag/SHA, then poll the run in short increments for
+at most roughly three minutes. The orchestrator must **never** call GitHub's deployment-approval API, approve its own
+run, use admin bypass, weaken the environment, retag, repack the immutable version, or use `--skip-duplicate`. Only
+Wolf's explicit approval of the `nuget` environment — normally from the GitHub phone notification — authorizes the job
+to continue. The shared GitHub identity technically permits self-review/admin bypass; the repository contract forbids
+using either. A timeout leaves the run honestly awaiting review and is reported without cancellation or inferred
+consent.
+
 The publish workflow requires `v0.8.0` to point at the commit whose `Directory.Build.props` says
 `0.8.0`, and requires all three package ids to be absent at that version. After the workflow succeeds,
 verify each nuget.org page reports `0.8.0`, schema `0.6.0` in release notes, the tagged repository commit,
-and a symbol package.
+and a symbol package; only then publish the prepared GitHub Release. A failed gate, rejected approval, mismatched ref,
+or partial publish is a hard stop for diagnosis. Never "repair" an immutable release by moving its tag or silently
+skipping an existing package.
 
 ## Releasing the tray
 

@@ -40,6 +40,13 @@ finishing a task (don't leave completed work uncommitted). **Never push** unless
 history is forever). This overrides the global "branch first" default; the global no-push /
 no-history-rewrite rules still apply.
 
+The main Shelfbound orchestrator has one standing push exception: after reviewed open-core library changes are landed
+and every documented preflight passes, it may prepare release notes, push `main` plus the exact annotated `v*` tag,
+prepare the GitHub Release, and trigger/watch the protected NuGet workflow as specified in
+`docs/project/releasing.md`. It must never approve or bypass the `nuget` environment gate; only Wolf's explicit GitHub
+approval may authorize publication. This exception does not apply to ordinary feature pushes, tray/tool releases, or
+any other agent/session.
+
 ## Docs (read before non-trivial work)
 
 `docs/project/` — `PROJECT.md` (overview/roadmap), `ARCHITECTURE.md`, `DECISIONS.md`,

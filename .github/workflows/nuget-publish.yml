@@ -7,6 +7,8 @@ name: Publish NuGet
 # The nuget.org Trusted Publishing policy is bound to the GitHub `nuget` environment, so this job must
 # declare `environment: nuget` for the OIDC token's environment claim to match. (Create the environment
 # in repo Settings -> Environments if it doesn't exist yet.)
+# Shelfbound also treats that environment as the owner-final publication boundary: the main orchestrator may trigger
+# this workflow, but must never approve its own deployment or use admin bypass. Wolf approves it explicitly.
 #
 # Triggered by a version tag (e.g. v0.4.0) or manually.
 on:
