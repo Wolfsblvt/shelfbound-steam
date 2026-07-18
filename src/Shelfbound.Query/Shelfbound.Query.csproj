@@ -13,4 +13,10 @@
     <ProjectReference Include="..\Shelfbound.Core\Shelfbound.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="..\..\contracts\power-search\query-plan-v1.corpus.json"
+          Pack="true"
+          PackagePath="contracts/power-search/" />
+  </ItemGroup>
+
 </Project>

@@ -1,0 +1,891 @@
+{
+  "contract": "shelfbound.query-plan",
+  "version": 1,
+  "cases": [
+    {
+      "id": "G1.raw-text",
+      "golden": "G1",
+      "input": "no horror",
+      "expect": {
+        "query": {
+          "groups": [],
+          "text": { "phrase": "no horror", "exact": false },
+          "sort": null,
+          "directives": { "like": [], "session": null }
+        },
+        "canonicalText": "no horror",
+        "diagnostics": [],
+        "localCapabilities": []
+      },
+      "future": ["uiOffersUnionExcludeConversion", "titleMembership"]
+    },
+    {
+      "id": "G1.explicit-union",
+      "golden": "G1",
+      "input": "-*:horror",
+      "expect": {
+        "query": {
+          "groups": [{ "op": "exclude", "terms": [{ "facet": "any", "value": "horror" }] }],
+          "text": null,
+          "sort": null,
+          "directives": { "like": [], "session": null }
+        },
+        "canonicalText": "-*:horror",
+        "diagnostics": [],
+        "localCapabilities": []
+      },
+      "future": ["unionBindings", "membership"]
+    },
+    {
+      "id": "G2.union-exclude",
+      "golden": "G2",
+      "input": "-*:horror",
+      "expect": {
+        "query": {
+          "groups": [{ "op": "exclude", "terms": [{ "facet": "any", "value": "horror" }] }],
+          "text": null,
+          "sort": null,
+          "directives": { "like": [], "session": null }
+        },
+        "canonicalText": "-*:horror",
+        "diagnostics": [],
+        "localCapabilities": []
+      },
+      "future": ["unionBindings", "membership"]
+    },
+    {
+      "id": "G2.de-morgan",
+      "golden": "G2",
+      "input": "-tag:horror|genre:slasher",
+      "expect": {
+        "query": {
+          "groups": [
+            { "op": "exclude", "terms": [{ "facet": "tag", "value": "horror" }] },
+            { "op": "exclude", "terms": [{ "facet": "genre", "value": "slasher" }] }
+          ],
+          "text": null,
+          "sort": null,
+          "directives": { "like": [], "session": null }
+        },
+        "canonicalText": "-tag:horror -genre:slasher",
+        "diagnostics": [],
+        "localCapabilities": [
+          { "code": "unsupported_facet", "field": "facet", "facet": "tag" },
+          { "code": "unsupported_facet", "field": "facet", "facet": "genre" }
+        ]
+      },
+      "future": ["membership"]
+    },
+    {
+      "id": "G3.full-cnf",
+      "golden": "G3",
+      "input": "*:cozy ++*:story-rich deckFit:>=playable owned:yes state:unplayed hoursToBeat:<15",
+      "expect": {
+        "query": {
+          "groups": [
+            { "op": "match", "terms": [{ "facet": "any", "value": "cozy" }] },
+            { "op": "strongPrefer", "terms": [{ "facet": "any", "value": "story-rich" }] },
+            { "op": "match", "terms": [{ "facet": "deckFit", "value": ">=playable" }] },
+            { "op": "match", "terms": [{ "facet": "owned", "value": "yes" }] },
+            { "op": "match", "terms": [{ "facet": "state", "value": "unplayed" }] },
+            { "op": "match", "terms": [{ "facet": "hoursToBeat", "value": "<15" }] }
+          ],
+          "text": null,
+          "sort": null,
+          "directives": { "like": [], "session": null }
+        },
+        "canonicalText": "*:cozy ++*:story-rich deckFit:>=playable owned:yes state:unplayed hoursToBeat:<15",
+        "diagnostics": [],
+        "localCapabilities": [
+          { "code": "unsupported_operator", "field": "group.op", "facet": null },
+          { "code": "unsupported_facet", "field": "facet", "facet": "deckFit" },
+          { "code": "unsupported_facet", "field": "facet", "facet": "hoursToBeat" }
+        ]
+      },
+      "future": ["membership", "queryFit", "lensOrdering", "unionMaxScoring"]
+    },
+    {
+      "id": "G4.like-name",
+      "golden": "G4",
+      "input": "like:\"The Witcher 3\"",
+      "expect": {
+        "query": {
+          "groups": [],
+          "text": null,
+          "sort": null,
+          "directives": { "like": ["The Witcher 3"], "session": null }
+        },
+        "canonicalText": "like:\"The Witcher 3\"",
+        "diagnostics": [],
+        "localCapabilities": [{ "code": "unsupported_facet", "field": "facet", "facet": "like" }]
+      },
+      "future": ["titleBinding", "referenceRemoval", "similarityRanking"]
+    },
+    {
+      "id": "G4.like-bound",
+      "golden": "G4",
+      "input": "like:steam:292030",
+      "expect": {
+        "query": {
+          "groups": [],
+          "text": null,
+          "sort": null,
+          "directives": { "like": ["steam:292030"], "session": null }
+        },
+        "canonicalText": "like:steam:292030",
+        "diagnostics": [],
+        "localCapabilities": [{ "code": "unsupported_facet", "field": "facet", "facet": "like" }]
+      },
+      "future": ["referenceRemoval", "similarityRanking"]
+    },
+    {
+      "id": "G5.repeated-like",
+      "golden": "G5",
+      "input": "like:\"The Witcher 3\"|like:\"Mass Effect\"",
+      "expect": {
+        "query": {
+          "groups": [],
+          "text": null,
+          "sort": null,
+          "directives": { "like": ["The Witcher 3", "Mass Effect"], "session": null }
+        },
+        "canonicalText": "like:\"The Witcher 3\" like:\"Mass Effect\"",
+        "diagnostics": [],
+        "localCapabilities": [
+          { "code": "unsupported_facet", "field": "facet", "facet": "like" },
+          { "code": "unsupported_facet", "field": "facet", "facet": "like" }
+        ]
+      },
+      "future": ["titleBinding", "maxReferenceSimilarity"]
+    },
+    {
+      "id": "G6.cnf-and-session",
+      "golden": "G6",
+      "input": "tag:puzzle|genre:platformer *:cozy|*:cute session:shortSession",
+      "expect": {
+        "query": {
+          "groups": [
+            {
+              "op": "match",
+              "terms": [
+                { "facet": "tag", "value": "puzzle" },
+                { "facet": "genre", "value": "platformer" }
+              ]
+            },
+            {
+              "op": "match",
+              "terms": [
+                { "facet": "any", "value": "cozy" },
+                { "facet": "any", "value": "cute" }
+              ]
+            }
+          ],
+          "text": null,
+          "sort": null,
+          "directives": { "like": [], "session": "shortSession" }
+        },
+        "canonicalText": "tag:puzzle|genre:platformer *:cozy|*:cute session:shortSession",
+        "diagnostics": [],
+        "localCapabilities": [
+          { "code": "unsupported_facet", "field": "facet", "facet": "tag" },
+          { "code": "unsupported_facet", "field": "facet", "facet": "genre" },
+          { "code": "unsupported_facet", "field": "facet", "facet": "session" }
+        ]
+      },
+      "future": ["membership", "sessionFitRanking"]
+    },
+    {
+      "id": "G7.fuzzy-title-input",
+      "golden": "G7",
+      "input": "assasins creed",
+      "expect": {
+        "query": {
+          "groups": [],
+          "text": { "phrase": "assasins creed", "exact": false },
+          "sort": null,
+          "directives": { "like": [], "session": null }
+        },
+        "canonicalText": "assasins creed",
+        "diagnostics": [],
+        "localCapabilities": []
+      },
+      "future": ["fuzzyTitleTier", "closeMatchLabel"]
+    },
+    {
+      "id": "G8.witcher-number",
+      "golden": "G8",
+      "input": "witcher 3",
+      "expect": {
+        "query": {
+          "groups": [],
+          "text": { "phrase": "witcher 3", "exact": false },
+          "sort": null,
+          "directives": { "like": [], "session": null }
+        },
+        "canonicalText": "witcher 3",
+        "diagnostics": [],
+        "localCapabilities": []
+      },
+      "future": ["articleNormalization", "romanNumeralNormalization"]
+    },
+    {
+      "id": "G8.age-number",
+      "golden": "G8",
+      "input": "age of empires 3",
+      "expect": {
+        "query": {
+          "groups": [],
+          "text": { "phrase": "age of empires 3", "exact": false },
+          "sort": null,
+          "directives": { "like": [], "session": null }
+        },
+        "canonicalText": "age of empires 3",
+        "diagnostics": [],
+        "localCapabilities": []
+      },
+      "future": ["romanNumeralNormalization"]
+    },
+    {
+      "id": "G8.exact-title",
+      "golden": "G8",
+      "input": "\"portal 2\"",
+      "expect": {
+        "query": {
+          "groups": [],
+          "text": { "phrase": "portal 2", "exact": true },
+          "sort": null,
+          "directives": { "like": [], "session": null }
+        },
+        "canonicalText": "\"portal 2\"",
+        "diagnostics": [],
+        "localCapabilities": []
+      },
+      "future": ["exactTitleTier"]
+    },
+    {
+      "id": "G9.ambiguous-title",
+      "golden": "G9",
+      "input": "ori",
+      "expect": {
+        "query": {
+          "groups": [],
+          "text": { "phrase": "ori", "exact": false },
+          "sort": null,
+          "directives": { "like": [], "session": null }
+        },
+        "canonicalText": "ori",
+        "diagnostics": [],
+        "localCapabilities": []
+      },
+      "future": ["titleCandidates", "noSilentBinding"]
+    },
+    {
+      "id": "G10.contradiction",
+      "golden": "G10",
+      "input": "tag:horror -tag:horror",
+      "expect": {
+        "query": {
+          "groups": [
+            { "op": "match", "terms": [{ "facet": "tag", "value": "horror" }] },
+            { "op": "exclude", "terms": [{ "facet": "tag", "value": "horror" }] }
+          ],
+          "text": null,
+          "sort": null,
+          "directives": { "like": [], "session": null }
+        },
+        "canonicalText": null,
+        "diagnostics": [
+          {
+            "code": "contradictory_terms",
+            "severity": "error",
+            "field": "groups",
+            "facet": "tag",
+            "span": { "start": 11, "length": 11 },
+            "rawToken": "-tag:horror",
+            "message": "The same ordinary term cannot be both required and excluded.",
+            "candidates": [],
+            "validBareForm": null,
+            "data": { "conflictingStart": "0", "conflictingLength": "10" }
+          }
+        ],
+        "localCapabilities": [
+          { "code": "unsupported_facet", "field": "facet", "facet": "tag" },
+          { "code": "unsupported_facet", "field": "facet", "facet": "tag" }
+        ]
+      },
+      "future": ["strictServerRejection"]
+    },
+    {
+      "id": "G11.local-filter-sort",
+      "golden": "G11",
+      "input": "installed:yes sort:size:desc",
+      "expect": {
+        "query": {
+          "groups": [{ "op": "match", "terms": [{ "facet": "installed", "value": "yes" }] }],
+          "text": null,
+          "sort": { "field": "size", "direction": "desc" },
+          "directives": { "like": [], "session": null }
+        },
+        "canonicalText": "installed:yes sort:size:desc",
+        "diagnostics": [],
+        "localCapabilities": []
+      },
+      "future": ["membership", "deterministicSort"]
+    },
+    {
+      "id": "G12.consumed-state-soft-union",
+      "golden": "G12",
+      "input": "state:dropped ?*:cozy",
+      "expect": {
+        "query": {
+          "groups": [
+            { "op": "match", "terms": [{ "facet": "state", "value": "dropped" }] },
+            { "op": "niceToHave", "terms": [{ "facet": "any", "value": "cozy" }] }
+          ],
+          "text": null,
+          "sort": null,
+          "directives": { "like": [], "session": null }
+        },
+        "canonicalText": "state:dropped ?*:cozy",
+        "diagnostics": [],
+        "localCapabilities": [{ "code": "unsupported_operator", "field": "group.op", "facet": null }]
+      },
+      "future": ["membership", "queryFit"]
+    },
+    {
+      "id": "G13.known-only-range",
+      "golden": "G13",
+      "input": "hoursToBeat:<20",
+      "expect": {
+        "query": {
+          "groups": [{ "op": "match", "terms": [{ "facet": "hoursToBeat", "value": "<20" }] }],
+          "text": null,
+          "sort": null,
+          "directives": { "like": [], "session": null }
+        },
+        "canonicalText": "hoursToBeat:<20",
+        "diagnostics": [],
+        "localCapabilities": [{ "code": "unsupported_facet", "field": "facet", "facet": "hoursToBeat" }]
+      },
+      "future": ["knownOnlyMembership", "unknownCount", "recoveryShelf"]
+    },
+    {
+      "id": "G13.excluded-range",
+      "golden": "G13",
+      "input": "-hoursToBeat:>50",
+      "expect": {
+        "query": {
+          "groups": [{ "op": "exclude", "terms": [{ "facet": "hoursToBeat", "value": ">50" }] }],
+          "text": null,
+          "sort": null,
+          "directives": { "like": [], "session": null }
+        },
+        "canonicalText": "-hoursToBeat:>50",
+        "diagnostics": [],
+        "localCapabilities": [{ "code": "unsupported_facet", "field": "facet", "facet": "hoursToBeat" }]
+      },
+      "future": ["unknownDoesNotTriggerExclusion"]
+    },
+    {
+      "id": "G14.unknown-facet",
+      "golden": "G14",
+      "input": "gnere:platformer",
+      "expect": {
+        "query": {
+          "groups": [],
+          "text": null,
+          "sort": null,
+          "directives": { "like": [], "session": null }
+        },
+        "canonicalText": null,
+        "diagnostics": [
+          {
+            "code": "unknown_facet",
+            "severity": "error",
+            "field": "facet",
+            "facet": "gnere",
+            "span": { "start": 0, "length": 16 },
+            "rawToken": "gnere:platformer",
+            "message": "The facet name is not part of QueryPlan v1.",
+            "candidates": ["genre"],
+            "validBareForm": null,
+            "data": {}
+          }
+        ],
+        "localCapabilities": []
+      },
+      "future": ["repairPrompt"]
+    },
+    {
+      "id": "G15.cross-surface-shape",
+      "golden": "G15",
+      "input": "installed:yes \"portal 2\" sort:name",
+      "expect": {
+        "query": {
+          "groups": [{ "op": "match", "terms": [{ "facet": "installed", "value": "yes" }] }],
+          "text": { "phrase": "portal 2", "exact": true },
+          "sort": { "field": "name", "direction": "asc" },
+          "directives": { "like": [], "session": null }
+        },
+        "canonicalText": "\"portal 2\" installed:yes sort:name:asc",
+        "diagnostics": [],
+        "localCapabilities": []
+      },
+      "future": ["restPlanMcpEquivalence"]
+    },
+    {
+      "id": "G16.recovery-input",
+      "golden": "G16",
+      "input": "tag:impossible owned:yes",
+      "expect": {
+        "query": {
+          "groups": [
+            { "op": "match", "terms": [{ "facet": "tag", "value": "impossible" }] },
+            { "op": "match", "terms": [{ "facet": "owned", "value": "yes" }] }
+          ],
+          "text": null,
+          "sort": null,
+          "directives": { "like": [], "session": null }
+        },
+        "canonicalText": "tag:impossible owned:yes",
+        "diagnostics": [],
+        "localCapabilities": [{ "code": "unsupported_facet", "field": "facet", "facet": "tag" }]
+      },
+      "future": ["singleDropRecovery", "protectedOwnership"]
+    },
+    {
+      "id": "G17.operator-weight-input",
+      "golden": "G17",
+      "input": "*:cozy ++*:story-rich",
+      "expect": {
+        "query": {
+          "groups": [
+            { "op": "match", "terms": [{ "facet": "any", "value": "cozy" }] },
+            { "op": "strongPrefer", "terms": [{ "facet": "any", "value": "story-rich" }] }
+          ],
+          "text": null,
+          "sort": null,
+          "directives": { "like": [], "session": null }
+        },
+        "canonicalText": "*:cozy ++*:story-rich",
+        "diagnostics": [],
+        "localCapabilities": [{ "code": "unsupported_operator", "field": "group.op", "facet": null }]
+      },
+      "future": ["quantizedQueryFit", "lexicographicLens"]
+    },
+    {
+      "id": "G18.title-tier-input",
+      "golden": "G18",
+      "input": "witcher",
+      "expect": {
+        "query": {
+          "groups": [],
+          "text": { "phrase": "witcher", "exact": false },
+          "sort": null,
+          "directives": { "like": [], "session": null }
+        },
+        "canonicalText": "witcher",
+        "diagnostics": [],
+        "localCapabilities": []
+      },
+      "future": ["titleTierBeforeTaste"]
+    },
+    {
+      "id": "G19.unknown-membership-value-input",
+      "golden": "G19",
+      "input": "chip:private-chip",
+      "expect": {
+        "query": {
+          "groups": [{ "op": "match", "terms": [{ "facet": "chip", "value": "private-chip" }] }],
+          "text": null,
+          "sort": null,
+          "directives": { "like": [], "session": null }
+        },
+        "canonicalText": "chip:private-chip",
+        "diagnostics": [],
+        "localCapabilities": [{ "code": "unsupported_facet", "field": "facet", "facet": "chip" }]
+      },
+      "future": ["accountVocabularyResolution", "uiPartialRun", "strictServerValueError"]
+    },
+    {
+      "id": "G19.unknown-ranking-value-input",
+      "golden": "G19",
+      "input": "?chip:private-chip",
+      "expect": {
+        "query": {
+          "groups": [{ "op": "niceToHave", "terms": [{ "facet": "chip", "value": "private-chip" }] }],
+          "text": null,
+          "sort": null,
+          "directives": { "like": [], "session": null }
+        },
+        "canonicalText": "?chip:private-chip",
+        "diagnostics": [],
+        "localCapabilities": [
+          { "code": "unsupported_operator", "field": "group.op", "facet": null },
+          { "code": "unsupported_facet", "field": "facet", "facet": "chip" }
+        ]
+      },
+      "future": ["flaggedRankingDegradation"]
+    },
+    {
+      "id": "G20.private-title-input",
+      "golden": "G20",
+      "input": "private upload title",
+      "expect": {
+        "query": {
+          "groups": [],
+          "text": { "phrase": "private upload title", "exact": false },
+          "sort": null,
+          "directives": { "like": [], "session": null }
+        },
+        "canonicalText": "private upload title",
+        "diagnostics": [],
+        "localCapabilities": []
+      },
+      "future": ["accountTitleIsolation"]
+    },
+    {
+      "id": "G21.mixed-member-operators",
+      "golden": "G21",
+      "input": "tag:cozy|-tag:horror",
+      "expect": {
+        "query": {
+          "groups": [],
+          "text": null,
+          "sort": null,
+          "directives": { "like": [], "session": null }
+        },
+        "canonicalText": null,
+        "diagnostics": [
+          {
+            "code": "mixed_group_operators",
+            "severity": "error",
+            "field": "group.op",
+            "facet": null,
+            "span": { "start": 0, "length": 20 },
+            "rawToken": "tag:cozy|-tag:horror",
+            "message": "Operators apply to the whole group; only the first member may carry one.",
+            "candidates": [],
+            "validBareForm": null,
+            "data": {}
+          }
+        ],
+        "localCapabilities": []
+      },
+      "future": []
+    },
+    {
+      "id": "G22.avoid-group",
+      "golden": "G22",
+      "input": "?-tag:grindy|tag:repetitive",
+      "expect": {
+        "query": {
+          "groups": [
+            {
+              "op": "avoid",
+              "terms": [
+                { "facet": "tag", "value": "grindy" },
+                { "facet": "tag", "value": "repetitive" }
+              ]
+            }
+          ],
+          "text": null,
+          "sort": null,
+          "directives": { "like": [], "session": null }
+        },
+        "canonicalText": "?-tag:grindy|tag:repetitive",
+        "diagnostics": [],
+        "localCapabilities": [
+          { "code": "unsupported_operator", "field": "group.op", "facet": null },
+          { "code": "unsupported_facet", "field": "facet", "facet": "tag" },
+          { "code": "unsupported_facet", "field": "facet", "facet": "tag" }
+        ]
+      },
+      "future": ["maxMemberPenalty"]
+    },
+    {
+      "id": "G23.ranking-only-binary",
+      "golden": "G23",
+      "input": "?installed:yes",
+      "expect": {
+        "query": {
+          "groups": [{ "op": "niceToHave", "terms": [{ "facet": "installed", "value": "yes" }] }],
+          "text": null,
+          "sort": null,
+          "directives": { "like": [], "session": null }
+        },
+        "canonicalText": "?installed:yes",
+        "diagnostics": [],
+        "localCapabilities": [{ "code": "unsupported_operator", "field": "group.op", "facet": null }]
+      },
+      "future": ["rankingOnlyBinarySemantics"]
+    },
+    {
+      "id": "G23.membership-emphasis-binary",
+      "golden": "G23",
+      "input": "+installed:yes",
+      "expect": {
+        "query": {
+          "groups": [{ "op": "prefer", "terms": [{ "facet": "installed", "value": "yes" }] }],
+          "text": null,
+          "sort": null,
+          "directives": { "like": [], "session": null }
+        },
+        "canonicalText": "+installed:yes",
+        "diagnostics": [],
+        "localCapabilities": [{ "code": "unsupported_operator", "field": "group.op", "facet": null }]
+      },
+      "future": ["membershipEmphasisNoOp"]
+    },
+    {
+      "id": "G24.decorated-like-minus",
+      "golden": "G24",
+      "input": "-like:steam:292030",
+      "expect": {
+        "query": { "groups": [], "text": null, "sort": null, "directives": { "like": [], "session": null } },
+        "canonicalText": null,
+        "diagnostics": [
+          {
+            "code": "unsupported_operator_for_facet",
+            "severity": "error",
+            "field": "group.op",
+            "facet": "like",
+            "span": { "start": 0, "length": 18 },
+            "rawToken": "-like:steam:292030",
+            "message": "'like' is valid only without an operator.",
+            "candidates": [],
+            "validBareForm": "like:<game>",
+            "data": { "operator": "-" }
+          }
+        ],
+        "localCapabilities": []
+      },
+      "future": ["uiPreservesInvalidToken", "strictServerRejection"]
+    },
+    {
+      "id": "G24.decorated-like-plus",
+      "golden": "G24",
+      "input": "+like:steam:292030",
+      "expect": {
+        "query": { "groups": [], "text": null, "sort": null, "directives": { "like": [], "session": null } },
+        "canonicalText": null,
+        "diagnostics": [
+          {
+            "code": "unsupported_operator_for_facet",
+            "severity": "error",
+            "field": "group.op",
+            "facet": "like",
+            "span": { "start": 0, "length": 18 },
+            "rawToken": "+like:steam:292030",
+            "message": "'like' is valid only without an operator.",
+            "candidates": [],
+            "validBareForm": "like:<game>",
+            "data": { "operator": "+" }
+          }
+        ],
+        "localCapabilities": []
+      },
+      "future": ["uiPreservesInvalidToken", "strictServerRejection"]
+    },
+    {
+      "id": "G24.decorated-like-strong",
+      "golden": "G24",
+      "input": "++like:steam:292030",
+      "expect": {
+        "query": { "groups": [], "text": null, "sort": null, "directives": { "like": [], "session": null } },
+        "canonicalText": null,
+        "diagnostics": [
+          {
+            "code": "unsupported_operator_for_facet",
+            "severity": "error",
+            "field": "group.op",
+            "facet": "like",
+            "span": { "start": 0, "length": 19 },
+            "rawToken": "++like:steam:292030",
+            "message": "'like' is valid only without an operator.",
+            "candidates": [],
+            "validBareForm": "like:<game>",
+            "data": { "operator": "++" }
+          }
+        ],
+        "localCapabilities": []
+      },
+      "future": ["uiPreservesInvalidToken", "strictServerRejection"]
+    },
+    {
+      "id": "G24.decorated-like-nice",
+      "golden": "G24",
+      "input": "?like:steam:292030",
+      "expect": {
+        "query": { "groups": [], "text": null, "sort": null, "directives": { "like": [], "session": null } },
+        "canonicalText": null,
+        "diagnostics": [
+          {
+            "code": "unsupported_operator_for_facet",
+            "severity": "error",
+            "field": "group.op",
+            "facet": "like",
+            "span": { "start": 0, "length": 18 },
+            "rawToken": "?like:steam:292030",
+            "message": "'like' is valid only without an operator.",
+            "candidates": [],
+            "validBareForm": "like:<game>",
+            "data": { "operator": "?" }
+          }
+        ],
+        "localCapabilities": []
+      },
+      "future": ["uiPreservesInvalidToken", "strictServerRejection"]
+    },
+    {
+      "id": "G24.decorated-like-avoid",
+      "golden": "G24",
+      "input": "?-like:steam:292030",
+      "expect": {
+        "query": { "groups": [], "text": null, "sort": null, "directives": { "like": [], "session": null } },
+        "canonicalText": null,
+        "diagnostics": [
+          {
+            "code": "unsupported_operator_for_facet",
+            "severity": "error",
+            "field": "group.op",
+            "facet": "like",
+            "span": { "start": 0, "length": 19 },
+            "rawToken": "?-like:steam:292030",
+            "message": "'like' is valid only without an operator.",
+            "candidates": [],
+            "validBareForm": "like:<game>",
+            "data": { "operator": "?-" }
+          }
+        ],
+        "localCapabilities": []
+      },
+      "future": ["uiPreservesInvalidToken", "strictServerRejection"]
+    },
+    {
+      "id": "G25.decorated-session-minus",
+      "golden": "G25",
+      "input": "-session:shortSession",
+      "expect": {
+        "query": { "groups": [], "text": null, "sort": null, "directives": { "like": [], "session": null } },
+        "canonicalText": null,
+        "diagnostics": [
+          {
+            "code": "unsupported_operator_for_facet",
+            "severity": "error",
+            "field": "group.op",
+            "facet": "session",
+            "span": { "start": 0, "length": 21 },
+            "rawToken": "-session:shortSession",
+            "message": "'session' is valid only without an operator.",
+            "candidates": [],
+            "validBareForm": "session:<sessionValue>",
+            "data": { "operator": "-" }
+          }
+        ],
+        "localCapabilities": []
+      },
+      "future": ["uiPreservesInvalidToken", "strictServerRejection"]
+    },
+    {
+      "id": "G25.decorated-session-plus",
+      "golden": "G25",
+      "input": "+session:shortSession",
+      "expect": {
+        "query": { "groups": [], "text": null, "sort": null, "directives": { "like": [], "session": null } },
+        "canonicalText": null,
+        "diagnostics": [
+          {
+            "code": "unsupported_operator_for_facet",
+            "severity": "error",
+            "field": "group.op",
+            "facet": "session",
+            "span": { "start": 0, "length": 21 },
+            "rawToken": "+session:shortSession",
+            "message": "'session' is valid only without an operator.",
+            "candidates": [],
+            "validBareForm": "session:<sessionValue>",
+            "data": { "operator": "+" }
+          }
+        ],
+        "localCapabilities": []
+      },
+      "future": ["uiPreservesInvalidToken", "strictServerRejection"]
+    },
+    {
+      "id": "G25.decorated-session-strong",
+      "golden": "G25",
+      "input": "++session:shortSession",
+      "expect": {
+        "query": { "groups": [], "text": null, "sort": null, "directives": { "like": [], "session": null } },
+        "canonicalText": null,
+        "diagnostics": [
+          {
+            "code": "unsupported_operator_for_facet",
+            "severity": "error",
+            "field": "group.op",
+            "facet": "session",
+            "span": { "start": 0, "length": 22 },
+            "rawToken": "++session:shortSession",
+            "message": "'session' is valid only without an operator.",
+            "candidates": [],
+            "validBareForm": "session:<sessionValue>",
+            "data": { "operator": "++" }
+          }
+        ],
+        "localCapabilities": []
+      },
+      "future": ["uiPreservesInvalidToken", "strictServerRejection"]
+    },
+    {
+      "id": "G25.decorated-session-nice",
+      "golden": "G25",
+      "input": "?session:shortSession",
+      "expect": {
+        "query": { "groups": [], "text": null, "sort": null, "directives": { "like": [], "session": null } },
+        "canonicalText": null,
+        "diagnostics": [
+          {
+            "code": "unsupported_operator_for_facet",
+            "severity": "error",
+            "field": "group.op",
+            "facet": "session",
+            "span": { "start": 0, "length": 21 },
+            "rawToken": "?session:shortSession",
+            "message": "'session' is valid only without an operator.",
+            "candidates": [],
+            "validBareForm": "session:<sessionValue>",
+            "data": { "operator": "?" }
+          }
+        ],
+        "localCapabilities": []
+      },
+      "future": ["uiPreservesInvalidToken", "strictServerRejection"]
+    },
+    {
+      "id": "G25.decorated-session-avoid",
+      "golden": "G25",
+      "input": "?-session:shortSession",
+      "expect": {
+        "query": { "groups": [], "text": null, "sort": null, "directives": { "like": [], "session": null } },
+        "canonicalText": null,
+        "diagnostics": [
+          {
+            "code": "unsupported_operator_for_facet",
+            "severity": "error",
+            "field": "group.op",
+            "facet": "session",
+            "span": { "start": 0, "length": 22 },
+            "rawToken": "?-session:shortSession",
+            "message": "'session' is valid only without an operator.",
+            "candidates": [],
+            "validBareForm": "session:<sessionValue>",
+            "data": { "operator": "?-" }
+          }
+        ],
+        "localCapabilities": []
+      },
+      "future": ["uiPreservesInvalidToken", "strictServerRejection"]
+    }
+  ]
+}

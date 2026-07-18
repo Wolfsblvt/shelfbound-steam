@@ -146,6 +146,10 @@ metadata, not just local data.
 `search_library` operates on the **merged view** (snapshot facts + user-data) and accepts a rich,
 composable, **deterministic** filter set:
 
+> **Current boundary:** the public [QueryPlan v1 contract and parser](./query-plan.md) are available in
+> `Shelfbound.Query`, but this MCP tool still maps its existing arguments to `LibraryFilter`. Adopting the
+> plan grammar or changing the tool wire shape is separate work; nothing below claims that migration has shipped.
+
 - text query; app id/name
 - categories/collections (include / exclude)
 - installed yes/no; installed on a given device; Steam Deck status (later)

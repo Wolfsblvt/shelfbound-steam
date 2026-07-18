@@ -55,8 +55,9 @@ src/
   Shelfbound.Steam     Local Steam scanner (VDF/ACF, modern + legacy categories, device specs) +
                        Steam Web API client + enrichment. The differentiator; auditable and open.
   Shelfbound.Query     Merged library view (snapshot facts + user-data) + deterministic
-                       filter/sort/summary + recommendations. No I/O, no LLM; reused by the MCP server,
-                       the tray, and the hosted layer.
+                       filter/sort/summary + recommendations, plus the versioned QueryPlan contract,
+                       parser/serializer, capability model, and conformance corpus. No I/O, no LLM;
+                       reused by the MCP server, the tray, and the hosted layer.
   Shelfbound.Storage   Local config (API key), the identity seam, and the user-data store
                        (statuses/ratings/completion/aspects, scoped memories, category meanings).
   Shelfbound.Client    Shared scan-to-snapshot builder + whitelist-only hosted projection +

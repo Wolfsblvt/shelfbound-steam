@@ -109,6 +109,12 @@ A reusable, deterministic `Shelfbound.Query` engine (filter/sort/summary) sits b
 consumers; the **local MCP server** (`Shelfbound.Mcp`, official C# SDK, stdio) exposes read tools over
 it. Keeping query logic out of the MCP layer lets the dashboard/hosted layer reuse it later.
 
+The additive QueryPlan v1 contract and hand-rolled grammar also live in `Shelfbound.Query`, beside the
+published `LibraryFilter` seam. Parsing recognizes the complete frozen language while explicit capability
+validation distinguishes local, hosted-only, and resolution-dependent features. This freezes one portable
+language without changing current `LibraryFilter` callers or pretending the plan has an executor; local MCP
+and engine migration remain later work. See [query-plan.md](./query-plan.md).
+
 ### Steam Web API as composable enrichment
 Positive visible game/playtime observations come from the Steam Web API behind `ISteamWebApiClient`
 (swappable/mockable). Its structured result preserves response time and distinguishes usable non-empty,

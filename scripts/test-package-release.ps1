@@ -157,6 +157,31 @@ function Assert-SymbolPackageSourceLink {
     }
 }
 
+function Assert-PackageTextEntry {
+    param(
+        [Parameter(Mandatory)][string]$PackagePath,
+        [Parameter(Mandatory)][string]$EntryPath,
+        [Parameter(Mandatory)][string]$SourcePath
+    )
+
+    Add-Type -AssemblyName System.IO.Compression
+    $archive = [System.IO.Compression.ZipFile]::OpenRead($PackagePath)
+    try {
+        $entry = $archive.Entries | Where-Object FullName -EQ $EntryPath | Select-Object -First 1
+        if ($null -eq $entry) { throw "Package '$PackagePath' has no '$EntryPath'." }
+        $reader = [System.IO.StreamReader]::new($entry.Open())
+        try { $packaged = $reader.ReadToEnd() } finally { $reader.Dispose() }
+    }
+    finally {
+        $archive.Dispose()
+    }
+
+    $source = Get-Content -Raw -LiteralPath $SourcePath
+    if ($packaged -cne $source) {
+        throw "Package entry '$EntryPath' does not match '$SourcePath'."
+    }
+}
+
 function Assert-CloudReferencesUseCentralPin {
     param(
         [Parameter(Mandatory)][string]$Repo,
@@ -295,6 +320,12 @@ try {
         }
         if ($metadata.ReleaseNotes -notlike "*Snapshot schema: $schemaVersion.*") {
             throw "Nuspec for '$packageId' does not embed snapshot schema '$schemaVersion'."
+        }
+        if ($packageId -eq 'Shelfbound.Query') {
+            Assert-PackageTextEntry `
+                -PackagePath $packagePath `
+                -EntryPath 'contracts/power-search/query-plan-v1.corpus.json' `
+                -SourcePath (Join-Path $root 'contracts/power-search/query-plan-v1.corpus.json')
         }
         Assert-SymbolPackageSourceLink -SymbolPackagePath $symbolsPath -PackageId $packageId -Commit $commit
     }

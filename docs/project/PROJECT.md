@@ -68,7 +68,10 @@ The local Steam data is the moat. AI reasoning is commodity; good structured fac
   and CLI/MCP wording keeps absence from becoming a non-ownership claim.
 - **`Shelfbound.Query`**: deterministic filter/sort/summary over a **merged library view** (snapshot
   facts + user-data) — search by category, install state, playtime, **status, rating, and completion**;
-  **recency** as human phrases (installed/last-played + "added N ago", inferred from first-seen).
+  **recency** as human phrases (installed/last-played + "added N ago", inferred from first-seen). The
+  additive **QueryPlan v1** contract, text parser/canonical serializer, capability validator, structured
+  diagnostics, and public conformance corpus are built beside `LibraryFilter`; the existing engine and local
+  MCP behavior have not migrated to that plan yet. See [query-plan.md](./query-plan.md).
 - **Local MCP server** (`Shelfbound.Mcp`, stdio): read tools (`search_library`, `get_library_summary`,
   `get_categories`, `get_game_details`, `find_installed_unplayed`), write/remember tools
   (`record_game_status`, `record_game_opinion`, `set_game_completion`, `set_category_definition`,
@@ -141,6 +144,7 @@ CLI/MCP packaged as .NET global tools.
 - [ARCHITECTURE.md](./ARCHITECTURE.md) — components, the snapshot seam, local/cloud boundary, data model.
 - [DECISIONS.md](./DECISIONS.md) — technical/architecture decision log.
 - [snapshot-schema.md](./snapshot-schema.md) — the snapshot contract in detail.
+- [query-plan.md](./query-plan.md) — QueryPlan v1 shape, text grammar, diagnostics, capabilities, and corpus.
 - [steam-collections.md](./steam-collections.md) — modern collections reader (stale-category fix): design + findings.
 - [privacy-and-data.md](./privacy-and-data.md) — privacy principles and what is read.
 - [mcp-design.md](./mcp-design.md) — local MCP tool design and memory-write guardrails.

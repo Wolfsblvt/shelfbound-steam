@@ -33,6 +33,9 @@
     <None Include="..\Fixtures\hosted-snapshot.golden.json"
           Link="Fixtures\hosted-snapshot.golden.json"
           CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\contracts\power-search\query-plan-v1.corpus.json"
+          Link="Contracts\power-search\query-plan-v1.corpus.json"
+          CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

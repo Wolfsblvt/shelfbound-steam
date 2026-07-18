@@ -127,7 +127,7 @@ The whole repository is licensed **AGPL-3.0-or-later** (see [License](#license))
 |---|---|
 | `src/Shelfbound.Core` | Domain models + the versioned snapshot contract + serializer. |
 | `src/Shelfbound.Steam` | Local Steam scanner + Steam Web API client + enrichment. |
-| `src/Shelfbound.Query` | Deterministic query/filter/summary engine over a snapshot. |
+| `src/Shelfbound.Query` | Deterministic query/filter/summary engine plus the versioned QueryPlan grammar contract. |
 | `src/Shelfbound.Storage` | Local config, identity seam, and the user-data store (statuses, ratings, memories). |
 | `src/Shelfbound.Client` | Shared scan-to-snapshot builder + Shelfbound server client, reused by the CLI and tray. |
 | `src/Shelfbound.Cli` | The `shelfbound` command-line tool (setup/scan/profile/upload). |
@@ -140,7 +140,8 @@ The whole repository is licensed **AGPL-3.0-or-later** (see [License](#license))
 
 Start with [docs/project/PROJECT.md](docs/project/PROJECT.md); the snapshot contract is in
 [docs/project/snapshot-schema.md](docs/project/snapshot-schema.md) and
-[`schema/snapshot.v0.schema.json`](schema/snapshot.v0.schema.json).
+[`schema/snapshot.v0.schema.json`](schema/snapshot.v0.schema.json). The cross-surface query contract is
+documented in [docs/project/query-plan.md](docs/project/query-plan.md).
 
 ## License
 
