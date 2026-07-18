@@ -92,6 +92,17 @@ function Assert-BreakingChangeReleasePolicy {
     }
 }
 
+function Test-UseProjectApiCompatSuppressions {
+    param(
+        [Parameter(Mandatory)][string]$BaselinePackageVersion,
+        [Parameter(Mandatory)][string]$CurrentPackageVersion
+    )
+
+    # Suppressions describe intentional breaks from an older release. Once the current version is published,
+    # CI must compare against that exact package without letting those historical suppressions mask new breaks.
+    return (Compare-ReleaseVersion $CurrentPackageVersion $BaselinePackageVersion) -gt 0
+}
+
 function Assert-CloudPackagePin {
     param(
         [Parameter(Mandatory)][string]$ProducerPackageVersion,
@@ -138,6 +149,7 @@ Export-ModuleMember -Function @(
     'Assert-PackageVersionNotReused',
     'Assert-SchemaReleasePolicy',
     'Assert-BreakingChangeReleasePolicy',
+    'Test-UseProjectApiCompatSuppressions',
     'Assert-CloudPackagePin',
     'Test-ContractContentChanged',
     'Remove-TextByteOrderMark',

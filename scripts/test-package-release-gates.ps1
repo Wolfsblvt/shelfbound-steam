@@ -61,6 +61,12 @@ $schemaArguments = @{
 Assert-SchemaReleasePolicy @schemaArguments
 Assert-BreakingChangeReleasePolicy -BaselinePackageVersion '0.7.0' -CurrentPackageVersion '0.8.0' -HasNewApiCompatSuppressions $true
 Assert-CloudPackagePin -ProducerPackageVersion '0.8.0' -CloudPackageVersion '0.8.0'
+if (-not (Test-UseProjectApiCompatSuppressions -BaselinePackageVersion '0.7.0' -CurrentPackageVersion '0.8.0')) {
+    throw 'A new package release must use its project API compatibility suppressions against the older baseline.'
+}
+if (Test-UseProjectApiCompatSuppressions -BaselinePackageVersion '0.8.0' -CurrentPackageVersion '0.8.0') {
+    throw 'Post-release validation must not reuse historical API compatibility suppressions against the published package.'
+}
 
 $lfContract = "{`n  `"version`": 1`n}`n"
 $crlfContract = $lfContract -replace "`n", "`r`n"
@@ -80,4 +86,4 @@ if ((ConvertTo-GitPath -Path 'src\Shelfbound.Core\CompatibilitySuppressions.xml'
     throw 'Repository paths must use Git separators on every host OS.'
 }
 
-Write-Host 'Package release gate tests passed (4 rejection fixtures + text/platform controls).' -ForegroundColor Green
+Write-Host 'Package release gate tests passed (4 rejection fixtures + release/text/platform controls).' -ForegroundColor Green

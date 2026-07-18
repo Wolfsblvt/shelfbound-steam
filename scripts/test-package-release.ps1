@@ -290,6 +290,18 @@ $runRoot = Join-Path ([System.IO.Path]::GetTempPath()) "shelfbound-package-relea
 $artifacts = Join-Path $runRoot 'packages'
 New-Item -ItemType Directory -Path $artifacts -Force | Out-Null
 try {
+    $useProjectApiCompatSuppressions = Test-UseProjectApiCompatSuppressions `
+        -BaselinePackageVersion $baselinePackageVersion `
+        -CurrentPackageVersion $packageVersion
+    $emptyApiCompatSuppressions = Join-Path $runRoot 'EmptyCompatibilitySuppressions.xml'
+    if (-not $useProjectApiCompatSuppressions) {
+        [System.IO.File]::WriteAllText(
+            $emptyApiCompatSuppressions,
+            '<?xml version="1.0" encoding="utf-8"?><Suppressions />',
+            [System.Text.UTF8Encoding]::new($false)
+        )
+    }
+
     foreach ($project in $libraryProjects.Values) {
         $arguments = @(
             'pack', (Join-Path $root $project),
@@ -300,6 +312,11 @@ try {
             '-p:EnablePackageValidation=true',
             "-p:PackageValidationBaselineVersion=$baselinePackageVersion"
         )
+        if (-not $useProjectApiCompatSuppressions) {
+            # CompatibilitySuppressionFilePath seeds an explicit ApiCompat item, preventing the SDK from
+            # auto-loading each project's historical CompatibilitySuppressions.xml for an equal baseline.
+            $arguments += "-p:CompatibilitySuppressionFilePath=$emptyApiCompatSuppressions"
+        }
         & dotnet @arguments
         if ($LASTEXITCODE -ne 0) { throw "Package validation failed for '$project'." }
     }
