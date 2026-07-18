@@ -70,9 +70,14 @@ if (Test-ContractContentChanged -Baseline $crlfContract -Current $lfContract) {
 if (-not (Test-ContractContentChanged -Baseline $lfContract -Current ($lfContract -replace '1', '2'))) {
     throw 'A semantic contract edit must compare changed.'
 }
+$bomPrefixedXml = "$([char]0xFEFF)<Suppressions />"
+[xml]$bomDocument = Remove-TextByteOrderMark -Text $bomPrefixedXml
+if ($bomDocument.DocumentElement.Name -ne 'Suppressions') {
+    throw 'Git-loaded repository XML must parse after a leading byte-order mark is removed.'
+}
 if ((ConvertTo-GitPath -Path 'src\Shelfbound.Core\CompatibilitySuppressions.xml') -ne
     'src/Shelfbound.Core/CompatibilitySuppressions.xml') {
     throw 'Repository paths must use Git separators on every host OS.'
 }
 
-Write-Host 'Package release gate tests passed (4 rejection fixtures + platform controls).' -ForegroundColor Green
+Write-Host 'Package release gate tests passed (4 rejection fixtures + text/platform controls).' -ForegroundColor Green

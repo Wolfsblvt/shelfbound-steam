@@ -118,6 +118,14 @@ function Test-ContractContentChanged {
     return $normalizedBaseline -ne $normalizedCurrent
 }
 
+function Remove-TextByteOrderMark {
+    param([Parameter(Mandatory)][AllowEmptyString()][string]$Text)
+
+    # Native git output preserves a committed UTF-8 BOM as U+FEFF on some hosts. Text readers normally consume it,
+    # so normalize git-loaded repository text before XML/JSON parsing or semantic comparison.
+    return $Text.TrimStart([char]0xFEFF)
+}
+
 function ConvertTo-GitPath {
     param([Parameter(Mandatory)][string]$Path)
 
@@ -132,5 +140,6 @@ Export-ModuleMember -Function @(
     'Assert-BreakingChangeReleasePolicy',
     'Assert-CloudPackagePin',
     'Test-ContractContentChanged',
+    'Remove-TextByteOrderMark',
     'ConvertTo-GitPath'
 )

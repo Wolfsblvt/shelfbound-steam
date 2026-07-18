@@ -51,7 +51,7 @@ function Get-GitFile {
         if ($Optional) { return $null }
         throw "Could not read '$Path' at '$Ref'."
     }
-    return $content
+    return Remove-TextByteOrderMark -Text $content
 }
 
 function Get-SnapshotSchemaVersion {
