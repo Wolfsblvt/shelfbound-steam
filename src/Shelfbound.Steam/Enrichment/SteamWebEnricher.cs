@@ -6,7 +6,8 @@ namespace Shelfbound.Steam.Enrichment;
 
 /// <summary>
 /// Merges positive visibility-gated Steam Web API observations into a locally scanned snapshot: sets
-/// playtime on installed games and adds visible not-installed game observations (with local categories).
+/// playtime on installed games, keeps their newest known last-played event, and adds visible not-installed
+/// game observations (with local categories).
 /// Pure and deterministic — the network fetch happens separately via <see cref="ISteamWebApiClient"/>.
 ///
 /// The document-level category summary is already computed from the full local category map, so it
@@ -36,11 +37,15 @@ public static class SteamWebEnricher
         var localAppIds = localGames.Select(game => game.AppId).ToHashSet();
         var games = new List<SnapshotGame>(localGames.Count + ownedByApp.Count);
 
-        // Installed games: attach playtime and last-played where the API knows them.
+        // Installed games: Web playtime takes precedence; last-played keeps the newest known event.
         foreach (SnapshotGame game in localGames)
         {
             games.Add(ownedByApp.TryGetValue(game.AppId, out OwnedGame? owned)
-                ? game with { PlaytimeMinutes = owned.PlaytimeForeverMinutes, LastPlayed = owned.LastPlayed ?? game.LastPlayed }
+                ? game with
+                {
+                    PlaytimeMinutes = owned.PlaytimeForeverMinutes,
+                    LastPlayed = SelectNewestLastPlayed(game.LastPlayed, owned.LastPlayed),
+                }
                 : game);
         }
 
@@ -109,6 +114,19 @@ public static class SteamWebEnricher
                 .ThenBy(category => category, StringComparer.Ordinal)
                 .ToArray(),
         };
+    }
+
+    private static DateTimeOffset? SelectNewestLastPlayed(
+        DateTimeOffset? localLastPlayed,
+        DateTimeOffset? webLastPlayed)
+    {
+        if (localLastPlayed is null)
+            return webLastPlayed;
+
+        if (webLastPlayed is null || localLastPlayed >= webLastPlayed)
+            return localLastPlayed;
+
+        return webLastPlayed;
     }
 
     private sealed record IndexedGame(SnapshotGame Game, int Index);

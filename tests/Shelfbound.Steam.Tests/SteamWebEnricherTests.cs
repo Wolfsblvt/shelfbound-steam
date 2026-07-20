@@ -92,6 +92,60 @@ public class SteamWebEnricherTests
     }
 
     [Fact]
+    public void Installed_game_last_played_uses_the_newest_known_event_while_web_playtime_takes_precedence()
+    {
+        DateTimeOffset oldest = DateTimeOffset.Parse("2026-07-01T10:00:00+00:00");
+        DateTimeOffset older = DateTimeOffset.Parse("2026-07-05T10:00:00+00:00");
+        DateTimeOffset newer = DateTimeOffset.Parse("2026-07-10T10:00:00+00:00");
+        SnapshotDocument snapshot = Snapshot(
+            new SnapshotGame { AppId = 10, Name = "Local newest", Installed = true, LibraryIndex = 0, PlaytimeMinutes = 120, LastPlayed = older },
+            new SnapshotGame { AppId = 10, Name = "Local older duplicate", Installed = true, LibraryIndex = 1, PlaytimeMinutes = 90, LastPlayed = oldest },
+            new SnapshotGame { AppId = 20, Name = "Web newest", Installed = true, LibraryIndex = 2, LastPlayed = oldest },
+            new SnapshotGame { AppId = 30, Name = "Known local", Installed = true, LibraryIndex = 3, LastPlayed = older },
+            new SnapshotGame { AppId = 40, Name = "Known web", Installed = true, LibraryIndex = 4 },
+            new SnapshotGame { AppId = 50, Name = "Unknown", Installed = true, LibraryIndex = 5 });
+        var owned = new List<OwnedGame>
+        {
+            new() { AppId = 10, Name = "Local newest", PlaytimeForeverMinutes = 900, LastPlayed = oldest },
+            new() { AppId = 20, Name = "Web newest", PlaytimeForeverMinutes = 20, LastPlayed = newer },
+            new() { AppId = 30, Name = "Known local", PlaytimeForeverMinutes = 30 },
+            new() { AppId = 40, Name = "Known web", PlaytimeForeverMinutes = 40, LastPlayed = newer },
+            new() { AppId = 50, Name = "Unknown", PlaytimeForeverMinutes = 50 },
+        };
+
+        SnapshotDocument enriched = SteamWebEnricher.Enrich(
+            snapshot,
+            new Dictionary<int, IReadOnlyList<string>>(),
+            owned);
+
+        SnapshotGame localNewest = enriched.Games.Single(game => game.AppId == 10);
+        localNewest.LastPlayed.ShouldBe(older);
+        localNewest.PlaytimeMinutes.ShouldBe(900);
+        enriched.Games.Single(game => game.AppId == 20).LastPlayed.ShouldBe(newer);
+        enriched.Games.Single(game => game.AppId == 30).LastPlayed.ShouldBe(older);
+        enriched.Games.Single(game => game.AppId == 40).LastPlayed.ShouldBe(newer);
+        enriched.Games.Single(game => game.AppId == 50).LastPlayed.ShouldBeNull();
+    }
+
+    [Fact]
+    public void Installed_game_last_played_tie_keeps_the_exact_local_offset()
+    {
+        DateTimeOffset localLastPlayed = DateTimeOffset.Parse("2026-07-10T14:00:00+02:00");
+        DateTimeOffset webLastPlayed = DateTimeOffset.Parse("2026-07-10T12:00:00+00:00");
+        SnapshotDocument snapshot = Snapshot(
+            new SnapshotGame { AppId = 10, Name = "Installed Game", Installed = true, LibraryIndex = 0, LastPlayed = localLastPlayed });
+
+        SnapshotDocument enriched = SteamWebEnricher.Enrich(
+            snapshot,
+            new Dictionary<int, IReadOnlyList<string>>(),
+            [new OwnedGame { AppId = 10, Name = "Installed Game", PlaytimeForeverMinutes = 120, LastPlayed = webLastPlayed }]);
+
+        SnapshotGame game = enriched.Games.Single();
+        game.LastPlayed.ShouldNotBeNull();
+        game.LastPlayed.Value.EqualsExact(localLastPlayed).ShouldBeTrue();
+    }
+
+    [Fact]
     public void Duplicate_appids_merge_to_one_deterministic_row_with_strongest_observations()
     {
         DateTimeOffset older = DateTimeOffset.Parse("2026-07-01T10:00:00+00:00");

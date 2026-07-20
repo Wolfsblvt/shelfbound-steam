@@ -62,8 +62,9 @@ fails; a published package version is never overwritten.
 
 `games[]` entry: `appId`, `name`, `installed`, `libraryIndex?` (null when not observed installed),
 `installDir?` (relative folder name only), `sizeOnDiskBytes?`, `playtimeMinutes?` (from the Steam Web
-API), `lastUpdated?`, `lastPlayed?`, `categories[]` (the user's category names for that game, in
-Steam's tag order; empty if uncategorized).
+API), `lastUpdated?`, `lastPlayed?` (the newest known local/Web play event; null means unknown, and an
+equal-instant tie retains the local timestamp representation), `categories[]` (the user's category names for
+that game, in Steam's tag order; empty if uncategorized).
 
 Schema v0.6.0 has no per-game ownership, access-grant, Family, or Steam-Private field. An installed app
 manifest produces a `games[]` entry under `installedOnly`, but manifest presence proves only that an
