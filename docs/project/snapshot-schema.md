@@ -35,7 +35,8 @@ the immutable library releases is:
 |---|---|---|
 | `0.6.0` | `0.4.0` | Historical published payload; immutable, no `libraries[].storage` |
 | `0.7.0` | `0.5.0` | Historical published payload; adds optional `libraries[].storage` |
-| `0.8.0` | `0.6.0` | Adds honest `observedSubset` coverage; current source |
+| `0.8.0` | `0.6.0` | Published immutable payload; adds honest `observedSubset` coverage |
+| `0.8.1` | `0.6.0` | Prepared source candidate (not tagged or published); corrects local/Web `LastPlayed` merge semantics |
 
 `Directory.Build.props` records the current mapping as `Version` + `SnapshotSchemaVersion`. CI compares
 both to the previous `v*` release, package-validates the public API, and inspects the packed nuspec's

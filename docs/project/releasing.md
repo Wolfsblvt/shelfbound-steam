@@ -7,8 +7,9 @@ behind them: see the "Packaging & distribution" section of [DECISIONS.md](./DECI
 ## Open-core library packages
 
 `Directory.Build.props` binds the current library package version to its snapshot schema version.
-For this release, `Shelfbound.Core`, `Shelfbound.Query`, and `Shelfbound.Steam` are package `0.8.0`
-and produce schema `0.6.0`. Published package `0.7.0` remains schema `0.5.0`, and `0.6.0` remains
+The prepared, unpublished source candidate has `Shelfbound.Core`, `Shelfbound.Query`, and
+`Shelfbound.Steam` at package `0.8.1` and schema `0.6.0`; it is not yet tagged or published.
+Published package `0.8.0` remains schema `0.6.0`, `0.7.0` remains schema `0.5.0`, and `0.6.0` remains
 schema `0.4.0`. `Shelfbound.Storage` is local persistence and remains non-packable; the
 portable `SnapshotStorage` DTO is already in Core.
 
@@ -43,8 +44,8 @@ history, pushes Steam `main`, creates the immutable annotated tag at that exact 
 
 ```pwsh
 git push origin main
-git tag -a v0.8.0 -m "Shelfbound libraries 0.8.0 (snapshot schema 0.6.0)"
-git push origin v0.8.0
+git tag -a v0.8.1 -m "Shelfbound libraries 0.8.1 (snapshot schema 0.6.0)"
+git push origin v0.8.1
 ```
 
 The tag push triggers `nuget-publish.yml`; do not also dispatch a duplicate manual run. Prepare a draft GitHub Release
@@ -56,9 +57,9 @@ to continue. The shared GitHub identity technically permits self-review/admin by
 using either. A timeout leaves the run honestly awaiting review and is reported without cancellation or inferred
 consent.
 
-The publish workflow requires `v0.8.0` to point at the commit whose `Directory.Build.props` says
-`0.8.0`, and requires all three package ids to be absent at that version. After the workflow succeeds,
-verify each nuget.org page reports `0.8.0`, schema `0.6.0` in release notes, the tagged repository commit,
+The publish workflow requires `v0.8.1` to point at the commit whose `Directory.Build.props` says
+`0.8.1`, and requires all three package ids to be absent at that version. After the workflow succeeds,
+verify each nuget.org page reports `0.8.1`, schema `0.6.0` in release notes, the tagged repository commit,
 and a symbol package; only then publish the prepared GitHub Release. A failed gate, rejected approval, mismatched ref,
 or partial publish is a hard stop for diagnosis. Never "repair" an immutable release by moving its tag or silently
 skipping an existing package.

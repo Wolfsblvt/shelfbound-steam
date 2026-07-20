@@ -203,9 +203,10 @@ tag. *Rejected:* attaching nupkgs to GitHub Releases for manual `--add-source` i
 `dotnet tool install -g`) and continuing the mixed publish set with silent duplicate skips.
 
 ### Library package identity — immutable version/schema/commit, gated before publish
-Current source targets **package `0.8.0` carrying snapshot schema `0.6.0`**. Published `0.6.0` remains
-its historical schema-`0.4.0` payload and published `0.7.0` remains schema `0.5.0`; an immutable version
-is never repacked. The .NET SDK's built-in Source Link support emits portable symbols and the exact
+The prepared, unpublished source candidate targets **package `0.8.1` carrying snapshot schema `0.6.0`**;
+it is not yet tagged or published. Published `0.8.0` remains its schema-`0.6.0` payload, while published
+`0.6.0` remains its historical schema-`0.4.0` payload and published `0.7.0` remains schema `0.5.0`; an immutable
+version is never repacked. The .NET SDK's built-in Source Link support emits portable symbols and the exact
 repository commit, while the nuspec release notes embed the schema mapping. CI packs and inspects all
 three libraries, compares schema/package changes to the previous `v*` release, and runs SDK package
 validation against the previous published package.
