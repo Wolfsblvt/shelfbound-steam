@@ -77,16 +77,9 @@ function Assert-BreakingChangeReleasePolicy {
     if (-not $HasNewApiCompatSuppressions) { return }
 
     $baseline = ConvertTo-ReleaseVersion $BaselinePackageVersion
-    $current = ConvertTo-ReleaseVersion $CurrentPackageVersion
-    $breakingChangeAllowed = if ($baseline.Major -eq 0) {
-        $current.Major -gt $baseline.Major -or
-            ($current.Major -eq 0 -and $current.Minor -gt $baseline.Minor)
-    }
-    else {
-        $current.Major -gt $baseline.Major
-    }
-
-    if (-not $breakingChangeAllowed) {
+    if (-not (Test-UseProjectApiCompatSuppressions `
+            -BaselinePackageVersion $BaselinePackageVersion `
+            -CurrentPackageVersion $CurrentPackageVersion)) {
         $policy = if ($baseline.Major -eq 0) { 'a pre-1.0 minor bump' } else { 'a major bump' }
         throw "New API compatibility suppressions require $policy; '$BaselinePackageVersion' -> '$CurrentPackageVersion' is not sufficient."
     }
@@ -98,9 +91,17 @@ function Test-UseProjectApiCompatSuppressions {
         [Parameter(Mandatory)][string]$CurrentPackageVersion
     )
 
-    # Suppressions describe intentional breaks from an older release. Once the current version is published,
-    # CI must compare against that exact package without letting those historical suppressions mask new breaks.
-    return (Compare-ReleaseVersion $CurrentPackageVersion $BaselinePackageVersion) -gt 0
+    # Suppressions describe intentional public API breaks. A patch release must compare cleanly with its immediate
+    # baseline; only the next pre-1.0 minor (or post-1.0 major) may introduce a new suppression set.
+    $baseline = ConvertTo-ReleaseVersion $BaselinePackageVersion
+    $current = ConvertTo-ReleaseVersion $CurrentPackageVersion
+
+    if ($baseline.Major -eq 0) {
+        return $current.Major -gt $baseline.Major -or
+            ($current.Major -eq 0 -and $current.Minor -gt $baseline.Minor)
+    }
+
+    return $current.Major -gt $baseline.Major
 }
 
 function Assert-CloudPackagePin {

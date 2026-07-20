@@ -67,6 +67,12 @@ if (-not (Test-UseProjectApiCompatSuppressions -BaselinePackageVersion '0.7.0' -
 if (Test-UseProjectApiCompatSuppressions -BaselinePackageVersion '0.8.0' -CurrentPackageVersion '0.8.0') {
     throw 'Post-release validation must not reuse historical API compatibility suppressions against the published package.'
 }
+if (Test-UseProjectApiCompatSuppressions -BaselinePackageVersion '0.8.0' -CurrentPackageVersion '0.8.1') {
+    throw 'A patch release must not reuse historical API compatibility suppressions against its immediate baseline.'
+}
+if (-not (Test-UseProjectApiCompatSuppressions -BaselinePackageVersion '0.8.0' -CurrentPackageVersion '0.9.0')) {
+    throw 'A pre-1.0 minor release must permit an explicitly reviewed new API compatibility suppression.'
+}
 
 $lfContract = "{`n  `"version`": 1`n}`n"
 $crlfContract = $lfContract -replace "`n", "`r`n"

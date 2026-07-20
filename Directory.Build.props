@@ -2,8 +2,8 @@
 
   <!-- Shared package/assembly metadata for the whole solution. -->
   <PropertyGroup>
-    <Version>0.8.0</Version>
-    <!-- Package 0.8.0 carries snapshot schema 0.6.0. Keep this mapping in sync with
+    <Version>0.8.1</Version>
+    <!-- Package 0.8.1 carries snapshot schema 0.6.0. Keep this mapping in sync with
          SnapshotSchema.Version; scripts/test-package-release.ps1 enforces it. -->
     <SnapshotSchemaVersion>0.6.0</SnapshotSchemaVersion>
     <Authors>Wolfsblvt</Authors>
@@ -28,7 +28,7 @@
     <IncludeSymbols Condition="'$(IsOpenCoreLibraryPackage)' == 'true'">true</IncludeSymbols>
     <SymbolPackageFormat Condition="'$(IsOpenCoreLibraryPackage)' == 'true'">snupkg</SymbolPackageFormat>
     <PackageReadmeFile Condition="'$(IsOpenCoreLibraryPackage)' == 'true'">README.md</PackageReadmeFile>
-    <PackageReleaseNotes Condition="'$(IsOpenCoreLibraryPackage)' == 'true'">Snapshot schema: $(SnapshotSchemaVersion). Source commit is recorded in repository metadata.</PackageReleaseNotes>
+    <PackageReleaseNotes Condition="'$(IsOpenCoreLibraryPackage)' == 'true'">Snapshot schema: $(SnapshotSchemaVersion). Local/Web LastPlayed selects the newest known event; null cannot clear known recency, and equal instants retain the local offset representation. Source commit is recorded in repository metadata.</PackageReleaseNotes>
   </PropertyGroup>
 
   <ItemGroup Condition="'$(IsOpenCoreLibraryPackage)' == 'true'">
