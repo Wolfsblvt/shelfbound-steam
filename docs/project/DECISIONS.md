@@ -121,7 +121,10 @@ Positive visible game/playtime observations come from the Steam Web API behind `
 missing, empty, and malformed responses; the latter three warn and leave the scan installed-only rather
 than laundering an empty response into completeness. A **pure** `SteamWebEnricher` merges usable rows,
 consolidating duplicate appids deterministically (maximum playtime/latest last-played, stable name and
-local-row selection) so one appid produces one output row and recomputed unique installed/size totals.
+local-row selection) so one appid produces one output row and recomputed unique installed/size totals. For an
+installed row, Web playtime keeps its existing precedence, while `LastPlayed` selects the newest non-null local/Web
+event instant; unknown never clears a known value and an equal-instant tie retains the consolidated local timestamp
+representation. Response acquisition time is not an event fact.
 Any output composed through this Web API path is `observedSubset`; it never carries a document-level
 completeness claim from its input. Because that state first exists in schema `0.6.0`, enriching an older
 in-memory document explicitly upgrades the returned document to the current schema rather than emitting
