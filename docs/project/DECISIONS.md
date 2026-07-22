@@ -62,6 +62,33 @@ to the same byte-exact golden fixture.
 (the data has already crossed the trust boundary), serializing the local model with ignored properties (new nested fields could leak),
 or maintaining separate CLI/tray payload builders (drift). See [privacy-and-data.md](./privacy-and-data.md).
 
+### Steam Private-game exclusion uses positive local evidence only (2026-07-22)
+Tray and Decky expose a default-off setting labelled **“Don't sync games marked Private in Steam.”**
+When enabled, the client reads only the documented account-scoped
+`UserLocalConfigStore/WebStorage/PrivateApps_<accountId>` values from bounded `localconfig.vdf` inputs.
+Positive membership is unioned across every readable account on that device. Absent, empty, unreadable,
+malformed, and account-mismatched outcomes are visible uncertainty and never become “Public” or a
+complete negative; the local cache can remain stale.
+
+Omission happens only inside the hosted whitelist projection. The full portable snapshot, local MCP, and
+local library remain unchanged. Matching games are removed unless a protected device-local un-skip exists;
+the resulting body contains no Private flag, reason, tombstone, evidence state, source key, or account
+identity. After a real omission, per-library counts, category membership/counts, installed count, and total
+size are recomputed from retained rows; `libraryCount` and unrelated facts survive. `fullLibrary` becomes
+`observedSubset`, while an existing partial scope stays unchanged. Preview and transport keep one prepared
+body, and Tray's background path uses the same preparation primitive and saved overrides.
+
+No snapshot-schema or hosted projection-version bump is needed: the wire field set and purposes do not
+expand, and omission can only reduce disclosure. Tray clears its existing background consent when the
+setting changes so the next body is manually previewed; Decky is manual-only. The CLI has no established
+protected interactive seam for this setting or per-game overrides, so its behavior remains explicitly
+default-off; adding identifier-bearing command-line switches was rejected. A future CLI integration must
+use the same preparation primitive plus protected local configuration.
+
+*Rejected:* treating cache absence/empty as Public; serializing Private markers or evidence; changing the
+portable snapshot; using manifest `LastOwner`, Chromium data, credentials, privileged Steam RPC/UI state,
+or command-line app-id overrides; and keeping stale aggregate/full-scope claims after omission.
+
 ### Data scope — installed games + local categories
 The local scan yields *installed* games per library plus the user's **local categories**.
 The visibility-gated Steam Web API can add positive owned-game/playtime observations, including visible

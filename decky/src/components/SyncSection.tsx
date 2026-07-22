@@ -1,6 +1,14 @@
 import { ButtonItem, ConfirmModal, PanelSection, PanelSectionRow, showModal } from "@decky/ui";
-import { useState } from "react";
-import { getPrivacyPreview, PrivacySummary, syncNow } from "../api";
+import { useEffect, useState } from "react";
+import {
+  getPrivacyPreview,
+  getSettings,
+  PrivacyPreviewResponse,
+  PrivacySummary,
+  syncNow,
+  unskipPrivateGame,
+  updateSettings,
+} from "../api";
 import { formatBytes } from "../format";
 
 /**
@@ -11,6 +19,15 @@ import { formatBytes } from "../format";
 export function SyncSection({ connected, onSynced }: { connected: boolean; onSynced: () => void }) {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<string | null>(null);
+  const [privateGameExclusionEnabled, setPrivateGameExclusionEnabled] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    void getSettings().then((settings) => {
+      if (settings.ok) {
+        setPrivateGameExclusionEnabled(settings.excludeSteamPrivateGames ?? false);
+      }
+    });
+  }, []);
 
   const runSync = async (uploadId: string) => {
     setBusy(true);
@@ -33,19 +50,46 @@ export function SyncSection({ connected, onSynced }: { connected: boolean; onSyn
       setResult(preview.error ?? "Could not build the privacy preview.");
       return;
     }
-    const uploadId = preview.uploadId;
     showModal(
-      <PreviewModal
-        summary={preview.summary}
-        snapshotJson={preview.snapshotJson ?? ""}
-        connected={connected}
-        onConfirm={() => void runSync(uploadId)}
-      />,
+      <PreviewModal initialPreview={preview} connected={connected} onConfirm={(uploadId) => void runSync(uploadId)} />,
+    );
+  };
+
+  const togglePrivateGameExclusion = async () => {
+    if (privateGameExclusionEnabled === null) return;
+    setBusy(true);
+    const enabled = !privateGameExclusionEnabled;
+    const updated = await updateSettings(null, null, enabled);
+    setBusy(false);
+    if (!updated.ok) {
+      setResult(updated.error ?? "Could not save the Private-game exclusion setting.");
+      return;
+    }
+    setPrivateGameExclusionEnabled(updated.excludeSteamPrivateGames ?? enabled);
+    setResult(
+      enabled
+        ? "Private-game exclusion enabled. Missing or uncertain local cache data will fail open visibly."
+        : "Private-game exclusion disabled.",
     );
   };
 
   return (
     <PanelSection title="Sync">
+      <PanelSectionRow>
+        <ButtonItem
+          layout="below"
+          disabled={busy || privateGameExclusionEnabled === null}
+          onClick={() => void togglePrivateGameExclusion()}
+        >
+          {privateGameExclusionEnabled ? "Private-game exclusion: On" : "Private-game exclusion: Off"}
+        </ButtonItem>
+      </PanelSectionRow>
+      <PanelSectionRow>
+        <div style={{ fontSize: "11px", opacity: 0.75 }}>
+          Don't sync games marked Private in Steam. Best effort: Steam's local cache can be stale, and missing or
+          unreadable data never proves a game is Public.
+        </div>
+      </PanelSectionRow>
       <PanelSectionRow>
         <ButtonItem layout="below" disabled={busy} onClick={() => void openPreview()}>
           Preview upload…
@@ -61,26 +105,43 @@ export function SyncSection({ connected, onSynced }: { connected: boolean; onSyn
 }
 
 function PreviewModal({
-  summary,
-  snapshotJson,
+  initialPreview,
   connected,
   onConfirm,
   closeModal,
 }: {
-  summary: PrivacySummary;
-  snapshotJson: string;
+  initialPreview: PrivacyPreviewResponse;
   connected: boolean;
-  onConfirm: () => void;
+  onConfirm: (uploadId: string) => void;
   closeModal?: () => void;
 }) {
+  const [preview, setPreview] = useState(initialPreview);
+  const [updatingAppId, setUpdatingAppId] = useState<number | null>(null);
+  const [overrideError, setOverrideError] = useState<string | null>(null);
+  const summary = preview.summary as PrivacySummary;
+  const privateGameExclusion = preview.privateGameExclusion;
+
+  const unskip = async (appId: number) => {
+    if (!preview.uploadId) return;
+    setUpdatingAppId(appId);
+    setOverrideError(null);
+    const updated = await unskipPrivateGame(preview.uploadId, appId);
+    setUpdatingAppId(null);
+    if (!updated.ok || !updated.summary || !updated.uploadId) {
+      setOverrideError(updated.error ?? "Could not save the device-local override.");
+      return;
+    }
+    setPreview(updated);
+  };
+
   return (
     <ConfirmModal
       strTitle="What will be uploaded"
       strOKButtonText={connected ? "Sync now" : "Not connected"}
       strCancelButtonText="Close"
-      bOKDisabled={!connected}
+      bOKDisabled={!connected || updatingAppId !== null}
       onOK={() => {
-        onConfirm();
+        if (preview.uploadId) onConfirm(preview.uploadId);
         closeModal?.();
       }}
       onCancel={() => closeModal?.()}
@@ -97,6 +158,23 @@ function PreviewModal({
         <div style={{ marginTop: "6px" }}>
           <b>Never included:</b> {summary.neverIncluded.join("; ")}
         </div>
+        {privateGameExclusion?.enabled && (
+          <div style={{ marginTop: "8px", padding: "8px", background: "rgba(30,41,59,0.7)" }}>
+            <b>Private-game exclusion:</b> {privateGameExclusion.status}
+            {privateGameExclusion.skippedGames.map((game) => (
+              <div
+                key={game.appId}
+                style={{ display: "flex", justifyContent: "space-between", gap: "8px", marginTop: "6px" }}
+              >
+                <span>{game.name}</span>
+                <button type="button" disabled={updatingAppId !== null} onClick={() => void unskip(game.appId)}>
+                  {updatingAppId === game.appId ? "Saving…" : "Sync this game"}
+                </button>
+              </div>
+            ))}
+            {overrideError && <div style={{ marginTop: "6px", color: "#fca5a5" }}>{overrideError}</div>}
+          </div>
+        )}
         <pre
           style={{
             marginTop: "10px",
@@ -109,7 +187,7 @@ function PreviewModal({
             wordBreak: "break-all",
           }}
         >
-          {snapshotJson}
+          {preview.snapshotJson ?? ""}
         </pre>
       </div>
     </ConfirmModal>

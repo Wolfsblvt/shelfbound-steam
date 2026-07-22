@@ -7,6 +7,7 @@ from shelfbound_decky.hosted_projection import FIELD_PURPOSES, PROJECTION_VERSIO
 GOLDEN_PATH = (
     Path(__file__).resolve().parents[2] / "tests" / "Fixtures" / "hosted-snapshot.golden.json"
 )
+PRIVATE_FIXTURE_ROOT = Path(__file__).resolve().parents[2] / "tests" / "Fixtures"
 
 
 def test_python_projection_matches_the_csharp_golden_and_drops_sensitive_fields():
@@ -75,6 +76,92 @@ def test_invalid_local_snapshot_fails_before_a_body_can_be_prepared():
         assert "device" in str(error)
     else:
         raise AssertionError("invalid snapshot unexpectedly produced an upload body")
+
+
+def test_private_exclusion_disabled_or_non_matching_preserves_existing_bytes_and_scope():
+    local = private_exclusion_snapshot()
+    expected = private_exclusion_golden("disabled")
+
+    disabled = prepare_hosted_upload(local)
+    no_match = prepare_hosted_upload(local, {999})
+
+    assert disabled.body == expected
+    assert no_match.body == expected
+    assert no_match.snapshot["stats"]["scope"] == "fullLibrary"
+    assert no_match.skipped_games == ()
+
+
+def test_private_exclusion_override_recomputes_all_affected_aggregates():
+    local = private_exclusion_snapshot()
+    original_local = json.dumps(local, separators=(",", ":"), ensure_ascii=False)
+
+    upload = prepare_hosted_upload(local, {20, 40} - {40})
+
+    assert upload.body == private_exclusion_golden("partial")
+    assert [(game.app_id, game.name) for game in upload.skipped_games] == [(20, "Skipped Beta")]
+    assert [library["gameCount"] for library in upload.snapshot["libraries"]] == [1, 1]
+    assert upload.snapshot["categories"] == [
+        {"name": "Alpha", "gameCount": 2},
+        {"name": "Beta", "gameCount": 1},
+        {"name": "Shared", "gameCount": 1},
+    ]
+    assert upload.snapshot["stats"] == {
+        "libraryCount": 2,
+        "installedGameCount": 2,
+        "totalSizeOnDiskBytes": 400,
+        "scope": "observedSubset",
+    }
+    assert json.dumps(local, separators=(",", ":"), ensure_ascii=False) == original_local
+    for forbidden in ("steamAccounts", "isPrivate", "exclusion", "evidence", "reason"):
+        assert forbidden not in upload.body
+
+
+def test_private_exclusion_all_games_preserves_library_facts_and_downgrades_scope():
+    upload = prepare_hosted_upload(private_exclusion_snapshot(), {10, 20, 30, 40})
+
+    assert upload.body == private_exclusion_golden("all")
+    assert upload.snapshot["games"] == []
+    assert upload.snapshot["categories"] == []
+    assert [library["gameCount"] for library in upload.snapshot["libraries"]] == [0, 0]
+    assert upload.snapshot["stats"]["libraryCount"] == 2
+    assert upload.snapshot["stats"]["scope"] == "observedSubset"
+
+
+def test_recomputed_category_order_matches_the_shared_utf16_ordinal_golden():
+    local = json.loads(
+        (PRIVATE_FIXTURE_ROOT / "private-game-exclusion.unicode-order.input.json").read_text(
+            encoding="utf-8"
+        )
+    )
+
+    upload = prepare_hosted_upload(local, {30})
+
+    golden = (
+        PRIVATE_FIXTURE_ROOT / "private-game-exclusion.unicode-order.golden.json"
+    ).read_text(encoding="utf-8").rstrip("\r\n")
+    assert upload.body == golden
+
+
+def test_private_exclusion_never_rewrites_an_existing_partial_scope():
+    for scope in ("installedOnly", "observedSubset"):
+        local = private_exclusion_snapshot()
+        local["stats"]["scope"] = scope
+
+        upload = prepare_hosted_upload(local, {20})
+
+        assert upload.snapshot["stats"]["scope"] == scope
+
+
+def private_exclusion_snapshot() -> dict:
+    return json.loads(
+        (PRIVATE_FIXTURE_ROOT / "private-game-exclusion.input.json").read_text(encoding="utf-8")
+    )
+
+
+def private_exclusion_golden(action: str) -> str:
+    return (
+        PRIVATE_FIXTURE_ROOT / f"private-game-exclusion.{action}.golden.json"
+    ).read_text(encoding="utf-8").rstrip("\r\n")
 
 
 def collect_leaf_paths(value, path: str, leaves: set[str]) -> None:

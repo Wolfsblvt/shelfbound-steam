@@ -82,4 +82,46 @@ public class VdfParserTests
 
         error.Message.ShouldContain("depth limit");
     }
+
+    [Fact]
+    public void Selects_only_the_requested_scalar_and_reports_matching_siblings()
+    {
+        const string vdf = """
+            "UnrelatedRoot" { "UnrelatedScalar" "must-not-be-selected" }
+            "UserLocalConfigStore"
+            {
+                "WebStorage"
+                {
+                    "UnrelatedScalar" "must-not-be-selected"
+                    "PrivateApps_11" "[40]"
+                    "PrivateApps_10" "[20]"
+                }
+            }
+            """;
+
+        VdfScalarSelection selection = VdfParser.SelectValue(
+            vdf,
+            ["UserLocalConfigStore", "WebStorage"],
+            "PrivateApps_10",
+            "PrivateApps_");
+
+        selection.Value.ShouldBe("[20]");
+        selection.HasMatchingSibling.ShouldBeTrue();
+        selection.ToString().ShouldNotContain("must-not-be-selected");
+    }
+
+    [Fact]
+    public void Selective_reader_enforces_depth_while_skipping_unrelated_subtrees()
+    {
+        string nested = string.Concat(Enumerable.Repeat("\"unrelated\" { ", SteamInputLimits.MaxVdfDepth + 1)) +
+            string.Concat(Enumerable.Repeat(" }", SteamInputLimits.MaxVdfDepth + 1));
+
+        FormatException error = Should.Throw<FormatException>(() => VdfParser.SelectValue(
+            nested,
+            ["UserLocalConfigStore", "WebStorage"],
+            "PrivateApps_10",
+            "PrivateApps_"));
+
+        error.Message.ShouldContain("depth limit");
+    }
 }

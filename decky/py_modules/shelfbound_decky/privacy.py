@@ -22,10 +22,17 @@ NEVER_INCLUDED = [
     "Serial numbers, MAC addresses, or hardware-derived ids",
     "Mount points, storage device names, or which folder a library lives in",
     "Exact OS build or kernel versions",
+    "Steam Private markers, cache contents, evidence states, or an exclusion reason",
 ]
 
 
-def build_privacy_preview(upload: HostedUpload, warnings: list[str]) -> dict:
+def build_privacy_preview(
+    upload: HostedUpload,
+    warnings: list[str],
+    *,
+    private_game_enabled: bool = False,
+    private_game_status: str = "Private-game exclusion is off.",
+) -> dict:
     snapshot = upload.snapshot
     stats = snapshot.get("stats", {})
     device = snapshot.get("device", {})
@@ -46,4 +53,12 @@ def build_privacy_preview(upload: HostedUpload, warnings: list[str]) -> dict:
         "summary": summary,
         "snapshotJson": upload.body,
         "warnings": list(warnings),
+        "privateGameExclusion": {
+            "enabled": private_game_enabled,
+            "status": private_game_status,
+            "skippedGames": [
+                {"appId": game.app_id, "name": game.name}
+                for game in upload.skipped_games
+            ],
+        },
     }

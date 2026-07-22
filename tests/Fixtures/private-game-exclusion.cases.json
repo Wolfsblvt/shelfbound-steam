@@ -1,0 +1,81 @@
+{
+  "evidenceCases": [
+    {
+      "name": "positive",
+      "accounts": [
+        {
+          "accountId": 10,
+          "action": "read",
+          "vdf": "\"UserLocalConfigStore\" { \"WebStorage\" { \"PrivateApps_10\" \"[20,20,40]\" } }"
+        }
+      ],
+      "expectedStates": ["positive"],
+      "expectedPrivateAppIds": [20, 40]
+    },
+    {
+      "name": "absent",
+      "accounts": [{ "accountId": 10, "action": "missing" }],
+      "expectedStates": ["absent"],
+      "expectedPrivateAppIds": []
+    },
+    {
+      "name": "empty",
+      "accounts": [
+        {
+          "accountId": 10,
+          "action": "read",
+          "vdf": "\"UserLocalConfigStore\" { \"WebStorage\" { \"PrivateApps_10\" \"[]\" } }"
+        }
+      ],
+      "expectedStates": ["empty"],
+      "expectedPrivateAppIds": []
+    },
+    {
+      "name": "malformed",
+      "accounts": [
+        {
+          "accountId": 10,
+          "action": "read",
+          "vdf": "\"UserLocalConfigStore\" { \"WebStorage\" { \"PrivateApps_10\" \"not-json\" } }"
+        }
+      ],
+      "expectedStates": ["malformed"],
+      "expectedPrivateAppIds": []
+    },
+    {
+      "name": "unreadable",
+      "accounts": [{ "accountId": 10, "action": "unreadable" }],
+      "expectedStates": ["unreadable"],
+      "expectedPrivateAppIds": []
+    },
+    {
+      "name": "account-mismatch",
+      "accounts": [
+        {
+          "accountId": 10,
+          "action": "read",
+          "vdf": "\"UserLocalConfigStore\" { \"WebStorage\" { \"PrivateApps_11\" \"[20]\" } }"
+        }
+      ],
+      "expectedStates": ["accountMismatch"],
+      "expectedPrivateAppIds": []
+    },
+    {
+      "name": "multi-account-union",
+      "accounts": [
+        {
+          "accountId": 10,
+          "action": "read",
+          "vdf": "\"UserLocalConfigStore\" { \"WebStorage\" { \"PrivateApps_10\" \"[20,30]\" } }"
+        },
+        {
+          "accountId": 11,
+          "action": "read",
+          "vdf": "\"UserLocalConfigStore\" { \"WebStorage\" { \"PrivateApps_11\" \"[30,40]\" } }"
+        }
+      ],
+      "expectedStates": ["positive", "positive"],
+      "expectedPrivateAppIds": [20, 30, 40]
+    }
+  ]
+}

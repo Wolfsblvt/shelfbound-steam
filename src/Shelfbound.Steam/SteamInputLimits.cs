@@ -18,6 +18,7 @@ internal static class SteamInputLimits
     public const int MaxCollectionEntries = 10_000;
     public const int MaxCollectionMemberships = 250_000;
     public const int MaxCategoryNameChars = 256;
+    public const int MaxPrivateAppEntries = 250_000;
 
     public const int MaxInstallDirectoryNameChars = 255;
 }

@@ -1,5 +1,6 @@
 import asyncio
 import json
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -11,6 +12,7 @@ STORED_TOKEN = "stored-token-that-must-stay-backend-side"
 CLAIMED_TOKEN = "claimed-token-that-must-stay-backend-side"
 ACCOUNT = {"accountId": "acc-1", "displayName": "Wolf"}
 DEVICE = {"id": "device-1", "name": "testdeck", "type": "steamDeck", "os": "linux"}
+PRIVATE_FIXTURE_ROOT = Path(__file__).resolve().parents[2] / "tests" / "Fixtures"
 SNAPSHOT = {
     "schemaVersion": "0.6.0",
     "snapshotId": "77777777-7777-7777-7777-777777777777",
@@ -110,6 +112,7 @@ def test_get_settings_returns_success_envelope(plugin):
     assert response["ok"] is True
     assert response["serverUrl"] == "http://127.0.0.1:5080"
     assert response["deviceName"] is None
+    assert response["excludeSteamPrivateGames"] is False
 
 
 def test_exception_paths_return_error_envelope(plugin):
@@ -164,6 +167,51 @@ def test_preview_body_is_the_exact_one_time_body_uploaded(plugin, fake_server):
         "status": "previewRequired",
         "error": "Preview this upload again before syncing.",
     }
+
+
+def test_private_preview_unskip_persists_locally_and_updates_the_exact_one_time_body(
+    decky_plugin_module, plugin, fake_server, monkeypatch
+):
+    local = json.loads(
+        (PRIVATE_FIXTURE_ROOT / "private-game-exclusion.input.json").read_text(encoding="utf-8")
+    )
+    settings = plugin._settings_store.load()
+    settings.exclude_steam_private_games = True
+    plugin._settings_store.save(settings)
+    monkeypatch.setattr(
+        plugin,
+        "_scan",
+        lambda: ScanOutput(local, ["synthetic scan warning"], {}, "fixture-root", []),
+    )
+    monkeypatch.setattr(
+        decky_plugin_module,
+        "read_private_apps_evidence",
+        lambda _root, _accounts: SimpleNamespace(
+            private_app_ids=frozenset({20}),
+            describe=lambda: "Synthetic positive local cache evidence.",
+        ),
+    )
+    plugin._token_store.save(STORED_TOKEN)
+
+    preview = asyncio.run(plugin.get_privacy_preview())
+    updated = asyncio.run(plugin.unskip_private_game(preview["uploadId"], 20))
+    synced = asyncio.run(plugin.sync_now(updated["uploadId"]))
+
+    assert preview["privateGameExclusion"] == {
+        "enabled": True,
+        "status": (
+            "Synthetic positive local cache evidence. 1 matching game(s) will be omitted from "
+            "this hosted body."
+        ),
+        "skippedGames": [{"appId": 20, "name": "Skipped Beta"}],
+    }
+    assert '"appId":20' not in preview["snapshotJson"]
+    assert updated["uploadId"] != preview["uploadId"]
+    assert updated["privateGameExclusion"]["skippedGames"] == []
+    assert '"appId":20' in updated["snapshotJson"]
+    assert plugin._settings_store.load().private_game_unskip_app_ids == {20}
+    assert fake_server.uploaded_bodies == [updated["snapshotJson"]]
+    assert synced["ok"] is True
 
 
 def test_pairing_claimed_flow_persists_token_and_clears_session(plugin, fake_server):

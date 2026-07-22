@@ -25,6 +25,12 @@ separate hosted service has its own privacy policy, retention rules, and account
   storage (`htmlcache/Local Storage/leveldb`), falling back to the legacy
   `userdata/<id>/7/remote/sharedconfig.vdf`. Only collection names + game membership are read; see
   [steam-collections.md](./steam-collections.md).
+- When the user enables **“Don't sync games marked Private in Steam”**, Shelfbound reads the account-scoped
+  `userdata/<id>/config/localconfig.vdf` value at
+  `UserLocalConfigStore/WebStorage/PrivateApps_<accountId>`. A bounded path-selective reader discards
+  unrelated VDF scalar contents while scanning; only the expected JSON integer array is retained and
+  parsed. Its positive membership is used in memory for hosted omission; the key suffix, account id,
+  raw value, and evidence outcomes are not uploaded or generally logged.
 - With an optional user-provided Steam Web API key, positive visibility-gated game/playtime
   observations. The response is never treated as complete; missing, empty, and malformed results warn
   and add no remote rows. The key is sent only to Steam and is never written into a snapshot or warning.
@@ -38,9 +44,9 @@ Nothing else. The scanner does not traverse saves, unrelated user files, or arbi
 
 ## Steam access-state research boundary
 
-The current scanner does not derive or emit Steam Private or Steam Family state. A redacted local
-[evidence spike](./research/2026-07-14-steam-client-access-spike.md) established narrower rules for any
-future work:
+The portable scanner still does not derive or emit Steam Private or Steam Family state. Official
+upload-capable clients now implement the narrower positive-only Private-game boundary established by the
+redacted local [evidence spike](./research/2026-07-14-steam-client-access-spike.md):
 
 - `UserLocalConfigStore/WebStorage/PrivateApps_<accountId>` in `localconfig.vdf` is a per-account,
   VDF-backed fallback cache used by the current client. It can be stale while offline and has no proven
@@ -59,8 +65,7 @@ future work:
   documented successful-completeness signal. A privacy boundary must not reinterpret any of them as
   “no Private games” or “not borrowed.”
 
-The additional cache/binary candidates are not part of the current scanner's declared local-read set
-above; manifest `LastOwner` is not extracted or emitted.
+No additional cache/binary candidate is read; manifest `LastOwner` is not extracted or emitted.
 
 ## Local input and storage hardening
 
@@ -121,6 +126,13 @@ The projection is fail-closed: invalid input produces no request. It reconstruct
 instead of serializing local model objects directly, so a future local field cannot silently start
 uploading.
 
+With Private-game exclusion enabled, only positive membership from the local account caches can omit a
+game, and a device-local un-skip wins. Absent, empty, unreadable, malformed, or mismatched evidence omits
+nothing and produces a visible best-effort status. The filter changes only this projection: neither the
+portable snapshot nor local MCP/library behavior changes. Omitted rows leave no marker, reason, evidence,
+or count in the hosted body. Affected library/category/stats aggregates are rebuilt from retained rows;
+any actual omission changes `fullLibrary` to `observedSubset` but never rewrites an already-partial scope.
+
 ## Preview and consent
 
 - `shelfbound upload --dry-run` prints the exact compact hosted body to stdout and sends nothing. It
@@ -131,12 +143,22 @@ uploading.
   material field-purpose change invalidates that consent. Projection v2 renews consent for the changed
   `stats.scope` purpose without adding a new uploaded field. Legacy documents retain their published
   scope label and schema identity in the preview/body; consumers apply the compatibility normalization.
+- The Private-game setting itself defaults off. Changing it clears Tray background consent so the next
+  upload is previewed. Preview lists only the local titles that would be skipped and can persist a
+  device-local **Sync this game** override; losing that settings file merely removes the override, causing
+  positive evidence to omit again. Decky uses the same one-use prepared-body rule and is manual-only.
 - Before any tray hosted action, the user must explicitly save this device's type. The existing `device.type`
   field and its purpose are unchanged: Desktop, Laptop, Steam Deck, and Other / not sure (explicit `unknown`) are
   valid choices; a Steam Deck suggestion still requires confirmation. This is local setup truth, not a new
   projected field or a consent-version change.
 - Decky returns one prepared body plus a one-use upload id. Confirming sends those exact bytes; a
   stale/reused id is rejected and requires a fresh preview.
+
+The CLI continues to use the same hosted projection, but it has no established protected interactive
+settings seam for this policy or per-game overrides. Its Private-game policy therefore remains default-off;
+users relying on the Tray/Decky setting should not use CLI upload as an equivalent enabled path. A future
+CLI slice must reuse `PrivateGameUploadPreparer` and protected local configuration rather than app ids in
+arguments or shell history.
 
 ## Memory/profile guardrails (local MCP write operations)
 

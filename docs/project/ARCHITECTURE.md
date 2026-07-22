@@ -61,7 +61,7 @@ src/
   Shelfbound.Storage   Local config (API key), the identity seam, and the user-data store
                        (statuses/ratings/completion/aspects, scoped memories, category meanings).
   Shelfbound.Client    Shared scan-to-snapshot builder + whitelist-only hosted projection +
-                       Shelfbound-server client, reused by the CLI and tray.
+                       optional local Private-game omission + Shelfbound-server client, reused by the CLI and tray.
   Shelfbound.Cli       `shelfbound` CLI — setup, scan (+ enrichment), profile, upload.
   Shelfbound.Tray      Cross-platform tray agent (Avalonia): background sync, status, one-time-code
                        connect, and upload-only device-token storage.
@@ -130,6 +130,11 @@ This is the **derived/user data** category — deliberately separate from the ra
    `observedSubset` after usable Web API observations, or `fullLibrary` only for a producer with an
    explicit completeness contract.
 
+The optional Private-game cache reader is deliberately **not** another snapshot step. When enabled by an
+upload-capable client, `Shelfbound.Client.PrivateGameUploadPreparer` reads each known account's bounded
+`localconfig.vdf` cache through `Shelfbound.Steam`, unions positive membership only, and applies it while
+constructing the hosted projection. The portable snapshot and local MCP/library view remain unchanged.
+
 Non-fatal problems become `warnings` on the result rather than aborting the scan.
 
 ## Local vs external boundary
@@ -141,7 +146,9 @@ Non-fatal problems become `warnings` on the result rather than aborting the scan
 - **Official hosted transport:** receives only `HostedProjection` v2. Steam account identity is
   dropped, automatic hostnames are neutralized, and exact OS builds are coarsened. Preview and HTTP
   reuse one prepared serialized body. Version 2 renews consent for the changed `stats.scope` purpose;
-  it does not expand the uploaded field set.
+  it does not expand the uploaded field set. A default-off local policy may omit positively cached
+  Private games before serialization, recomputing retained-row library/category/stats aggregates and
+  downgrading `fullLibrary` to `observedSubset` after any omission. No omission marker or evidence is added.
 - **Decky:** emits the same complete snapshot contract locally, then mirrors the hosted whitelist in
   Python because the platform cannot consume the C# client assembly.
 
