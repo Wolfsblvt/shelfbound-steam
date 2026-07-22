@@ -43,6 +43,11 @@ token.
 - **Sync now** first builds the privacy-minimized hosted projection and shows its exact compact JSON.
   Confirming sends that same prepared body — the tray does not rescan or reserialize between preview
   and transport.
+- **Don't sync games marked Private in Steam** is an optional, default-off best-effort filter. It uses
+  positive membership from Steam's stale-capable local account caches only; missing/empty/error/mismatch
+  evidence fails open with a visible status. The preview lists titles that would be skipped and can save
+  a device-local **Sync this game** override. Private ids/evidence never enter the upload, and the complete
+  local snapshot is unchanged.
 - New installs default auto-sync off. Background sync can run on an interval after the user enables it
   and has previewed + successfully sent the current projection version once. An uploaded field-set
   expansion or material purpose change invalidates that consent; projection v2 does so for the changed
@@ -64,8 +69,9 @@ hostname. Game and collection names are still personal data.
 - Settings live in `…/AppData/shelfbound/tray.json` (server URLs default to localhost for now); the upload-only
   device token is stored separately in `token.bin` — DPAPI-encrypted on Windows, a 0600 file elsewhere.
 - The settings file records the explicit device type and consented hosted-projection version; it does not
-  duplicate the preview body. Missing or unrecognised device types require setup again without discarding
-  unrelated settings or the token.
+  duplicate the preview body. It may also hold the default-off Private-game setting and minimal app-id
+  un-skip overrides; the file is written atomically and owner-only on Unix. Missing or unrecognised device
+  types require setup again without discarding unrelated settings or the token.
 - Login auto-start is wired for Windows (Run key), Linux (`~/.config/autostart`), and macOS (LaunchAgent).
 
 ## Auto-update

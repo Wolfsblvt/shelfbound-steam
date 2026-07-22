@@ -5,7 +5,22 @@ using Shelfbound.Steam.Steam;
 namespace Shelfbound.Tray;
 
 /// <summary>A locally built upload whose exact JSON can be previewed and then sent without rebuilding.</summary>
-public sealed record PreparedSync(HostedUpload Upload, IReadOnlyList<string> Warnings);
+internal sealed class PreparedSync
+{
+    internal PreparedSync(
+        PrivateGameUploadPreparation privateGamePreparation,
+        IReadOnlyList<string> warnings)
+    {
+        PrivateGamePreparation = privateGamePreparation;
+        Warnings = warnings;
+    }
+
+    internal PrivateGameUploadPreparation PrivateGamePreparation { get; }
+    internal HostedUpload Upload => PrivateGamePreparation.Upload;
+    internal IReadOnlyList<SkippedPrivateGame> SkippedGames => PrivateGamePreparation.SkippedGames;
+    internal PrivateGameExclusionStatus PrivateGameStatus => PrivateGamePreparation.Status;
+    internal IReadOnlyList<string> Warnings { get; }
+}
 
 /// <summary>
 /// The non-UI heart of the agent: holds settings, runs syncs (scan + upload via the shared client),
@@ -28,6 +43,7 @@ public sealed class SyncAgent : IDisposable
     public DeviceType? SuggestedDeviceType { get; }
     public DateTimeOffset? LastSync { get; private set; }
     public string StatusLine { get; private set; } = "Starting…";
+    public string PrivateGameStatusLine { get; private set; }
     public IReadOnlyList<string> History
     {
         get { lock (_lock) { return _history.ToList(); } }
@@ -48,6 +64,9 @@ public sealed class SyncAgent : IDisposable
         Specs = device.Specs ?? new DeviceSpecs();
         HostedOsDescription = HostedProjection.CoarsenOsDescription(device.Os, Specs.OsDescription);
         SuggestedDeviceType = DeviceTypeSetup.GetSuggestion();
+        PrivateGameStatusLine = Settings.ExcludeSteamPrivateGames
+            ? "Enabled — checked at preparation time; missing or uncertain cache data fails open."
+            : "Off";
     }
 
     public void Start()
@@ -58,14 +77,21 @@ public sealed class SyncAgent : IDisposable
     /// <summary>Applies a settings change, persists it, updates auto-start, and reschedules.</summary>
     public void UpdateSettings(Action<AppSettings> mutate)
     {
+        bool privateGameSettingWasEnabled = Settings.ExcludeSteamPrivateGames;
         mutate(Settings);
+        if (Settings.ExcludeSteamPrivateGames != privateGameSettingWasEnabled)
+        {
+            PrivateGameStatusLine = Settings.ExcludeSteamPrivateGames
+                ? "Enabled — checked at preparation time; missing or uncertain cache data fails open."
+                : "Off";
+        }
         _dependencies.SaveSettings(Settings);
         _dependencies.ApplyAutoStart(Settings.StartOnLogin);
         Reschedule();
     }
 
     /// <summary>Builds the one exact hosted body that the tray must show before a manual sync.</summary>
-    public Task<PreparedSync?> PrepareSyncAsync() => BuildPreparedSyncAsync(logPreview: true);
+    internal Task<PreparedSync?> PrepareSyncAsync() => BuildPreparedSyncAsync(logPreview: true);
 
     private async Task<PreparedSync?> BuildPreparedSyncAsync(bool logPreview)
     {
@@ -91,7 +117,13 @@ public sealed class SyncAgent : IDisposable
                     DeviceType = Settings.DeviceType,
                 },
                 CancellationToken.None);
-            return new PreparedSync(HostedProjection.Prepare(build.Snapshot), build.Warnings);
+            PrivateGameUploadPreparation privateGamePreparation = _dependencies.PreparePrivateGameUpload(
+                build.Snapshot,
+                Settings.ExcludeSteamPrivateGames,
+                Settings.PrivateGameUnskipAppIds.ToHashSet());
+            PrivateGameStatusLine = privateGamePreparation.Status.Message;
+            Changed?.Invoke();
+            return new PreparedSync(privateGamePreparation, build.Warnings);
         }
         catch (Exception ex)
         {
@@ -101,7 +133,7 @@ public sealed class SyncAgent : IDisposable
     }
 
     /// <summary>Sends a user-confirmed prepared body. No scan or re-serialization happens here.</summary>
-    public async Task SyncNowAsync(PreparedSync prepared)
+    internal async Task SyncNowAsync(PreparedSync prepared)
     {
         ArgumentNullException.ThrowIfNull(prepared);
         if (!RequireSetup())
@@ -114,6 +146,37 @@ public sealed class SyncAgent : IDisposable
             _dependencies.SaveSettings(Settings);
             Reschedule(startImmediately: false);
         }
+    }
+
+    /// <summary>
+    /// Persists one device-local un-skip and regenerates bytes from the same scan and evidence. No
+    /// rescan occurs, so the preview remains an exact approval surface for the returned preparation.
+    /// </summary>
+    internal PreparedSync UnskipPrivateGame(PreparedSync prepared, int appId)
+    {
+        ArgumentNullException.ThrowIfNull(prepared);
+        if (!prepared.SkippedGames.Any(game => game.AppId == appId))
+            throw new InvalidOperationException("That game is not skipped by this preparation.");
+
+        List<int> previousOverrides = Settings.PrivateGameUnskipAppIds.ToList();
+        var updatedOverrides = previousOverrides.ToHashSet();
+        updatedOverrides.Add(appId);
+        PrivateGameUploadPreparation updated = prepared.PrivateGamePreparation
+            .WithUnskippedAppIds(updatedOverrides);
+        Settings.PrivateGameUnskipAppIds = updatedOverrides.Order().ToList();
+        try
+        {
+            _dependencies.SaveSettings(Settings);
+        }
+        catch
+        {
+            Settings.PrivateGameUnskipAppIds = previousOverrides;
+            throw;
+        }
+
+        PrivateGameStatusLine = updated.Status.Message;
+        Changed?.Invoke();
+        return new PreparedSync(updated, prepared.Warnings);
     }
 
     public async Task ConnectAsync()
@@ -240,6 +303,8 @@ public sealed class SyncAgent : IDisposable
             Log($"Scan warning — {warning}");
         if (prepared.Warnings.Count > 3)
             Log($"Scan warning — … and {prepared.Warnings.Count - 3} more.");
+        if (prepared.PrivateGameStatus.Enabled)
+            Log($"Private-game exclusion — {prepared.PrivateGameStatus.Message}");
         if (result.Ok)
             LastSync = DateTimeOffset.Now;
         UpdateStatus();
@@ -303,6 +368,7 @@ public sealed class SyncAgent : IDisposable
 internal sealed record SyncAgentDependencies
 {
     public required Func<SnapshotBuildOptions, CancellationToken, Task<SnapshotBuildResult>> BuildSnapshotAsync { get; init; }
+    public required Func<SnapshotDocument, bool, IReadOnlySet<int>, PrivateGameUploadPreparation> PreparePrivateGameUpload { get; init; }
     public required Func<string, string, string, CancellationToken, Task<ConnectFlowResult?>> ConnectAsync { get; init; }
     public required Func<string, string, HostedUpload, CancellationToken, Task<UploadResult>> UploadAsync { get; init; }
     public required Func<string?> LoadToken { get; init; }
@@ -313,6 +379,8 @@ internal sealed record SyncAgentDependencies
     public static SyncAgentDependencies Default { get; } = new()
     {
         BuildSnapshotAsync = SnapshotBuilder.BuildAsync,
+        PreparePrivateGameUpload = (snapshot, enabled, overrides) =>
+            PrivateGameUploadPreparer.Prepare(snapshot, enabled, overrides),
         ConnectAsync = ConnectFlow.RunAsync,
         UploadAsync = async (serverUrl, token, upload, ct) =>
         {

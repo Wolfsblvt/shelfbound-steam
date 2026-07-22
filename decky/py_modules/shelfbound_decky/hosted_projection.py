@@ -60,25 +60,50 @@ FIELD_PURPOSES: tuple[tuple[str, str], ...] = (
 
 
 @dataclass(frozen=True)
+class SkippedPrivateGame:
+    """Local-only summary of one app omitted from the hosted body."""
+
+    app_id: int
+    name: str
+
+
+@dataclass(frozen=True)
 class HostedUpload:
     """A projected snapshot and the canonical compact JSON used for preview and transport."""
 
     snapshot: dict
     body: str
+    skipped_games: tuple[SkippedPrivateGame, ...] = ()
 
     @property
     def game_count(self) -> int:
         return len(self.snapshot["games"])
 
 
-def prepare_hosted_upload(snapshot: dict) -> HostedUpload:
+def prepare_hosted_upload(
+    snapshot: dict,
+    excluded_app_ids: set[int] | frozenset[int] | None = None,
+) -> HostedUpload:
     """Projects and serializes a local snapshot; raises before any HTTP request on invalid input."""
-    projected = project_hosted_snapshot(snapshot)
+    normalized_exclusions = {
+        app_id
+        for app_id in (excluded_app_ids or ())
+        if isinstance(app_id, int) and not isinstance(app_id, bool) and app_id > 0
+    }
+    projected = project_hosted_snapshot(snapshot, normalized_exclusions)
     body = json.dumps(projected, separators=(",", ":"), ensure_ascii=False)
-    return HostedUpload(projected, body)
+    skipped: list[SkippedPrivateGame] = []
+    seen_app_ids: set[int] = set()
+    for game in _require_list(_require(snapshot, "games", "snapshot"), "games"):
+        source_game = _require_dict(game, "games[]")
+        app_id = _require(source_game, "appId", "games[]")
+        if app_id in normalized_exclusions and app_id not in seen_app_ids:
+            skipped.append(SkippedPrivateGame(app_id, _require_text(source_game, "name", "games[]")))
+            seen_app_ids.add(app_id)
+    return HostedUpload(projected, body, tuple(skipped))
 
 
-def project_hosted_snapshot(snapshot: dict) -> dict:
+def project_hosted_snapshot(snapshot: dict, excluded_app_ids: set[int] | None = None) -> dict:
     """Copies only the documented hosted fields from a complete local snapshot."""
     root = _require_dict(snapshot, "snapshot")
     source = _require_dict(_require(root, "source", "snapshot"), "source")
@@ -88,7 +113,7 @@ def project_hosted_snapshot(snapshot: dict) -> dict:
     games = _require_list(_require(root, "games", "snapshot"), "games")
     categories = _require_list(_require(root, "categories", "snapshot"), "categories")
 
-    return {
+    projected = {
         "schemaVersion": _require_text(root, "schemaVersion", "snapshot"),
         "snapshotId": _require_text(root, "snapshotId", "snapshot"),
         "createdAt": _require(root, "createdAt", "snapshot"),
@@ -108,6 +133,7 @@ def project_hosted_snapshot(snapshot: dict) -> dict:
             "scope": stats.get("scope", "installedOnly"),
         },
     }
+    return _apply_game_exclusion(projected, excluded_app_ids or set())
 
 
 def coarsen_os_description(os_family: str, os_description: str | None) -> str | None:
@@ -200,6 +226,51 @@ def _project_category(value: object) -> dict:
     return {
         "name": _require_text(category, "name", "categories[]"),
         "gameCount": _require(category, "gameCount", "categories[]"),
+    }
+
+
+def _apply_game_exclusion(snapshot: dict, excluded_app_ids: set[int]) -> dict:
+    if not excluded_app_ids or not any(
+        game["appId"] in excluded_app_ids for game in snapshot["games"]
+    ):
+        return snapshot
+
+    retained_games = [
+        game for game in snapshot["games"] if game["appId"] not in excluded_app_ids
+    ]
+    library_counts: dict[int, int] = {}
+    for game in retained_games:
+        library_index = game.get("libraryIndex")
+        if library_index is not None:
+            library_counts[library_index] = library_counts.get(library_index, 0) + 1
+
+    libraries = [
+        {**library, "gameCount": library_counts.get(library["index"], 0)}
+        for library in snapshot["libraries"]
+    ]
+    category_counts: dict[str, int] = {}
+    for game in retained_games:
+        for name in dict.fromkeys(game["categories"]):
+            category_counts[name] = category_counts.get(name, 0) + 1
+    categories = [
+        {"name": name, "gameCount": count}
+        for name, count in sorted(category_counts.items(), key=lambda item: (-item[1], item[0]))
+    ]
+
+    stats = dict(snapshot["stats"])
+    stats["installedGameCount"] = sum(1 for game in retained_games if game["installed"])
+    stats["totalSizeOnDiskBytes"] = sum(
+        game.get("sizeOnDiskBytes") or 0 for game in retained_games
+    )
+    if stats["scope"] == "fullLibrary":
+        stats["scope"] = "observedSubset"
+
+    return {
+        **snapshot,
+        "libraries": libraries,
+        "games": retained_games,
+        "categories": categories,
+        "stats": stats,
     }
 
 

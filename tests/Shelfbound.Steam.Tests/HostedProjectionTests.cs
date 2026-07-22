@@ -86,6 +86,104 @@ public class HostedProjectionTests
         manifestPaths.ToHashSet(StringComparer.Ordinal).ShouldBe(leaves);
     }
 
+    [Fact]
+    public void Disabled_or_non_matching_exclusion_preserves_the_existing_bytes_and_scope()
+    {
+        SnapshotDocument local = PrivateExclusionSnapshot();
+        string expected = PrivateExclusionGolden("disabled");
+
+        PrivateGameUploadPreparation disabled = PrivateGameUploadPreparer.Prepare(
+            local,
+            enabled: false,
+            new HashSet<int>(),
+            steamPath: null,
+            machineName: "synthetic-host");
+        PrivateGameUploadPreparation noMatch = PrivateGameUploadPreparer.PrepareFromEvidence(
+            local,
+            new HashSet<int> { 999 },
+            new HashSet<int>());
+
+        disabled.Upload.Json.ShouldBe(expected);
+        noMatch.Upload.Json.ShouldBe(expected);
+        disabled.Status.Enabled.ShouldBeFalse();
+        noMatch.SkippedGames.ShouldBeEmpty();
+        noMatch.Upload.Snapshot.Stats.Scope.ShouldBe(LibraryScope.FullLibrary);
+    }
+
+    [Fact]
+    public void Positive_membership_omits_except_for_local_override_and_recomputes_every_aggregate()
+    {
+        SnapshotDocument local = PrivateExclusionSnapshot();
+        string originalLocalBytes = SnapshotSerializer.Serialize(local, indented: false);
+
+        PrivateGameUploadPreparation prepared = PrivateGameUploadPreparer.PrepareFromEvidence(
+            local,
+            new HashSet<int> { 20, 40 },
+            new HashSet<int> { 40 });
+
+        prepared.Upload.Json.ShouldBe(PrivateExclusionGolden("partial"));
+        prepared.SkippedGames.ShouldHaveSingleItem().ShouldBe(new SkippedPrivateGame(20, "Skipped Beta"));
+        prepared.Upload.Snapshot.Libraries.Select(library => library.GameCount).ShouldBe([1, 1]);
+        prepared.Upload.Snapshot.Categories.Select(category => (category.Name, category.GameCount)).ShouldBe(
+            [("Alpha", 2), ("Beta", 1), ("Shared", 1)]);
+        prepared.Upload.Snapshot.Stats.LibraryCount.ShouldBe(2, "physical library facts survive omission");
+        prepared.Upload.Snapshot.Stats.InstalledGameCount.ShouldBe(2);
+        prepared.Upload.Snapshot.Stats.TotalSizeOnDiskBytes.ShouldBe(400);
+        prepared.Upload.Snapshot.Stats.Scope.ShouldBe(LibraryScope.ObservedSubset);
+        SnapshotSerializer.Serialize(local, indented: false).ShouldBe(originalLocalBytes);
+
+        using JsonDocument json = JsonDocument.Parse(prepared.Upload.Json);
+        json.RootElement.TryGetProperty("steamAccounts", out _).ShouldBeFalse();
+        prepared.Upload.Json.ShouldNotContain("isPrivate");
+        prepared.Upload.Json.ShouldNotContain("exclusion");
+        prepared.Upload.Json.ShouldNotContain("evidence");
+        prepared.Upload.Json.ShouldNotContain("reason");
+    }
+
+    [Fact]
+    public void All_games_can_be_omitted_without_erasing_library_facts_or_claiming_full_coverage()
+    {
+        SnapshotDocument local = PrivateExclusionSnapshot();
+
+        PrivateGameUploadPreparation prepared = PrivateGameUploadPreparer.PrepareFromEvidence(
+            local,
+            new HashSet<int> { 10, 20, 30, 40 },
+            new HashSet<int>());
+
+        prepared.Upload.Json.ShouldBe(PrivateExclusionGolden("all"));
+        prepared.Upload.Snapshot.Games.ShouldBeEmpty();
+        prepared.Upload.Snapshot.Categories.ShouldBeEmpty();
+        prepared.Upload.Snapshot.Libraries.Select(library => library.GameCount).ShouldBe([0, 0]);
+        prepared.Upload.Snapshot.Stats.LibraryCount.ShouldBe(2);
+        prepared.Upload.Snapshot.Stats.Scope.ShouldBe(LibraryScope.ObservedSubset);
+    }
+
+    [Fact]
+    public void Existing_partial_scopes_are_never_rewritten_and_unskip_regenerates_exact_bytes()
+    {
+        SnapshotDocument full = PrivateExclusionSnapshot();
+        foreach (LibraryScope scope in new[] { LibraryScope.InstalledOnly, LibraryScope.ObservedSubset })
+        {
+            SnapshotDocument partial = full with { Stats = full.Stats with { Scope = scope } };
+            PrivateGameUploadPreparation prepared = PrivateGameUploadPreparer.PrepareFromEvidence(
+                partial,
+                new HashSet<int> { 20 },
+                new HashSet<int>());
+
+            prepared.Upload.Snapshot.Stats.Scope.ShouldBe(scope);
+        }
+
+        PrivateGameUploadPreparation initial = PrivateGameUploadPreparer.PrepareFromEvidence(
+            full,
+            new HashSet<int> { 20 },
+            new HashSet<int>());
+        PrivateGameUploadPreparation overridden = initial.WithUnskippedAppIds(new HashSet<int> { 20 });
+
+        overridden.Upload.Json.ShouldBe(PrivateExclusionGolden("disabled"));
+        overridden.SkippedGames.ShouldBeEmpty();
+        overridden.Status.Message.ShouldContain("device-local overrides");
+    }
+
     private static SnapshotDocument FullLocalSnapshot(string deviceName) => new()
     {
         SchemaVersion = SnapshotSchema.Version,
@@ -167,6 +265,18 @@ public class HostedProjectionTests
             Scope = LibraryScope.ObservedSubset,
         },
     };
+
+    private static SnapshotDocument PrivateExclusionSnapshot() =>
+        SnapshotSerializer.Deserialize(File.ReadAllText(Path.Combine(
+            AppContext.BaseDirectory,
+            "Fixtures",
+            "private-game-exclusion.input.json")));
+
+    private static string PrivateExclusionGolden(string action) =>
+        File.ReadAllText(Path.Combine(
+            AppContext.BaseDirectory,
+            "Fixtures",
+            $"private-game-exclusion.{action}.golden.json")).TrimEnd('\r', '\n');
 
     private static void CollectLeafPaths(JsonElement element, string path, ISet<string> leaves)
     {

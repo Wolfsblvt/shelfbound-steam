@@ -37,6 +37,11 @@ not a second scanner architecture:
 - **No root** (the `plugin.json` flags deliberately omit it), **no background work** — every scan,
   preview, and upload is user-triggered. **No runtime pip dependencies** — the backend is pure
   stdlib, keeping the plugin auditable (Decky store review is audit-minded).
+- **Best-effort Private-game omission is opt-in.** The default-off setting reads only each local
+  account's bounded `localconfig.vdf` Private-app value, unions positive membership, and filters the
+  hosted projection without changing the complete local snapshot. Missing/empty/error/mismatch evidence
+  fails open visibly. Preview shows skipped titles and can persist a local **Sync this game** override;
+  raw account ids, cache values, Private ids/evidence, and omission reasons never enter hosted JSON.
 
 ## Layout
 
@@ -49,6 +54,7 @@ decky/
   py_modules/shelfbound_decky/
     vdf.py                  Text VDF parser (mirrors src/Shelfbound.Steam/Vdf)
     steam_files.py          libraryfolders / appmanifest / loginusers / sharedconfig parsers + modern-collections JSON seam
+    private_apps.py         positive-only, account-scoped local Private-app cache reader
     snappy.py               Snappy block decompression (mirrors Collections/Snappy.cs)
     chromium_leveldb.py     Chromium Local Storage LevelDB reader: *.ldb SSTables + *.log WAL (mirrors ChromiumLevelDb.cs)
     steam_collections.py    Modern collections facade: key build + value decode + JSON parse (mirrors SteamCollectionsReader.cs)
@@ -175,5 +181,7 @@ confirmation sends those exact bytes, while stale/reused ids fail closed. The up
 Steam-account array, automatic hostname, exact OS build, filesystem paths, credentials, saves,
 screenshots, and serials. It includes the user/neutral device label, random device id, coarse OS/specs,
 games, collections, and per-library storage kind + free/total capacity. Storage paths, mount points,
-and block-device names stay local. Game and collection names remain personal. License:
+and block-device names stay local. An enabled positive-only Private filter can omit game rows and
+recomputes every affected aggregate/scope from what remains; it adds no marker or reason. Settings and
+device-local un-skip overrides are owner-only files. Game and collection names remain personal. License:
 AGPL-3.0-or-later (whole repo).

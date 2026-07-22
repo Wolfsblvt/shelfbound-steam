@@ -145,6 +145,13 @@ public sealed class DeviceTypeSetupTests
                 counters.ObservedTypes.Add(options.DeviceType);
                 return Task.FromResult(BuildResult(options));
             },
+            PreparePrivateGameUpload = (snapshot, enabled, overrides) =>
+                PrivateGameUploadPreparer.Prepare(
+                    snapshot,
+                    enabled,
+                    overrides,
+                    steamPath: null,
+                    machineName: "synthetic-host"),
             ConnectAsync = (_, _, _, _) =>
             {
                 counters.ConnectCount++;

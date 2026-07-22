@@ -1,6 +1,6 @@
 # Shelfbound — Project Overview (open-source core)
 
-> Status as of 2026-07-15. This file is the living overview of the **open-source core**. Read it first.
+> Status as of 2026-07-22. This file is the living overview of the **open-source core**. Read it first.
 
 ## What Shelfbound is
 
@@ -84,6 +84,11 @@ The local Steam data is the moat. AI reasoning is commodity; good structured fac
 - CLI (`Shelfbound.Cli`): `shelfbound setup` (API key), `shelfbound scan` (+ enrichment),
   `shelfbound profile` (a local "what Shelfbound remembers" view), and privacy-minimized hosted
   upload with an exact `--dry-run` preview.
+- **Best-effort Private-game hosted exclusion:** Tray and Decky can optionally read Steam's bounded,
+  stale-capable account caches locally, union only positive membership on that device, and omit matching
+  games from the hosted projection. The complete local snapshot is unchanged; no Private marker, reason,
+  evidence, or account identity leaves the device. Preview shows skipped titles and supports persistent
+  device-local un-skip overrides; missing/empty/error/mismatch evidence fails open visibly.
 - **Tray agent** (`Shelfbound.Tray`, Avalonia): background auto-sync, a numeric-loopback **one-time-code
   connect** flow that stores only a device-bound `device:upload` token, a deliberately minimal connected-device
   card, and explicit editable Desktop/Laptop/Steam Deck/Other setup before any hosted action. An **exact-body upload
@@ -126,7 +131,7 @@ Local-first — prove the data model locally before anything depends on it.
 Done: local scanner including Windows registry discovery, local categories (modern collections + legacy fallback), visible not-installed +
 playtime observations (Steam Web API), the query engine (merging facts + user-data), the local MCP server (read +
 write tools), the user-data store + identity seam, the tray installer + self-update with fail-closed release gates, and the
-CLI/MCP packaged as .NET global tools.
+CLI/MCP packaged as .NET global tools, plus the default-off Tray/Decky Private-game hosted-exclusion boundary.
 
 > Hosted and paid features (if any) are developed separately and are intentionally out of scope here.
 

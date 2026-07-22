@@ -14,7 +14,7 @@ import asyncio
 import os
 import sys
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
 # The loader puts py_modules on sys.path; insert defensively so local smoke tests work too.
@@ -27,6 +27,7 @@ from shelfbound_decky import SCHEMA_VERSION, TOOL_NAME, TOOL_VERSION  # noqa: E4
 from shelfbound_decky import device_identity, locator, overview, privacy  # noqa: E402
 from shelfbound_decky.cloud import PairingUnavailableError, ShelfboundServer  # noqa: E402
 from shelfbound_decky.hosted_projection import HostedUpload, prepare_hosted_upload  # noqa: E402
+from shelfbound_decky.private_apps import read_private_apps_evidence  # noqa: E402
 from shelfbound_decky.settings import SettingsStore, TokenStore  # noqa: E402
 from shelfbound_decky.snapshot import ScanOutput, build_snapshot  # noqa: E402
 
@@ -40,6 +41,10 @@ class _PendingUpload:
     upload_id: str
     upload: HostedUpload
     warnings: list[str]
+    snapshot: dict = field(repr=False)
+    positive_private_app_ids: frozenset[int] = field(repr=False)
+    evidence_message: str
+    private_game_enabled: bool
 
 
 class Plugin:
@@ -84,6 +89,14 @@ class Plugin:
                 },
                 "lastSync": settings.last_sync,
                 "pairingInProgress": self._pairing_session is not None,
+                "privateGameExclusion": {
+                    "enabled": settings.exclude_steam_private_games,
+                    "status": (
+                        "Enabled — checked at preview time; missing or uncertain cache data fails open."
+                        if settings.exclude_steam_private_games
+                        else "Off"
+                    ),
+                },
             }
         except Exception as error:  # noqa: BLE001
             return self._fail("get_status", error)
@@ -101,10 +114,10 @@ class Plugin:
     async def get_privacy_preview(self) -> dict:
         try:
             scan = await asyncio.to_thread(self._scan)
-            upload = await asyncio.to_thread(prepare_hosted_upload, scan.snapshot)
-            pending = _PendingUpload(str(uuid.uuid4()), upload, list(scan.warnings))
+            settings = self._settings_store.load()
+            pending = await asyncio.to_thread(self._prepare_upload, scan, settings)
             self._pending_upload = pending
-            preview = privacy.build_privacy_preview(upload, pending.warnings)
+            preview = self._preview_payload(pending)
             return {"ok": True, "uploadId": pending.upload_id, **preview}
         except Exception as error:  # noqa: BLE001
             self._pending_upload = None
@@ -163,6 +176,43 @@ class Plugin:
             }
         except Exception as error:  # noqa: BLE001
             return self._fail("sync_now", error)
+
+    async def unskip_private_game(self, upload_id: str, app_id: int) -> dict:
+        """Persist one local override and rebuild bytes from the same scan/evidence."""
+        try:
+            pending = self._pending_upload
+            if pending is None or upload_id != pending.upload_id:
+                return {
+                    "ok": False,
+                    "status": "previewRequired",
+                    "error": "Preview this upload again before changing skipped games.",
+                }
+            if not isinstance(app_id, int) or isinstance(app_id, bool) or not any(
+                game.app_id == app_id for game in pending.upload.skipped_games
+            ):
+                return {"ok": False, "error": "That game is not skipped by this preview."}
+
+            settings = self._settings_store.load()
+            overrides = set(settings.private_game_unskip_app_ids or set())
+            overrides.add(app_id)
+            excluded = set(pending.positive_private_app_ids) - overrides
+            upload = prepare_hosted_upload(pending.snapshot, excluded)
+            settings.private_game_unskip_app_ids = overrides
+            self._settings_store.save(settings)
+
+            updated = _PendingUpload(
+                upload_id=str(uuid.uuid4()),
+                upload=upload,
+                warnings=pending.warnings,
+                snapshot=pending.snapshot,
+                positive_private_app_ids=pending.positive_private_app_ids,
+                evidence_message=pending.evidence_message,
+                private_game_enabled=pending.private_game_enabled,
+            )
+            self._pending_upload = updated
+            return {"ok": True, "uploadId": updated.upload_id, **self._preview_payload(updated)}
+        except Exception as error:  # noqa: BLE001
+            return self._fail("unskip_private_game", error)
 
     # ---- account pairing (PROPOSED server endpoints — see cloud.py) --------------
 
@@ -240,20 +290,33 @@ class Plugin:
                 "ok": True,
                 "serverUrl": settings.server_url,
                 "deviceName": settings.device_name,
+                "excludeSteamPrivateGames": settings.exclude_steam_private_games,
             }
         except Exception as error:  # noqa: BLE001
             return self._fail("get_settings", error)
 
-    async def update_settings(self, server_url: str | None = None, device_name: str | None = None) -> dict:
+    async def update_settings(
+        self,
+        server_url: str | None = None,
+        device_name: str | None = None,
+        exclude_steam_private_games: bool | None = None,
+    ) -> dict:
         try:
             settings = self._settings_store.load()
             if server_url is not None and server_url.strip():
                 settings.server_url = server_url.strip()
             if device_name is not None:
                 settings.device_name = device_name.strip() or None
+            if isinstance(exclude_steam_private_games, bool):
+                settings.exclude_steam_private_games = exclude_steam_private_games
             self._settings_store.save(settings)
             self._pending_upload = None
-            return {"ok": True, "serverUrl": settings.server_url, "deviceName": settings.device_name}
+            return {
+                "ok": True,
+                "serverUrl": settings.server_url,
+                "deviceName": settings.device_name,
+                "excludeSteamPrivateGames": settings.exclude_steam_private_games,
+            }
         except Exception as error:  # noqa: BLE001
             return self._fail("update_settings", error)
 
@@ -280,6 +343,49 @@ class Plugin:
         settings = self._settings_store.load()
         device = device_identity.resolve_device(settings.device_name, None)
         return build_snapshot(steam_root, device, self._tool_version())
+
+    def _prepare_upload(self, scan: ScanOutput, settings) -> _PendingUpload:
+        positive_app_ids: frozenset[int] = frozenset()
+        if settings.exclude_steam_private_games and scan.steam_root is not None:
+            evidence = read_private_apps_evidence(scan.steam_root, scan.accounts)
+            positive_app_ids = evidence.private_app_ids
+            evidence_message = evidence.describe()
+        elif settings.exclude_steam_private_games:
+            evidence_message = (
+                "Steam's local Private-game cache was unavailable. No games were omitted."
+            )
+        else:
+            evidence_message = "Private-game exclusion is off."
+
+        overrides = set(settings.private_game_unskip_app_ids or set())
+        excluded = set(positive_app_ids) - overrides
+        upload = prepare_hosted_upload(scan.snapshot, excluded)
+        return _PendingUpload(
+            upload_id=str(uuid.uuid4()),
+            upload=upload,
+            warnings=list(scan.warnings),
+            snapshot=scan.snapshot,
+            positive_private_app_ids=positive_app_ids,
+            evidence_message=evidence_message,
+            private_game_enabled=settings.exclude_steam_private_games,
+        )
+
+    @staticmethod
+    def _preview_payload(pending: _PendingUpload) -> dict:
+        status = pending.evidence_message
+        if pending.private_game_enabled and pending.upload.skipped_games:
+            status += (
+                f" {len(pending.upload.skipped_games)} matching game(s) will be omitted from "
+                "this hosted body."
+            )
+        elif pending.private_game_enabled and pending.positive_private_app_ids:
+            status += " No matching game will be omitted after device-local overrides."
+        return privacy.build_privacy_preview(
+            pending.upload,
+            pending.warnings,
+            private_game_enabled=pending.private_game_enabled,
+            private_game_status=status,
+        )
 
     def _tool_version(self) -> str:
         return getattr(decky, "DECKY_PLUGIN_VERSION", None) or TOOL_VERSION

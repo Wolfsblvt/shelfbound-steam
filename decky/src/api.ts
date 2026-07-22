@@ -53,6 +53,7 @@ export interface StatusResponse {
   connection?: { connected: boolean; serverUrl: string; account: AccountInfo | null };
   lastSync?: LastSync | null;
   pairingInProgress?: boolean;
+  privateGameExclusion?: { enabled: boolean; status: string };
 }
 
 export interface StorageLibrary {
@@ -107,6 +108,18 @@ export interface PrivacyPreviewResponse {
   summary?: PrivacySummary;
   snapshotJson?: string;
   warnings?: string[];
+  privateGameExclusion?: PrivateGameExclusionPreview;
+}
+
+export interface SkippedPrivateGame {
+  appId: number;
+  name: string;
+}
+
+export interface PrivateGameExclusionPreview {
+  enabled: boolean;
+  status: string;
+  skippedGames: SkippedPrivateGame[];
 }
 
 export interface SyncResponse {
@@ -145,17 +158,22 @@ export interface SettingsResponse {
   error?: string;
   serverUrl?: string;
   deviceName?: string | null;
+  excludeSteamPrivateGames?: boolean;
 }
 
 export const getStatus = callable<[], StatusResponse>("get_status");
 export const getStorageOverview = callable<[], StorageOverviewResponse>("get_storage_overview");
 export const getPrivacyPreview = callable<[], PrivacyPreviewResponse>("get_privacy_preview");
 export const syncNow = callable<[uploadId: string], SyncResponse>("sync_now");
+export const unskipPrivateGame = callable<[uploadId: string, appId: number], PrivacyPreviewResponse>(
+  "unskip_private_game",
+);
 export const pairingStart = callable<[], PairingStartResponse>("pairing_start");
 export const pairingPoll = callable<[], PairingPollResponse>("pairing_poll");
 export const pairingCancel = callable<[], { ok: boolean }>("pairing_cancel");
 export const disconnect = callable<[], { ok: boolean; error?: string }>("disconnect");
 export const getSettings = callable<[], SettingsResponse>("get_settings");
-export const updateSettings = callable<[serverUrl: string | null, deviceName: string | null], SettingsResponse>(
-  "update_settings",
-);
+export const updateSettings = callable<
+  [serverUrl: string | null, deviceName: string | null, excludeSteamPrivateGames: boolean | null],
+  SettingsResponse
+>("update_settings");

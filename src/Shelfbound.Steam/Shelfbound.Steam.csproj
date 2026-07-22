@@ -21,6 +21,7 @@
   <ItemGroup>
     <!-- The collections reader's binary plumbing (snappy/leveldb) is internal; expose it for tests. -->
     <InternalsVisibleTo Include="Shelfbound.Steam.Tests" />
+    <InternalsVisibleTo Include="Shelfbound.Client" />
   </ItemGroup>
 
 </Project>

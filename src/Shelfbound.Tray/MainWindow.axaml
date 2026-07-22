@@ -166,6 +166,10 @@
             <StackPanel Spacing="12">
               <TextBlock Classes="label" Text="SYNC"/>
               <CheckBox x:Name="AutoSyncCheck" Content="Sync automatically in the background"/>
+              <CheckBox x:Name="PrivateGameExclusionCheck"
+                        Content="Don't sync games marked Private in Steam"/>
+              <TextBlock x:Name="PrivateGameExclusionStatusText" Foreground="#94a3b8" FontSize="11"
+                         TextWrapping="Wrap"/>
               <StackPanel x:Name="IntervalRow" Orientation="Horizontal" Spacing="8">
                 <TextBlock Text="Every" VerticalAlignment="Center" Foreground="#cbd5e1"/>
                 <NumericUpDown x:Name="IntervalInput" Minimum="1" Maximum="1440" Increment="5" Width="120"/>

@@ -34,6 +34,7 @@ public partial class MainWindow : Window
     {
         _loading = true;
         AutoSyncCheck.IsChecked = _agent.Settings.AutoSync;
+        PrivateGameExclusionCheck.IsChecked = _agent.Settings.ExcludeSteamPrivateGames;
         IntervalInput.Value = _agent.Settings.IntervalMinutes;
         StartLoginCheck.IsChecked = _agent.Settings.StartOnLogin;
         StartMinimizedCheck.IsChecked = _agent.Settings.StartMinimized;
@@ -62,6 +63,7 @@ public partial class MainWindow : Window
         UpdateNotesLink.PointerPressed += (_, _) => Browser.Open(_update?.TargetReleaseUrl ?? AppInfo.ReleasesUrl);
         BugReportLink.PointerPressed += (_, _) => Browser.Open(AppInfo.IssuesUrl);
         AutoSyncCheck.IsCheckedChanged += (_, _) => Apply();
+        PrivateGameExclusionCheck.IsCheckedChanged += (_, _) => Apply();
         StartLoginCheck.IsCheckedChanged += (_, _) => Apply();
         StartMinimizedCheck.IsCheckedChanged += (_, _) => Apply();
         AutoUpdateCheck.IsCheckedChanged += (_, _) => Apply();
@@ -91,9 +93,14 @@ public partial class MainWindow : Window
     {
         if (_loading)
             return;
+        bool privateGameSettingChanged = _agent.Settings.ExcludeSteamPrivateGames !=
+            (PrivateGameExclusionCheck.IsChecked ?? false);
         _agent.UpdateSettings(s =>
         {
             s.AutoSync = AutoSyncCheck.IsChecked ?? false;
+            s.ExcludeSteamPrivateGames = PrivateGameExclusionCheck.IsChecked ?? false;
+            if (privateGameSettingChanged)
+                s.HostedUploadConsentVersion = null;
             s.IntervalMinutes = (int)(IntervalInput.Value ?? 60m);
             s.StartOnLogin = StartLoginCheck.IsChecked ?? false;
             s.StartMinimized = StartMinimizedCheck.IsChecked ?? false;
@@ -122,6 +129,9 @@ public partial class MainWindow : Window
     private void Refresh()
     {
         StatusText.Text = _agent.StatusLine;
+        PrivateGameExclusionStatusText.Text = _agent.Settings.ExcludeSteamPrivateGames
+            ? _agent.PrivateGameStatusLine
+            : "Off. Enable this best-effort local-cache filter to inspect skipped games in the next preview.";
         DeviceText.Text = _agent.IsConnected
             ? $"Device: {DeviceName()}"
             : "Sign in to connect this device.";
@@ -182,10 +192,10 @@ public partial class MainWindow : Window
             if (prepared is null)
                 return;
 
-            var preview = new UploadPreviewWindow(prepared);
-            bool confirmed = await preview.ShowDialog<bool>(this);
-            if (confirmed)
-                await _agent.SyncNowAsync(prepared);
+            var preview = new UploadPreviewWindow(prepared, _agent.UnskipPrivateGame);
+            PreparedSync? confirmed = await preview.ShowDialog<PreparedSync?>(this);
+            if (confirmed is not null)
+                await _agent.SyncNowAsync(confirmed);
         }
         finally
         {

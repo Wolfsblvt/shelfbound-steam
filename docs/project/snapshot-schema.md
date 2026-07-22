@@ -121,6 +121,13 @@ Game names and collection names remain personal. `games[].name` can contain a pr
 from future or third-party producers even though official producers are Steam-only today. See the
 preview/consent details in [privacy-and-data.md](./privacy-and-data.md).
 
+An enabled official-client Private-game policy may remove positively identified rows while building this
+same projection. This is not a snapshot or wire-schema field: the complete local document stays intact and
+the hosted JSON gains no Private marker, reason, evidence, or omission count. After a real omission, the
+projection rebuilds per-library and category counts/lists plus installed/size totals from retained games;
+it preserves `libraryCount` and downgrades only `fullLibrary` to `observedSubset`. No omission leaves bytes
+and scope compatible with the ordinary projection.
+
 ## Scope and what's intentionally missing
 
 The scanner emits **installed Steam app-manifest observations per library**, plus accounts, device info, and the user's

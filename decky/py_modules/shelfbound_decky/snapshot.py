@@ -53,6 +53,8 @@ class ScanOutput:
     snapshot: dict
     warnings: list[str] = field(default_factory=list)
     library_paths: dict[int, str] = field(default_factory=dict)
+    steam_root: str | None = None
+    accounts: list[SteamAccount] = field(default_factory=list)
 
 
 def build_snapshot(
@@ -153,7 +155,13 @@ def build_snapshot(
         },
     }
 
-    return ScanOutput(snapshot=snapshot, warnings=warnings, library_paths=library_paths)
+    return ScanOutput(
+        snapshot=snapshot,
+        warnings=warnings,
+        library_paths=library_paths,
+        steam_root=steam_root,
+        accounts=accounts,
+    )
 
 
 def _read_libraries(steam_root: str, warnings: list[str]) -> list[SteamLibraryFolder]:

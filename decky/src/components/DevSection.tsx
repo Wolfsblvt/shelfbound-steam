@@ -45,7 +45,7 @@ function ServerUrlModal({
       strTitle="Shelfbound server URL"
       strOKButtonText="Save"
       onOK={() => {
-        void updateSettings(value, null).then(() => onSaved());
+        void updateSettings(value, null, null).then(() => onSaved());
         closeModal?.();
       }}
       onCancel={() => closeModal?.()}

@@ -234,6 +234,18 @@ public static class HostedProjection
         return new HostedUpload(projected, Serialize(projected));
     }
 
+    internal static HostedUpload Prepare(
+        SnapshotDocument snapshot,
+        string machineName,
+        IReadOnlySet<int> excludedAppIds)
+    {
+        ArgumentNullException.ThrowIfNull(excludedAppIds);
+
+        HostedSnapshot projected = Create(snapshot, machineName);
+        HostedSnapshot filtered = ApplyGameExclusion(projected, excludedAppIds);
+        return new HostedUpload(filtered, Serialize(filtered));
+    }
+
     public static string Serialize(HostedSnapshot snapshot) => JsonSerializer.Serialize(snapshot, JsonOptions);
 
     public static HostedSnapshot Deserialize(string json) =>
@@ -348,6 +360,46 @@ public static class HostedProjection
         RequireValue(category.Name, "categories[].name");
 
         return new HostedSnapshotCategory { Name = category.Name, GameCount = category.GameCount };
+    }
+
+    private static HostedSnapshot ApplyGameExclusion(
+        HostedSnapshot snapshot,
+        IReadOnlySet<int> excludedAppIds)
+    {
+        if (excludedAppIds.Count == 0 || !snapshot.Games.Any(game => excludedAppIds.Contains(game.AppId)))
+            return snapshot;
+
+        HostedSnapshotGame[] retainedGames = snapshot.Games
+            .Where(game => !excludedAppIds.Contains(game.AppId))
+            .ToArray();
+        HostedSnapshotLibrary[] libraries = snapshot.Libraries
+            .Select(library => library with
+            {
+                GameCount = retainedGames.Count(game => game.LibraryIndex == library.Index),
+            })
+            .ToArray();
+        HostedSnapshotCategory[] categories = retainedGames
+            .SelectMany(game => game.Categories.Distinct(StringComparer.Ordinal))
+            .GroupBy(name => name, StringComparer.Ordinal)
+            .Select(group => new HostedSnapshotCategory { Name = group.Key, GameCount = group.Count() })
+            .OrderByDescending(category => category.GameCount)
+            .ThenBy(category => category.Name, StringComparer.Ordinal)
+            .ToArray();
+
+        return snapshot with
+        {
+            Libraries = libraries,
+            Games = retainedGames,
+            Categories = categories,
+            Stats = snapshot.Stats with
+            {
+                InstalledGameCount = retainedGames.Count(game => game.Installed),
+                TotalSizeOnDiskBytes = retainedGames.Sum(game => game.SizeOnDiskBytes ?? 0),
+                Scope = snapshot.Stats.Scope == LibraryScope.FullLibrary
+                    ? LibraryScope.ObservedSubset
+                    : snapshot.Stats.Scope,
+            },
+        };
     }
 
     private static void RequireValue(string? value, string path)
