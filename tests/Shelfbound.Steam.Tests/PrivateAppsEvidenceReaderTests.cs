@@ -32,7 +32,7 @@ public sealed class PrivateAppsEvidenceReaderTests
             var dependencies = new PrivateAppsEvidenceReaderDependencies
             {
                 FileExists = path => inputsByPath[path].Action != "missing",
-                ParseFile = path => ParseFixture(inputsByPath[path]),
+                ReadCacheValue = (path, expectedKey) => ReadFixture(inputsByPath[path], expectedKey),
             };
 
             PrivateAppsEvidenceResult result = PrivateAppsEvidenceReader.Read(
@@ -60,7 +60,17 @@ public sealed class PrivateAppsEvidenceReaderTests
         {
             string path = LocalConfigPath(root, 10);
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-            File.WriteAllText(path, "\"UserLocalConfigStore\" { \"WebStorage\" { \"PrivateApps_10\" \"[20]\" } }");
+            File.WriteAllText(path, """
+                "UnrelatedRoot" { "UnrelatedScalar" "must-not-be-selected" }
+                "UserLocalConfigStore"
+                {
+                    "WebStorage"
+                    {
+                        "UnrelatedScalar" "must-not-be-selected"
+                        "PrivateApps_10" "[20]"
+                    }
+                }
+                """);
             var account = new SteamAccount { SteamId64 = (SteamId64Base + 10).ToString() };
 
             PrivateAppsEvidenceResult result = PrivateAppsEvidenceReader.Read(root, [account]);
@@ -83,7 +93,7 @@ public sealed class PrivateAppsEvidenceReaderTests
         var dependencies = new PrivateAppsEvidenceReaderDependencies
         {
             FileExists = _ => true,
-            ParseFile = _ => VdfParser.Parse(vdf),
+            ReadCacheValue = (_, expectedKey) => SelectPrivateAppsValue(vdf, expectedKey),
         };
 
         PrivateAppsEvidenceResult result = PrivateAppsEvidenceReader.Read("fixture", [account], dependencies);
@@ -92,12 +102,26 @@ public sealed class PrivateAppsEvidenceReaderTests
         result.PrivateAppIds.ShouldBeEmpty();
     }
 
-    private static VdfObject ParseFixture(EvidenceAccountFixture account) => account.Action switch
+    private static PrivateAppsCacheValue ReadFixture(
+        EvidenceAccountFixture account,
+        string expectedKey) => account.Action switch
+        {
+            "read" => SelectPrivateAppsValue(
+                account.Vdf ?? throw new InvalidDataException("Fixture VDF is required."),
+                expectedKey),
+            "unreadable" => throw new IOException("Synthetic unreadable fixture."),
+            _ => throw new InvalidDataException($"Unexpected fixture action '{account.Action}'."),
+        };
+
+    private static PrivateAppsCacheValue SelectPrivateAppsValue(string vdf, string expectedKey)
     {
-        "read" => VdfParser.Parse(account.Vdf ?? throw new InvalidDataException("Fixture VDF is required.")),
-        "unreadable" => throw new IOException("Synthetic unreadable fixture."),
-        _ => throw new InvalidDataException($"Unexpected fixture action '{account.Action}'."),
-    };
+        VdfScalarSelection selection = VdfParser.SelectValue(
+            vdf,
+            ["UserLocalConfigStore", "WebStorage"],
+            expectedKey,
+            "PrivateApps_");
+        return new PrivateAppsCacheValue(selection.Value, selection.HasMatchingSibling);
+    }
 
     private static string LocalConfigPath(string steamRoot, int accountId) =>
         Path.Combine(steamRoot, "userdata", accountId.ToString(), "config", "localconfig.vdf");

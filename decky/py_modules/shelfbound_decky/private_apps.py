@@ -7,14 +7,13 @@ Raw account ids and app ids stay in backend memory and never enter logs or hoste
 
 from __future__ import annotations
 
-import json
 import os
 from dataclasses import dataclass
 from typing import Callable
 
 from . import limits, vdf
 from .steam_files import SteamAccount
-from .vdf import VdfFormatError, VdfObject
+from .vdf import VdfFormatError, VdfScalarSelection
 
 POSITIVE = "positive"
 ABSENT = "absent"
@@ -64,13 +63,14 @@ def read_private_apps_evidence(
     accounts: list[SteamAccount],
     *,
     file_exists: Callable[[str], bool] = os.path.isfile,
-    parse_file: Callable[[str], VdfObject] = vdf.parse_file,
+    select_cache_value: Callable[[str, str], VdfScalarSelection] | None = None,
 ) -> PrivateAppsEvidenceResult:
     """Unions positive membership across every known account on this device."""
+    value_selector = select_cache_value or _select_private_apps_value
     outcomes: list[PrivateAppsEvidenceOutcome] = []
     private_app_ids: set[int] = set()
     for account in accounts:
-        outcome = _read_account(steam_root, account, file_exists, parse_file)
+        outcome = _read_account(steam_root, account, file_exists, value_selector)
         outcomes.append(outcome)
         if outcome.state == POSITIVE:
             private_app_ids.update(outcome.private_app_ids)
@@ -81,7 +81,7 @@ def _read_account(
     steam_root: str,
     account: SteamAccount,
     file_exists: Callable[[str], bool],
-    parse_file: Callable[[str], VdfObject],
+    select_cache_value: Callable[[str, str], VdfScalarSelection],
 ) -> PrivateAppsEvidenceOutcome:
     account_id = account.account_id
     if account_id is None or account_id <= 0 or account_id > 4_294_967_295:
@@ -92,43 +92,92 @@ def _read_account(
     if not file_exists(path):
         return PrivateAppsEvidenceOutcome(ABSENT)
 
+    expected_key = f"PrivateApps_{account_text}"
     try:
-        root = parse_file(path)
+        selection = select_cache_value(path, expected_key)
     except OSError:
         return PrivateAppsEvidenceOutcome(UNREADABLE)
     except VdfFormatError:
         return PrivateAppsEvidenceOutcome(MALFORMED)
 
-    local_store = root.get_object("UserLocalConfigStore")
-    web_storage = local_store.get_object("WebStorage") if local_store is not None else None
-    if web_storage is None:
-        return PrivateAppsEvidenceOutcome(ABSENT)
-
-    expected_key = f"PrivateApps_{account_text}"
-    raw_value = web_storage.get_value(expected_key)
+    raw_value = selection.value
     if raw_value is None:
-        has_other_account_key = any(
-            key.casefold().startswith("privateapps_") for key in web_storage.values
-        )
         return PrivateAppsEvidenceOutcome(
-            ACCOUNT_MISMATCH if has_other_account_key else ABSENT
+            ACCOUNT_MISMATCH if selection.has_matching_sibling else ABSENT
         )
     if not raw_value.strip():
         return PrivateAppsEvidenceOutcome(EMPTY)
 
-    try:
-        values = json.loads(raw_value)
-    except ValueError:
+    app_ids = _parse_private_app_ids(raw_value)
+    if app_ids is None:
         return PrivateAppsEvidenceOutcome(MALFORMED)
-    if not isinstance(values, list) or len(values) > limits.MAX_PRIVATE_APP_ENTRIES:
-        return PrivateAppsEvidenceOutcome(MALFORMED)
-
-    app_ids: set[int] = set()
-    for value in values:
-        if not isinstance(value, int) or isinstance(value, bool) or value <= 0 or value > 2_147_483_647:
-            return PrivateAppsEvidenceOutcome(MALFORMED)
-        app_ids.add(value)
     return PrivateAppsEvidenceOutcome(
         POSITIVE if app_ids else EMPTY,
-        frozenset(app_ids),
+        app_ids,
     )
+
+
+def _select_private_apps_value(path: str, expected_key: str) -> VdfScalarSelection:
+    return vdf.select_file_value(
+        path,
+        ("UserLocalConfigStore", "WebStorage"),
+        expected_key,
+        "PrivateApps_",
+    )
+
+
+def _parse_private_app_ids(raw_value: str) -> frozenset[int] | None:
+    """Parse exactly one flat JSON integer array with entry limits enforced during the scan."""
+    index = _skip_json_whitespace(raw_value, 0)
+    if index >= len(raw_value) or raw_value[index] != "[":
+        return None
+    index = _skip_json_whitespace(raw_value, index + 1)
+    if index < len(raw_value) and raw_value[index] == "]":
+        index = _skip_json_whitespace(raw_value, index + 1)
+        return frozenset() if index == len(raw_value) else None
+
+    app_ids: set[int] = set()
+    entry_count = 0
+    while index < len(raw_value):
+        if not raw_value[index].isdigit() or not raw_value[index].isascii():
+            return None
+
+        first_digit = raw_value[index]
+        app_id = 0
+        while (
+            index < len(raw_value)
+            and raw_value[index].isascii()
+            and raw_value[index].isdigit()
+        ):
+            if first_digit == "0" and app_id == 0 and index + 1 < len(raw_value):
+                next_char = raw_value[index + 1]
+                if next_char.isascii() and next_char.isdigit():
+                    return None
+            app_id = (app_id * 10) + (ord(raw_value[index]) - ord("0"))
+            if app_id > 2_147_483_647:
+                return None
+            index += 1
+
+        if app_id <= 0:
+            return None
+        entry_count += 1
+        if entry_count > limits.MAX_PRIVATE_APP_ENTRIES:
+            return None
+        app_ids.add(app_id)
+
+        index = _skip_json_whitespace(raw_value, index)
+        if index >= len(raw_value):
+            return None
+        if raw_value[index] == "]":
+            index = _skip_json_whitespace(raw_value, index + 1)
+            return frozenset(app_ids) if index == len(raw_value) else None
+        if raw_value[index] != ",":
+            return None
+        index = _skip_json_whitespace(raw_value, index + 1)
+    return None
+
+
+def _skip_json_whitespace(value: str, index: int) -> int:
+    while index < len(value) and value[index] in " \t\r\n":
+        index += 1
+    return index

@@ -31,17 +31,22 @@ def test_shared_fixture_covers_positive_and_every_ambiguous_outcome():
         def file_exists(path: str) -> bool:
             return inputs_by_path[path]["action"] != "missing"
 
-        def parse_file(path: str):
+        def select_cache_value(path: str, expected_key: str):
             account = inputs_by_path[path]
             if account["action"] == "unreadable":
                 raise OSError("Synthetic unreadable fixture.")
-            return vdf.parse(account["vdf"])
+            return vdf.select_value(
+                account["vdf"],
+                ("UserLocalConfigStore", "WebStorage"),
+                expected_key,
+                "PrivateApps_",
+            )
 
         result = read_private_apps_evidence(
             steam_root,
             accounts,
             file_exists=file_exists,
-            parse_file=parse_file,
+            select_cache_value=select_cache_value,
         )
 
         assert [outcome.state for outcome in result.outcomes] == evidence_case["expectedStates"]
@@ -61,11 +66,53 @@ def test_rejects_an_unbounded_private_app_array():
         "fixture",
         [account],
         file_exists=lambda _path: True,
-        parse_file=lambda _path: vdf.parse(payload),
+        select_cache_value=lambda _path, expected_key: vdf.select_value(
+            payload,
+            ("UserLocalConfigStore", "WebStorage"),
+            expected_key,
+            "PrivateApps_",
+        ),
     )
 
     assert result.outcomes[0].state == MALFORMED
     assert not result.private_app_ids
+
+
+def test_deeply_nested_json_fails_open_as_malformed():
+    nested = "[" * 3_000 + "1" + "]" * 3_000
+    payload = f'"UserLocalConfigStore" {{ "WebStorage" {{ "PrivateApps_10" "{nested}" }} }}'
+    account = SteamAccount(str(STEAM_ID64_BASE + 10), None, None, False)
+
+    result = read_private_apps_evidence(
+        "fixture",
+        [account],
+        file_exists=lambda _path: True,
+        select_cache_value=lambda _path, expected_key: vdf.select_value(
+            payload,
+            ("UserLocalConfigStore", "WebStorage"),
+            expected_key,
+            "PrivateApps_",
+        ),
+    )
+
+    assert result.outcomes[0].state == MALFORMED
+    assert not result.private_app_ids
+
+
+def test_default_reader_stream_selects_the_documented_file(tmp_path):
+    path = tmp_path / "userdata" / "10" / "config" / "localconfig.vdf"
+    path.parent.mkdir(parents=True)
+    path.write_text(
+        '"UnrelatedRoot" { "UnrelatedScalar" "must-not-be-selected" } '
+        '"UserLocalConfigStore" { "WebStorage" { '
+        '"UnrelatedScalar" "must-not-be-selected" "PrivateApps_10" "[20]" } }',
+        encoding="utf-8",
+    )
+    account = SteamAccount(str(STEAM_ID64_BASE + 10), None, None, False)
+
+    result = read_private_apps_evidence(str(tmp_path), [account])
+
+    assert result.private_app_ids == frozenset({20})
 
 
 def localconfig_path(steam_root: str, account_id: int) -> str:

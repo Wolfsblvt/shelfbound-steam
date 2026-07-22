@@ -25,9 +25,10 @@ separate hosted service has its own privacy policy, retention rules, and account
   storage (`htmlcache/Local Storage/leveldb`), falling back to the legacy
   `userdata/<id>/7/remote/sharedconfig.vdf`. Only collection names + game membership are read; see
   [steam-collections.md](./steam-collections.md).
-- When the user enables **“Don't sync games marked Private in Steam”**, the account-scoped
+- When the user enables **“Don't sync games marked Private in Steam”**, Shelfbound reads the account-scoped
   `userdata/<id>/config/localconfig.vdf` value at
-  `UserLocalConfigStore/WebStorage/PrivateApps_<accountId>`. Only the expected JSON integer array is
+  `UserLocalConfigStore/WebStorage/PrivateApps_<accountId>`. A bounded path-selective reader discards
+  unrelated VDF scalar contents while scanning; only the expected JSON integer array is retained and
   parsed. Its positive membership is used in memory for hosted omission; the key suffix, account id,
   raw value, and evidence outcomes are not uploaded or generally logged.
 - With an optional user-provided Steam Web API key, positive visibility-gated game/playtime

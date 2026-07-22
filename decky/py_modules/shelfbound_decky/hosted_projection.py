@@ -91,7 +91,7 @@ def prepare_hosted_upload(
         if isinstance(app_id, int) and not isinstance(app_id, bool) and app_id > 0
     }
     projected = project_hosted_snapshot(snapshot, normalized_exclusions)
-    body = json.dumps(projected, separators=(",", ":"), ensure_ascii=False)
+    body = _canonical_json(projected)
     skipped: list[SkippedPrivateGame] = []
     seen_app_ids: set[int] = set()
     for game in _require_list(_require(snapshot, "games", "snapshot"), "games"):
@@ -254,7 +254,10 @@ def _apply_game_exclusion(snapshot: dict, excluded_app_ids: set[int]) -> dict:
             category_counts[name] = category_counts.get(name, 0) + 1
     categories = [
         {"name": name, "gameCount": count}
-        for name, count in sorted(category_counts.items(), key=lambda item: (-item[1], item[0]))
+        for name, count in sorted(
+            category_counts.items(),
+            key=lambda item: (-item[1], _utf16_ordinal_sort_key(item[0])),
+        )
     ]
 
     stats = dict(snapshot["stats"])
@@ -277,6 +280,28 @@ def _apply_game_exclusion(snapshot: dict, excluded_app_ids: set[int]) -> dict:
 def _copy_optional(source: dict, target: dict, key: str) -> None:
     if key in source and source[key] is not None:
         target[key] = source[key]
+
+
+def _utf16_ordinal_sort_key(value: str) -> bytes:
+    """Match .NET StringComparer.Ordinal by comparing big-endian UTF-16 code units."""
+    return value.encode("utf-16-be", errors="surrogatepass")
+
+
+def _canonical_json(value: object) -> str:
+    """Match System.Text.Json's surrogate-pair escaping while retaining ordinary Unicode."""
+    serialized = json.dumps(value, separators=(",", ":"), ensure_ascii=False)
+    parts: list[str] = []
+    for char in serialized:
+        code_point = ord(char)
+        if code_point <= 0xFFFF:
+            parts.append(char)
+            continue
+
+        scalar = code_point - 0x10000
+        high_surrogate = 0xD800 + (scalar >> 10)
+        low_surrogate = 0xDC00 + (scalar & 0x3FF)
+        parts.append(f"\\u{high_surrogate:04X}\\u{low_surrogate:04X}")
+    return "".join(parts)
 
 
 def _require(source: dict, key: str, path: str) -> object:

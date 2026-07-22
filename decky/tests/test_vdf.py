@@ -82,3 +82,42 @@ def test_pathological_nesting_is_rejected_before_python_recursion_limit():
 
     with pytest.raises(VdfFormatError, match="depth limit"):
         vdf.parse(nested)
+
+
+def test_selects_only_the_requested_scalar_and_reports_matching_siblings():
+    payload = """
+        "UnrelatedRoot" { "UnrelatedScalar" "must-not-be-selected" }
+        "UserLocalConfigStore"
+        {
+            "WebStorage"
+            {
+                "UnrelatedScalar" "must-not-be-selected"
+                "PrivateApps_11" "[40]"
+                "PrivateApps_10" "[20]"
+            }
+        }
+    """
+
+    selection = vdf.select_value(
+        payload,
+        ("UserLocalConfigStore", "WebStorage"),
+        "PrivateApps_10",
+        "PrivateApps_",
+    )
+
+    assert selection.value == "[20]"
+    assert selection.has_matching_sibling
+    assert "must-not-be-selected" not in repr(selection)
+
+
+def test_selective_reader_enforces_depth_while_skipping_unrelated_subtrees():
+    depth = limits.MAX_VDF_DEPTH + 1
+    nested = '"unrelated" { ' * depth + " }" * depth
+
+    with pytest.raises(VdfFormatError, match="depth limit"):
+        vdf.select_value(
+            nested,
+            ("UserLocalConfigStore", "WebStorage"),
+            "PrivateApps_10",
+            "PrivateApps_",
+        )

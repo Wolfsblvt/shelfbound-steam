@@ -127,6 +127,21 @@ def test_private_exclusion_all_games_preserves_library_facts_and_downgrades_scop
     assert upload.snapshot["stats"]["scope"] == "observedSubset"
 
 
+def test_recomputed_category_order_matches_the_shared_utf16_ordinal_golden():
+    local = json.loads(
+        (PRIVATE_FIXTURE_ROOT / "private-game-exclusion.unicode-order.input.json").read_text(
+            encoding="utf-8"
+        )
+    )
+
+    upload = prepare_hosted_upload(local, {30})
+
+    golden = (
+        PRIVATE_FIXTURE_ROOT / "private-game-exclusion.unicode-order.golden.json"
+    ).read_text(encoding="utf-8").rstrip("\r\n")
+    assert upload.body == golden
+
+
 def test_private_exclusion_never_rewrites_an_existing_partial_scope():
     for scope in ("installedOnly", "observedSubset"):
         local = private_exclusion_snapshot()

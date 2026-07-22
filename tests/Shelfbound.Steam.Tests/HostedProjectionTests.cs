@@ -159,6 +159,26 @@ public class HostedProjectionTests
     }
 
     [Fact]
+    public void Recomputed_category_order_matches_the_shared_utf16_ordinal_golden()
+    {
+        SnapshotDocument local = SnapshotSerializer.Deserialize(File.ReadAllText(Path.Combine(
+            AppContext.BaseDirectory,
+            "Fixtures",
+            "private-game-exclusion.unicode-order.input.json")));
+
+        PrivateGameUploadPreparation prepared = PrivateGameUploadPreparer.PrepareFromEvidence(
+            local,
+            new HashSet<int> { 30 },
+            new HashSet<int>());
+
+        string golden = File.ReadAllText(Path.Combine(
+            AppContext.BaseDirectory,
+            "Fixtures",
+            "private-game-exclusion.unicode-order.golden.json")).TrimEnd('\r', '\n');
+        prepared.Upload.Json.ShouldBe(golden);
+    }
+
+    [Fact]
     public void Existing_partial_scopes_are_never_rewritten_and_unskip_regenerates_exact_bytes()
     {
         SnapshotDocument full = PrivateExclusionSnapshot();

@@ -24,6 +24,9 @@ internal sealed record PrivateAppsEvidenceOutcome(
     PrivateAppsEvidenceState State,
     IReadOnlySet<int> PrivateAppIds);
 
+/// <summary>The one permitted account-scoped cache scalar plus mismatch-only sibling evidence.</summary>
+internal sealed record PrivateAppsCacheValue(string? RawValue, bool HasOtherAccountKey);
+
 /// <summary>Same-device union of positive Private-app cache membership plus all source outcomes.</summary>
 internal sealed record PrivateAppsEvidenceResult
 {
@@ -101,10 +104,11 @@ internal static class PrivateAppsEvidenceReader
         if (!dependencies.FileExists(path))
             return Outcome(PrivateAppsEvidenceState.Absent);
 
-        VdfObject root;
+        string expectedKey = $"PrivateApps_{accountText}";
+        PrivateAppsCacheValue cacheValue;
         try
         {
-            root = dependencies.ParseFile(path);
+            cacheValue = dependencies.ReadCacheValue(path, expectedKey);
         }
         catch (UnauthorizedAccessException)
         {
@@ -119,17 +123,10 @@ internal static class PrivateAppsEvidenceReader
             return Outcome(PrivateAppsEvidenceState.Malformed);
         }
 
-        VdfObject? webStorage = root.GetObject("UserLocalConfigStore")?.GetObject("WebStorage");
-        if (webStorage is null)
-            return Outcome(PrivateAppsEvidenceState.Absent);
-
-        string expectedKey = $"PrivateApps_{accountText}";
-        string? rawValue = webStorage.GetValue(expectedKey);
+        string? rawValue = cacheValue.RawValue;
         if (rawValue is null)
         {
-            bool hasOtherAccountKey = webStorage.Values.Keys.Any(key =>
-                key.StartsWith("PrivateApps_", StringComparison.OrdinalIgnoreCase));
-            return Outcome(hasOtherAccountKey
+            return Outcome(cacheValue.HasOtherAccountKey
                 ? PrivateAppsEvidenceState.AccountMismatch
                 : PrivateAppsEvidenceState.Absent);
         }
@@ -173,12 +170,22 @@ internal static class PrivateAppsEvidenceReader
 
 internal sealed record PrivateAppsEvidenceReaderDependencies
 {
+    private static readonly string[] PrivateAppsObjectPath = ["UserLocalConfigStore", "WebStorage"];
+
     public required Func<string, bool> FileExists { get; init; }
-    public required Func<string, VdfObject> ParseFile { get; init; }
+    public required Func<string, string, PrivateAppsCacheValue> ReadCacheValue { get; init; }
 
     public static PrivateAppsEvidenceReaderDependencies Default { get; } = new()
     {
         FileExists = File.Exists,
-        ParseFile = VdfParser.ParseFile,
+        ReadCacheValue = (path, expectedKey) =>
+        {
+            VdfScalarSelection selection = VdfParser.SelectFileValue(
+                path,
+                PrivateAppsObjectPath,
+                expectedKey,
+                "PrivateApps_");
+            return new PrivateAppsCacheValue(selection.Value, selection.HasMatchingSibling);
+        },
     };
 }
