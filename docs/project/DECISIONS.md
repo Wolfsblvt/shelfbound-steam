@@ -382,7 +382,7 @@ shelling out to the .NET CLI where installed (reuses the battle-tested reader bu
 dependency + Decky review surface); the self-contained stdlib port keeps the plugin auditable, no
 runtime pip deps. **One hardware-TBD seam:** the SteamOS Local Storage leveldb *path* (env override
 `SHELFBOUND_STEAM_LOCALSTORAGE` + a candidate path; validated on a real Deck under A1). Dynamic
-`filterSpec` collections remain a later item. See `decky/NEXT-STEPS.md` §A2 and
+`filterSpec` collections remain a later item. See `decky/next-steps.md` §A2 and
 [steam-collections.md](./steam-collections.md).
 
 ---

@@ -9,7 +9,7 @@ Shelfbound is **open-core**: this repository (`shelfbound-steam`, AGPL-3.0-or-la
 core; a separate private repository holds the proprietary hosted product that funds the project. See
 [DECISIONS.md](./DECISIONS.md) ("Two repositories", "License") and [ARCHITECTURE.md](./ARCHITECTURE.md)
 ("Repository boundary"). The two interoperate through the **snapshot contract**, and the hosted product
-additionally reuses the public libraries as packages under the [CLA](../../CLA.md).
+additionally reuses the public libraries as packages under the [CLA](../../cla.md).
 
 ## The principle
 
@@ -69,7 +69,7 @@ to a private type.
   - *Benefit:* useful to anyone building on the snapshot; a natural fit next to the models in
     `Shelfbound.Core` (or `Shelfbound.Query`).
   - *CLA/relicense:* trivially safe. It becomes AGPL; the hosted product keeps using it via the
-    published package, and the [CLA](../../CLA.md) already lets the maintainer reuse any external
+    published package, and the [CLA](../../cla.md) already lets the maintainer reuse any external
     contribution in the closed product. Clean, unblocked move.
 - **An install-history derivation** — a pure, deterministic routine that reconstructs a per-game
   install/uninstall timeline by **diffing an owner's snapshot history**. It depends only on the public
@@ -145,7 +145,7 @@ Not done here — recorded so an accepted recommendation is cheap to execute:
 1. Extract the piece into the right public assembly (`Shelfbound.Core` for contract-shaped utilities,
    `Shelfbound.Query` for query/derivation), with tests.
 2. Keep the hosted product consuming it via the **published package** — no forked copy. The
-   [CLA](../../CLA.md) keeps external contributions reusable in the closed product.
+   [CLA](../../cla.md) keeps external contributions reusable in the closed product.
 3. Bump/publish the package and update the private consumer's reference.
 
 Publishing is one-way (public history is forever), so each move is a small, deliberate PR — never a bulk
@@ -155,5 +155,5 @@ sweep.
 
 - [DECISIONS.md](./DECISIONS.md) — "Two repositories", "License", and the OSS-boundary entry.
 - [ARCHITECTURE.md](./ARCHITECTURE.md) — the repository boundary and the snapshot seam.
-- [CLA.md](../../CLA.md) — the dual grant that makes public contributions reusable in the hosted product.
+- [cla.md](../../cla.md) — the dual grant that makes public contributions reusable in the hosted product.
 - [AGENTS.md](../../AGENTS.md) — the always-on "keep hosted/product/secrets out of this repo" rule.

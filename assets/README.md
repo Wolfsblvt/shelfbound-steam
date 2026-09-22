@@ -15,5 +15,5 @@ script uses `iconutil` for the ICNS. Non-Mac runs regenerate PNG/ICO outputs and
 substituting a different encoder. Pass `-MagickPath` to use a portable ImageMagick executable, or use `-Check` to validate
 committed sources and outputs without a renderer.
 
-The color and mono source hashes are enforced by the exporter. See [TRADEMARKS.md](../TRADEMARKS.md) for the relationship
+The color and mono source hashes are enforced by the exporter. See [trademarks.md](../trademarks.md) for the relationship
 between the repository's AGPL-3.0-or-later copyright license and trademark rights.

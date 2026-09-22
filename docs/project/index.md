@@ -5,7 +5,7 @@ contract or decision relevant to a change.
 
 ## Core
 
-- [INDEX.md](./INDEX.md) — this documentation map.
+- [index.md](./index.md) — this documentation map.
 - [PROJECT.md](./PROJECT.md) — product-independent open-core scope and roadmap.
 - [ARCHITECTURE.md](./ARCHITECTURE.md) — components, data flow, and repository boundaries.
 - [DECISIONS.md](./DECISIONS.md) — durable technical decisions and their rationale.

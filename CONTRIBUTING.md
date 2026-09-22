@@ -14,10 +14,10 @@ and are out of scope here. Good contributions: Steam-file parsing robustness, cr
 
 This project is open-core: it's free under **AGPL-3.0-or-later**, and the maintainer also runs a
 separate paid hosted service built on the reusable libraries here (which keeps the open core free).
-By contributing, you agree to the lightweight **[Contributor License Agreement](CLA.md)**: your work
+By contributing, you agree to the lightweight **[Contributor License Agreement](cla.md)**: your work
 is licensed under AGPL-3.0-or-later like any contribution, **and** you grant the maintainer the right
 to also use/relicense it (including in the proprietary hosted service). You keep your copyright. See
-[CLA.md](CLA.md) for the exact terms.
+[cla.md](cla.md) for the exact terms.
 
 ## Before you start
 
