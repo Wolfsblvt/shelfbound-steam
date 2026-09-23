@@ -8,7 +8,7 @@
 > **Also ported to Python** for the Decky plugin (`decky/py_modules/shelfbound_decky/`: `snappy.py`,
 > `chromium_leveldb.py`, `steam_collections.py`, `steam_localstorage.py`) — stdlib-only, same semantics,
 > mirroring the C# oracle tests. The one Deck-TBD piece is the SteamOS Local Storage *path* (env override
-> + candidate; validated on hardware under decky `NEXT-STEPS.md` §A1).
+> + candidate; validated on hardware under decky `next-steps.md` §A1).
 
 ## The bug
 
