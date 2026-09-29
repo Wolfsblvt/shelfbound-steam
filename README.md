@@ -1,156 +1,294 @@
+<img src="assets/icon.svg" alt="Shelfbound icon" width="96" align="right">
+
 # Shelfbound
 
-[![quality gates](https://img.shields.io/github/actions/workflow/status/Wolfsblvt/shelfbound-steam/ci.yml?branch=main&logo=githubactions&logoColor=white&label=quality%20gates)](https://github.com/Wolfsblvt/shelfbound-steam/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/Wolfsblvt/shelfbound-steam/graph/badge.svg)](https://codecov.io/gh/Wolfsblvt/shelfbound-steam)
-[![C# style](https://img.shields.io/badge/C%23%20style-report--only-6c757d?logo=dotnet&logoColor=white)](.editorconfig)
-[![Decky quality](https://img.shields.io/badge/Decky-ESLint%20%2B%20Prettier-5a45ff?logo=eslint&logoColor=white)](decky/package.json)
-[![Decky tests](https://img.shields.io/badge/Decky%20tests-pytest-0a9edc?logo=pytest&logoColor=white)](decky/tests)
-[![NuGet](https://img.shields.io/nuget/v/Shelfbound.Core?logo=nuget&label=NuGet&color=004880)](https://www.nuget.org/packages/Shelfbound.Core)
-[![license](https://img.shields.io/github/license/Wolfsblvt/shelfbound-steam?color=blue)](LICENSE)
+[![CI](https://img.shields.io/github/actions/workflow/status/Wolfsblvt/shelfbound-steam/ci.yml?branch=main&logo=githubactions&logoColor=white&label=CI)](https://github.com/Wolfsblvt/shelfbound-steam/actions/workflows/ci.yml)
+[![NuGet](https://img.shields.io/nuget/v/Shelfbound.Core?logo=nuget&label=Shelfbound.Core&color=004880)](https://www.nuget.org/packages/Shelfbound.Core)
 [![.NET 10](https://img.shields.io/badge/.NET-10-512bd4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com)
+[![AGPL-3.0-or-later](https://img.shields.io/github/license/Wolfsblvt/shelfbound-steam?color=blue)](LICENSE)
 
 **AI-ready context for your real Steam library.**
 
-Shelfbound is a personal gaming context layer: it reads your *real* Steam library — installed games
-per device, your local categories (collections), notes, statuses, and taste — and makes it available
-to AI tools through [MCP](https://modelcontextprotocol.io), locally or via a hosted service. The point
-is to let ChatGPT/Claude reason about *your* library, not generic Steam API data.
+Shelfbound turns the Steam library on this machine—installed games, local collections, device and
+storage context, optional playtime observations, and the preferences you choose to save—into structured
+local data and MCP tools. It lets an AI client reason about *your* backlog instead of a generic catalogue.
 
-> **Unofficial.** Shelfbound is not affiliated with or endorsed by Valve. "Steam" is used
+The local scanner and MCP server need no Shelfbound account, token, or hosted service. By default a scan
+reads local Steam files and makes no network request. Steam Web API enrichment and upload to a configured
+server are separate, explicit actions.
+
+> [!NOTE]
+> Shelfbound is unofficial and is not affiliated with or endorsed by Valve. “Steam” is used
 > descriptively.
 
-This repository (`shelfbound-steam`) is the **open-source local core**: domain models, the snapshot
-contract, the local Steam scanner, and the CLI. The hosted service lives in a separate private repo.
+## First success: inspect the library on this machine
 
-## Status
-
-Early but already useful, all local:
-
-- **`shelfbound scan`** writes a versioned **snapshot** of your library — installed games across all
-  libraries (names, install state, size, timestamps), your Steam accounts, the device, and your
-  **local categories** (read from your **modern Steam collections**, falling back to the legacy store).
-  With a Steam Web API key it also adds **visible not-installed game observations and playtime**.
-  Steam does not guarantee that visibility-gated result is complete; Shelfbound keeps useful positive
-  rows and never treats absence as non-ownership. No install paths, credentials, or saves.
-- **`shelfbound-mcp`** — a local **MCP server** that exposes the library to AI tools (ChatGPT/Claude):
-  search by category / install state / playtime, library summary, game details, "what haven't I played?".
-- **Per-game context** — the MCP server can also *remember* what you tell it: statuses
-  (finished/paused/dropped), ratings, completion, category meanings, and freeform memories — stored
-  locally and shared with the CLI.
-
-Also built: a cross-platform **tray app** (privacy preview, consent-gated background sync + account
-connect) and **`shelfbound upload`** (send a minimized hosted projection to a Shelfbound server).
-Steam discovery checks an explicit path, `SHELFBOUND_STEAM_PATH`, the current user's Windows Steam
-registry path when applicable, then platform defaults. Still to come locally: dynamic (rule-based)
-collections and real-hardware validation/distribution of the Decky prototype. The hosted service lives
-in a separate private repo. See [docs/project/PROJECT.md](docs/project/PROJECT.md) for the roadmap.
-
-## Quick start
-
-**Install as global tools** (published to NuGet on each release; requires the **.NET 10 runtime**):
+The current source requires the [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) and a
+Steam desktop installation.
 
 ```bash
-dotnet tool install -g Shelfbound.Cli    # the `shelfbound` command
-dotnet tool install -g Shelfbound.Mcp    # the `shelfbound-mcp` server
-shelfbound setup                         # one-time: shows config + how to add an API key
-shelfbound scan --pretty
+git clone https://github.com/Wolfsblvt/shelfbound-steam.git
+cd shelfbound-steam
+dotnet run --project src/Shelfbound.Cli -- scan --pretty
 ```
 
-**Or run from source** (requires the **.NET 10 SDK**):
+Shelfbound prints a summary and writes `shelfbound-snapshot.json`. The file is a portable, versioned
+record of what this device actually exposed: installed games per Steam library, collections, size and
+recency facts, device/storage context, and the library's evidence scope.
+
+Treat the snapshot as personal data. It can contain Steam account identifiers and the names of your
+games and collections, although it never contains credentials, save files, screenshots, full install
+paths, hardware serials, or arbitrary files.
+
+Useful scan options:
+
+```text
+--output <file>       choose the snapshot path
+--stdout              write JSON to standard output
+--steam-path <dir>    override Steam discovery
+--device-name <name>  choose a non-secret device label
+--device-type <type>  desktop | laptop | steamDeck | server | unknown
+```
+
+Run `dotnet run --project src/Shelfbound.Cli -- --help` for the complete CLI surface.
+
+## Talk to the library through MCP
+
+Build the current local MCP server:
+
+```bash
+dotnet build src/Shelfbound.Mcp/Shelfbound.Mcp.csproj -c Release
+```
+
+For MCP clients that use the common `mcpServers` JSON shape, point the client at the built assembly and
+the snapshot from the first step:
+
+```json
+{
+  "mcpServers": {
+    "shelfbound": {
+      "command": "dotnet",
+      "args": [
+        "<absolute-repo-path>/src/Shelfbound.Mcp/bin/Release/net10.0/shelfbound-mcp.dll"
+      ],
+      "env": {
+        "SHELFBOUND_SNAPSHOT": "<absolute-repo-path>/shelfbound-snapshot.json"
+      }
+    }
+  }
+}
+```
+
+Replace both placeholders with absolute paths. Without `SHELFBOUND_SNAPSHOT`, the server scans Steam
+when it starts. `SHELFBOUND_STEAM_PATH` overrides discovery, and `STEAM_WEB_API_KEY` enables the
+optional enrichment described below.
+
+A useful first prompt is:
+
+> Summarize the scope and collections in my library, then show five installed games I have probably
+> not started.
+
+The server is local, stdio-only MCP. Protocol messages use stdout; redacted diagnostics use stderr.
+Its current tools are:
+
+| Purpose | Tools |
+|---|---|
+| Read and search | `get_library_summary`, `get_categories`, `search_library`, `get_game_details`, `find_installed_unplayed`, `get_recommendations` |
+| Inspect saved context | `get_profile_status`, `get_game_user_data`, `get_remembered` |
+| Save or correct explicit context | `record_game_status`, `record_game_opinion`, `set_game_completion`, `set_category_definition`, `remember`, `delete_memory` |
+
+Search can combine title text, install state, uncategorized state, collection inclusion/exclusion,
+playtime, status, rating, completion, played-elsewhere state, sorting, and a result limit.
+Recommendations are deterministic cards over observed facts and saved context; the AI client presents
+and discusses them.
+
+Saved context belongs to the local profile store and can include statuses, ratings, completion,
+liked/disliked aspects, collection meanings, and scoped memories. MCP instructions tell the client to
+save only facts the user explicitly states—never an inferred preference—and `delete_memory` provides a
+correction path. Inspect the same state without an MCP client:
+
+```bash
+dotnet run --project src/Shelfbound.Cli -- profile
+```
+
+## What Shelfbound knows—and what it does not
+
+### Local scan
+
+Shelfbound reads:
+
+- Steam library metadata and app manifests for installed-game presence, names, relative install
+  folders, sizes, and timestamps;
+- the most recent local Steam account context;
+- current static Steam collections from the client's Chromium Local Storage, with the legacy
+  `sharedconfig.vdf` store as a fallback;
+- best-effort device specifications and per-library storage kind/capacity.
+
+Collection reading is best-effort outside its validated Windows path and can lag Steam's last unflushed
+edit. Dynamic rule-based collections (`filterSpec`) and non-Steam shortcuts are not part of the current
+scan.
+
+An installed manifest is evidence that an install is recorded on this device. It is **not** proof that
+the active account owns the game or can still launch it.
+
+### Optional Steam Web API enrichment
+
+A user-provided Steam Web API key can add positive observations for visible not-installed games,
+playtime, and last-played time:
+
+```bash
+# Set STEAM_WEB_API_KEY in this process first, then save it without putting it in argv.
+dotnet run --project src/Shelfbound.Cli -- setup --steam-api-key-env
+dotnet run --project src/Shelfbound.Cli -- scan --pretty
+```
+
+The profile's **Game details** visibility must be public enough for `GetOwnedGames`. The key is accepted
+from the environment or standard input, never as a command-line value, and is not included in surfaced
+request errors. A saved key is currently plaintext in the user's config directory (mode `0600` on Unix;
+on Windows it inherits the user-profile directory ACL); OS-keystore encryption is not implemented yet.
+
+This enrichment is useful but not complete. Shelfbound labels its evidence honestly:
+
+| Scope | Meaning |
+|---|---|
+| `installedOnly` | Games observed from installed manifests on this device. |
+| `observedSubset` | Installed facts plus positive visibility-gated observations; absence proves nothing. |
+| `fullLibrary` | Reserved for a source that explicitly guarantees completeness. No current Steam scan path produces it. |
+
+Under either partial scope, an empty search result does **not** mean “not owned” or “not available.”
+
+## Privacy and network behavior
+
+| Action | Network behavior | Data boundary |
+|---|---|---|
+| `scan` | None by default. | Writes the complete local snapshot you chose. |
+| MCP startup | None by default. With an API key configured, it may call Steam's `GetOwnedGames`. | Library facts and saved context remain local. |
+| `setup` | No request is needed to save a key supplied through stdin/environment. | The key is kept in local config and never added to a snapshot. |
+| `upload --dry-run` | None. | Prints the exact compact hosted body and sends nothing. |
+| `upload` | Posts only after you provide a server and bearer token. | Sends the prepared whitelist projection to that configured server. |
+
+The complete local snapshot is deliberately richer than the hosted projection and is **not**
+upload-safe by itself. The official projection:
+
+- drops the complete `steamAccounts` array;
+- replaces automatic hostname input with a neutral label;
+- coarsens the exact OS description;
+- retains the random device id, chosen device label, coarse specs, libraries, storage capacity, games,
+  collections, and aggregate facts needed by the receiving product;
+- still contains personal game and collection names.
+
+The CLI does not expose the interactive clients' optional Private-game exclusion setting; its preview
+contains every game row in the prepared projection. Preview those exact bytes without a token or server:
+
+```bash
+dotnet run --project src/Shelfbound.Cli -- upload --dry-run
+```
+
+A real upload additionally requires `SHELFBOUND_SERVER` or `--server`, plus `SHELFBOUND_TOKEN` in the
+environment. Availability, account behavior, limits, and production endpoints belong to the receiving
+server; this repository does not promise them.
+
+See [Privacy and data](docs/project/privacy-and-data.md) for the field-level contract and
+[Security](SECURITY.md) for private vulnerability reporting.
+
+## Public core and hosted companion
+
+This repository is the free, AGPL-licensed local core:
+
+```text
+local Steam files ──> scanner ──> snapshot v0.6.0 ──┬─> query engine + local profile ──> MCP (stdio)
+optional Steam API ───── positive observations ──────┘
+                                                     └─> whitelist projection ──> optional configured server
+```
+
+The separate Shelfbound Cloud repository is a proprietary, pre-alpha companion. It consumes the
+published snapshot contract and open-core packages; it does not parse Steam files server-side. The
+local scanner, snapshot, query engine, profile store, and MCP server work without it.
+
+That separation is intentional, not a trial funnel hidden in the wiring. This README does not present
+hosted accounts, plans, quotas, dashboards, or future endpoints as part of the open-source checkout.
+
+## Status and distribution
+
+The supported first-success path in this README is the CLI and local MCP server from current source.
+
+The reusable `Shelfbound.Core`, `Shelfbound.Query`, and `Shelfbound.Steam` libraries are released as
+immutable NuGet packages. `Shelfbound.Cli` and `Shelfbound.Mcp` also have independently versioned .NET
+global-tool packages:
+
+```bash
+dotnet tool install -g Shelfbound.Cli
+dotnet tool install -g Shelfbound.Mcp
+```
+
+Those tool packages can lag `main`; check their package pages and release notes before assuming parity
+with the source capabilities documented here.
+
+Other repository surfaces have narrower status:
+
+- `src/Shelfbound.Tray` contains the cross-platform uploader/tray source, including consent preview and
+  upload-only device connection. It is not the quick-start path above.
+- `decky/` is an exploratory Decky Loader prototype. It is tested off-device but has never run on a real
+  Steam Deck and is not a public Deck-support claim or store release.
+
+Current releases and source identities are recorded on the
+[GitHub Releases page](https://github.com/Wolfsblvt/shelfbound-steam/releases).
+
+## Architecture and repository map
+
+The versioned JSON snapshot is the seam. Steam parsing happens once in `Shelfbound.Steam`; local query,
+MCP, tools, and optional upload consume the resulting contract instead of re-parsing client files.
+
+| Path | Responsibility |
+|---|---|
+| `src/Shelfbound.Core` | Snapshot and user-context models, schema identity, serialization. |
+| `src/Shelfbound.Steam` | Local Steam discovery/parsing plus optional Web API enrichment. |
+| `src/Shelfbound.Query` | Deterministic search, summaries, recommendations, profile derivation, and the QueryPlan grammar contract. |
+| `src/Shelfbound.Storage` | Local config, profile identity, and atomic user-data persistence. |
+| `src/Shelfbound.Mcp` | Local stdio MCP adapter over the snapshot/query/profile seams. |
+| `src/Shelfbound.Cli` | `setup`, `profile`, `scan`, and explicit `upload` commands. |
+| `src/Shelfbound.Client` | Shared snapshot builder, hosted whitelist projection, and server client. |
+| `src/Shelfbound.Tray` | Avalonia tray/uploader client source. |
+| `schema/` and `contracts/` | Machine-readable snapshot and cross-consumer conformance contracts. |
+| `decky/` | Hardware-gated Python/TypeScript prototype using the same snapshot/projection contract. |
+| `tests/` | .NET tests and contract fixtures. |
+
+Start deeper in [Project documentation](docs/project/), especially
+[Architecture](docs/project/ARCHITECTURE.md),
+[Snapshot schema](docs/project/snapshot-schema.md),
+[MCP design](docs/project/mcp-design.md), and
+[Project status](docs/project/PROJECT.md).
+
+## Development and contribution
+
+The normal local checks are:
 
 ```bash
 dotnet build
-dotnet run --project src/Shelfbound.Cli -- setup        # one-time: shows config + how to add an API key
-dotnet run --project src/Shelfbound.Cli -- scan --pretty
-dotnet run --project src/Shelfbound.Cli -- profile      # what Shelfbound remembers about your library
-```
-
-**Steam Web API key (optional — for additional visible games + playtime):** get one at
-<https://steamcommunity.com/dev/apikey> (sign in, register any domain — `localhost` is fine), then
-run `shelfbound setup --steam-api-key-stdin` and provide the key as one line on standard input, or set
-`STEAM_WEB_API_KEY` and run `shelfbound setup --steam-api-key-env`. Also set your Steam profile
-**Game details → Public**, or the API may return no usable game list. Even with that visibility, the
-result is an observed subset rather than proof of a complete library. Both the CLI and MCP server use
-the saved key, warn on missing/empty/malformed responses, and never include the key in warnings. Secrets
-are deliberately not accepted as command-line arguments.
-
-This writes `shelfbound-snapshot.json` (git-ignored — it lists your games, so treat it as personal).
-Useful options: `--output <file>`, `--stdout`, `--steam-path <dir>`, `--device-name <name>`,
-and `--device-type …`. Set `STEAM_WEB_API_KEY` or use the saved configuration to add visible game and
-playtime observations via the Steam Web API. Run `shelfbound --help`.
-
-### Upload to a Shelfbound server (optional)
-
-`shelfbound upload` scans locally, derives a whitelist-only hosted projection, and sends that minimized
-body so the hosted MCP/dashboard can read your library without your machine online. Preview the exact
-compact body first (no server or token required), then upload:
-
-```bash
-shelfbound upload --dry-run                            # prints exact body; sends nothing
-shelfbound upload --server <url>                       # token comes from SHELFBOUND_TOKEN
-```
-
-Set `SHELFBOUND_TOKEN` in the process environment before uploading; bearer tokens are not accepted
-in argv, where shell history and process inspection could expose them. `SHELFBOUND_SERVER` can replace
-the non-secret `--server` option.
-
-A hosted body includes the user-chosen/neutral device label, random device id, coarse OS/specs,
-libraries, games, collections, and stats. It drops the complete Steam-account array (login, persona,
-and Steam ids), never auto-uploads the machine hostname, and omits exact OS builds. Game and collection
-names remain personal; a game name can reveal a private/non-Steam title from another producer.
-Official clients also preserve successful server warnings and distinguish throttling, token scope,
-device-cap, invalid-snapshot, and payload-size failures instead of collapsing them to a status number.
-
-A one-shot upload is free. Continuous `--watch` sync is a paid (Pro/Lifetime) feature, enforced by the
-server. See [the privacy contract](docs/project/privacy-and-data.md) for the exact field boundary and
-preview behavior.
-
-### Local MCP server
-
-`shelfbound-mcp` scans your library on startup and serves it to MCP-compatible AI clients over stdio.
-Point your client (e.g. Claude Desktop) at the built `shelfbound-mcp` executable. It reads config from
-the environment: `SHELFBOUND_STEAM_PATH` (else auto-detected), `STEAM_WEB_API_KEY` (optional, for
-additional visible games + playtime), `SHELFBOUND_SNAPSHOT` (load a snapshot file instead of scanning). Read tools:
-`search_library`, `get_library_summary`, `get_categories`, `get_game_details`, `find_installed_unplayed`.
-Write/remember tools: `record_game_status`, `record_game_opinion`, `set_game_completion`,
-`set_category_definition`, `remember`, plus `get_game_user_data` / `get_remembered`.
-
-```bash
 dotnet test
+pwsh scripts/test.ps1
+pwsh scripts/lint.ps1
 ```
 
-## Repository layout
+The aggregate scripts also exercise Decky's Python/TypeScript contract surface; see
+[CONTRIBUTING.md](CONTRIBUTING.md) for the isolated Python environment, Node 22 requirements, coding
+conventions, schema-change rules, and the lightweight contributor licence agreement.
 
-The whole repository is licensed **AGPL-3.0-or-later** (see [License](#license)).
+Open an issue before substantial changes. Use
+[the issue templates](https://github.com/Wolfsblvt/shelfbound-steam/issues/new/choose) for bugs or
+feature requests. Questions are handled on a best-effort basis; GitHub Discussions is not currently
+enabled for this repository. Follow the [Code of Conduct](CODE_OF_CONDUCT.md).
 
-| Project | Purpose |
-|---|---|
-| `src/Shelfbound.Core` | Domain models + the versioned snapshot contract + serializer. |
-| `src/Shelfbound.Steam` | Local Steam scanner + Steam Web API client + enrichment. |
-| `src/Shelfbound.Query` | Deterministic query/filter/summary engine plus the versioned QueryPlan grammar contract. |
-| `src/Shelfbound.Storage` | Local config, identity seam, and the user-data store (statuses, ratings, memories). |
-| `src/Shelfbound.Client` | Shared scan-to-snapshot builder + Shelfbound server client, reused by the CLI and tray. |
-| `src/Shelfbound.Cli` | The `shelfbound` command-line tool (setup/scan/profile/upload). |
-| `src/Shelfbound.Tray` | The cross-platform tray app (Avalonia): background sync, status, and account connect. |
-| `src/Shelfbound.Mcp` | The `shelfbound-mcp` local MCP server. |
-| `decky/` | Steam Deck (Decky) plugin **prototype** — own Python/TS toolchain, emits the same snapshot contract. Hardware-gated; see [decky/README.md](decky/README.md). |
-| `tests/…` | Unit + integration tests. |
+## License, contributions, and marks
 
-## Documentation
+The entire public repository—including application artwork—is licensed
+[AGPL-3.0-or-later](LICENSE). Modified network services must make the corresponding source available
+under the licence's terms.
 
-Start with [docs/project/PROJECT.md](docs/project/PROJECT.md); the snapshot contract is in
-[docs/project/snapshot-schema.md](docs/project/snapshot-schema.md) and
-[`schema/snapshot.v0.schema.json`](schema/snapshot.v0.schema.json). The cross-surface query contract is
-documented in [docs/project/query-plan.md](docs/project/query-plan.md).
+Contributions remain AGPL in the public project and are also covered by the
+[Contributor License Agreement](cla.md), which grants the maintainer additional reuse/relicensing
+rights for the separate proprietary companion. Contributors retain their copyright.
 
-## License
-
-This project is licensed under **AGPL-3.0-or-later** (see [LICENSE](LICENSE)) to ensure that
-improvements to hosted or modified versions remain available to users and the community. This keeps
-the open-source core free for everyone and prevents it from being quietly turned into a closed
-product. A separate hosted version may be offered for convenience; it is developed privately and is
-out of scope for this repository.
-
-The whole repository, including copyright in the tray artwork, remains under that license. Shelfbound names and marks
-are also subject to the separate, narrow [trademark notice](trademarks.md); the copyright license does not grant
-trademark rights beyond applicable law.
+The Shelfbound name and marks are covered by the separate
+[trademark notice](trademarks.md). The copyright licence does not grant permission to imply endorsement
+of a modified or unrelated product.
