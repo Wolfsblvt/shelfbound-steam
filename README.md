@@ -1,6 +1,4 @@
-<img src="assets/icon.svg" alt="Shelfbound icon" width="96" align="right">
-
-# Shelfbound
+# <img src="assets/icon.svg" alt="" width="32" height="32"> Shelfbound
 
 [![CI](https://img.shields.io/github/actions/workflow/status/Wolfsblvt/shelfbound-steam/ci.yml?branch=main&logo=githubactions&logoColor=white&label=CI)](https://github.com/Wolfsblvt/shelfbound-steam/actions/workflows/ci.yml)
 [![NuGet](https://img.shields.io/nuget/v/Shelfbound.Core?logo=nuget&label=Shelfbound.Core&color=004880)](https://www.nuget.org/packages/Shelfbound.Core)
@@ -13,9 +11,9 @@ Shelfbound turns the Steam library on this machine—installed games, local coll
 storage context, optional playtime observations, and the preferences you choose to save—into structured
 local data and MCP tools. It lets an AI client reason about *your* backlog instead of a generic catalogue.
 
-The local scanner and MCP server need no Shelfbound account, token, or hosted service. By default a scan
-reads local Steam files and makes no network request. Steam Web API enrichment and upload to a configured
-server are separate, explicit actions.
+The local scanner and MCP server need no Shelfbound account, token, or hosted service. A scan reads
+local Steam files; if a Steam Web API key is supplied through the environment or saved by `setup`,
+it also requests visible game observations from Steam. Upload to a configured server is a separate action.
 
 > [!NOTE]
 > Shelfbound is unofficial and is not affiliated with or endorsed by Valve. “Steam” is used
@@ -36,9 +34,9 @@ Shelfbound prints a summary and writes `shelfbound-snapshot.json`. The file is a
 record of what this device actually exposed: installed games per Steam library, collections, size and
 recency facts, device/storage context, and the library's evidence scope.
 
-Treat the snapshot as personal data. It can contain Steam account identifiers and the names of your
-games and collections, although it never contains credentials, save files, screenshots, full install
-paths, hardware serials, or arbitrary files.
+Treat the snapshot as personal data. It can contain identifiers, login names, and persona names for
+every account in Steam's local `loginusers.vdf`, plus the names of your games and collections. It never
+contains credentials, save files, screenshots, full install paths, hardware serials, or arbitrary files.
 
 Useful scan options:
 
@@ -119,7 +117,7 @@ Shelfbound reads:
 
 - Steam library metadata and app manifests for installed-game presence, names, relative install
   folders, sizes, and timestamps;
-- the most recent local Steam account context;
+- every account in the local `loginusers.vdf` file (the most recent account is selected for Web API enrichment);
 - current static Steam collections from the client's Chromium Local Storage, with the legacy
   `sharedconfig.vdf` store as a fallback;
 - best-effort device specifications and per-library storage kind/capacity.
@@ -147,6 +145,14 @@ from the environment or standard input, never as a command-line value, and is no
 request errors. A saved key is currently plaintext in the user's config directory (mode `0600` on Unix;
 on Windows it inherits the user-profile directory ACL); OS-keystore encryption is not implemented yet.
 
+To scan offline after saving a key, set `STEAM_WEB_API_KEY` to one space for the scan process. This
+overrides the saved key and disables enrichment; leaving the variable unset uses the saved key. For
+example, in a POSIX shell:
+
+```bash
+STEAM_WEB_API_KEY=' ' dotnet run --project src/Shelfbound.Cli -- scan --pretty
+```
+
 This enrichment is useful but not complete. Shelfbound labels its evidence honestly:
 
 | Scope | Meaning |
@@ -161,11 +167,11 @@ Under either partial scope, an empty search result does **not** mean “not owne
 
 | Action | Network behavior | Data boundary |
 |---|---|---|
-| `scan` | None by default. | Writes the complete local snapshot you chose. |
-| MCP startup | None by default. With an API key configured, it may call Steam's `GetOwnedGames`. | Library facts and saved context remain local. |
+| `scan` | Calls Steam's `GetOwnedGames` when an environment or saved API key is present and a local account is found; otherwise no network request. | Writes the complete local snapshot you chose. |
+| MCP startup | When it scans without an existing snapshot, the same key rule applies; loading an existing snapshot makes no Steam request. | Library facts and saved context remain local. |
 | `setup` | No request is needed to save a key supplied through stdin/environment. | The key is kept in local config and never added to a snapshot. |
-| `upload --dry-run` | None. | Prints the exact compact hosted body and sends nothing. |
-| `upload` | Posts only after you provide a server and bearer token. | Sends the prepared whitelist projection to that configured server. |
+| `upload --dry-run` | The snapshot build may call Steam's `GetOwnedGames` under the same key rule; it sends nothing to a Shelfbound server. | Prints the exact compact hosted body. |
+| `upload` | The snapshot build may call Steam under the same key rule; it posts to a Shelfbound server only after you provide a server and bearer token. | Sends the prepared whitelist projection to that configured server. |
 
 The complete local snapshot is deliberately richer than the hosted projection and is **not**
 upload-safe by itself. The official projection:
@@ -231,8 +237,9 @@ Other repository surfaces have narrower status:
 - `decky/` is an exploratory Decky Loader prototype. It is tested off-device but has never run on a real
   Steam Deck and is not a public Deck-support claim or store release.
 
-Current releases and source identities are recorded on the
-[GitHub Releases page](https://github.com/Wolfsblvt/shelfbound-steam/releases).
+The [GitHub Releases page](https://github.com/Wolfsblvt/shelfbound-steam/releases) records the
+published library stream. Check the separate [CLI](https://www.nuget.org/packages/Shelfbound.Cli)
+and [MCP](https://www.nuget.org/packages/Shelfbound.Mcp) package pages for their tool versions.
 
 ## Architecture and repository map
 
